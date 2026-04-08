@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { normalizePhoneForDirectory } from "@/lib/phone-normalize";
+import {
+  normalizePhoneForDirectory,
+  normalizePhoneFreeform,
+} from "@/lib/phone-normalize";
+import { parseMemberSpreadsheet } from "@/lib/spreadsheet-members";
 export async function createDirectoryMember(
   _prev: { error?: string } | null,
   formData: FormData,
@@ -47,6 +51,106 @@ export async function createDirectoryMember(
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/agregar");
   redirect("/dashboard");
+}
+
+export type BulkImportResult =
+  | { error: string }
+  | {
+      ok: true;
+      created: number;
+      errors: { row: number; sheet?: string; message: string }[];
+    };
+
+const BULK_MAX_FILE_BYTES = 3 * 1024 * 1024;
+
+export async function bulkImportDirectoryMembers(
+  _prev: BulkImportResult | null,
+  formData: FormData,
+): Promise<BulkImportResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "No autorizado" };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return {
+      error:
+        "Selecciona un archivo: Excel (.xlsx, .xls), CSV o TSV (exportación desde Google Sheets)",
+    };
+  }
+
+  const lower = file.name.toLowerCase();
+  const allowed =
+    lower.endsWith(".xlsx") ||
+    lower.endsWith(".xls") ||
+    lower.endsWith(".csv") ||
+    lower.endsWith(".tsv");
+  if (!allowed) {
+    return {
+      error:
+        "Formatos admitidos: .xlsx, .xls, .csv, .tsv (en Sheets: Archivo → Descargar → Excel o Valores separados por comas)",
+    };
+  }
+  if (file.size > BULK_MAX_FILE_BYTES) {
+    return { error: "Archivo demasiado grande (máximo 3 MB)" };
+  }
+
+  let rows: ReturnType<typeof parseMemberSpreadsheet>;
+  try {
+    const buf = Buffer.from(await file.arrayBuffer());
+    rows = parseMemberSpreadsheet(buf, file.name);
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+
+  if (rows.length === 0) {
+    return { error: "No hay filas de datos (además de la cabecera)" };
+  }
+
+  const errors: { row: number; sheet?: string; message: string }[] = [];
+  let created = 0;
+
+  for (const row of rows) {
+    const loc = { row: row.rowNumber, sheet: row.sheetName };
+    if (!row.gamertag) {
+      errors.push({ ...loc, message: "Falta gamertag" });
+      continue;
+    }
+    if (!row.telefono) {
+      errors.push({ ...loc, message: "Falta teléfono" });
+      continue;
+    }
+
+    const phoneResult = normalizePhoneFreeform(row.telefono, row.pais);
+    if (!phoneResult.ok) {
+      errors.push({ ...loc, message: phoneResult.error });
+      continue;
+    }
+
+    try {
+      await prisma.directoryMember.create({
+        data: {
+          gamertag: row.gamertag,
+          phone: phoneResult.phone,
+          phoneCountry: phoneResult.phoneCountry,
+          active: row.seSalio ? false : row.activo,
+          leftAt: row.seSalio ? new Date() : null,
+          isAdmin: row.admin,
+          banExempt: row.protegido,
+          notes: row.notas,
+          userId: session.user.id,
+        },
+      });
+      created++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error al guardar";
+      errors.push({ ...loc, message: msg });
+    }
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/agregar");
+
+  return { ok: true, created, errors };
 }
 
 export async function deleteDirectoryMember(id: string) {

@@ -66,3 +66,60 @@ export function normalizePhoneForDirectory(
     phoneCountry: upper,
   };
 }
+
+/**
+ * Celda de Excel: si empieza por + se interpreta como internacional; si no,
+ * hace falta `pais` (ISO2) como en el formulario manual.
+ */
+export function normalizePhoneFreeform(
+  telefonoRaw: string,
+  paisFallback?: string,
+):
+  | { ok: true; phone: string; phoneCountry: string | null }
+  | { ok: false; error: string } {
+  const t = telefonoRaw.trim();
+  if (!t) return { ok: false, error: "Teléfono vacío" };
+
+  if (t.startsWith("+")) {
+    const parsed = parsePhoneNumberFromString(t);
+    if (parsed) {
+      try {
+        if (parsed.isValid() || parsed.isPossible()) {
+          return {
+            ok: true,
+            phone: parsed.formatInternational(),
+            phoneCountry: parsed.country ?? null,
+          };
+        }
+      } catch {
+        /* continuar */
+      }
+    }
+    const digitsOnly = t.replace(/\D/g, "");
+    if (digitsOnly.length >= 8 && digitsOnly.length <= 15) {
+      return {
+        ok: true,
+        phone: `+${digitsOnly}`,
+        phoneCountry: parsed?.country ?? null,
+      };
+    }
+    return { ok: false, error: "Teléfono con + no reconocido" };
+  }
+
+  const pais = (paisFallback ?? "").trim().toUpperCase();
+  const inner = normalizePhoneForDirectory(pais, t);
+  if (!inner.ok) {
+    return {
+      ok: false,
+      error:
+        inner.error === "Elige un país con prefijo"
+          ? "Sin + en teléfono: rellena la columna pais (ej. MX)"
+          : inner.error,
+    };
+  }
+  return {
+    ok: true,
+    phone: inner.phone,
+    phoneCountry: inner.phoneCountry,
+  };
+}

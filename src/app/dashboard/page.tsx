@@ -1,10 +1,12 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { DatabaseUnavailable } from "@/components/database-unavailable";
+import { DirectorySection } from "@/components/directory-section";
 import {
   directoryMemberWhere,
   parseDirectoryFilters,
 } from "@/lib/directory-query";
-import { DirectorySection } from "@/components/directory-section";
+import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import { prisma } from "@/lib/prisma";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -23,20 +25,32 @@ export default async function DashboardPage({
 
   const whereMembers = directoryMemberWhere(userId, filters);
 
-  const [membersRaw, countryRows] = await Promise.all([
-    prisma.directoryMember.findMany({
-      where: whereMembers,
-      include: {
-        strikes: { orderBy: { createdAt: "desc" } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.directoryMember.findMany({
-      where: { userId, phoneCountry: { not: null } },
-      select: { phoneCountry: true },
-      distinct: ["phoneCountry"],
-    }),
-  ]);
+  let membersRaw: Awaited<
+    ReturnType<typeof prisma.directoryMember.findMany<{ include: { strikes: true } }>>
+  >;
+  let countryRows: { phoneCountry: string | null }[];
+
+  try {
+    [membersRaw, countryRows] = await Promise.all([
+      prisma.directoryMember.findMany({
+        where: whereMembers,
+        include: {
+          strikes: { orderBy: { createdAt: "desc" } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.directoryMember.findMany({
+        where: { userId, phoneCountry: { not: null } },
+        select: { phoneCountry: true },
+        distinct: ["phoneCountry"],
+      }),
+    ]);
+  } catch (e) {
+    if (isDatabaseUnreachableError(e)) {
+      return <DatabaseUnavailable />;
+    }
+    throw e;
+  }
 
   const countryCodes = countryRows
     .map((r) => r.phoneCountry)
