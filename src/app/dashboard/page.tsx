@@ -19,7 +19,16 @@ export default async function DashboardPage({
 }) {
   const session = await auth();
   if (!session?.user) return null;
-  const userId = await resolveDirectoryUserId(session);
+
+  let userId: string | null;
+  try {
+    userId = await resolveDirectoryUserId(session);
+  } catch (e) {
+    if (isDatabaseUnreachableError(e)) {
+      return <DatabaseUnavailable />;
+    }
+    throw e;
+  }
   if (!userId) return null;
 
   const sp = await searchParams;

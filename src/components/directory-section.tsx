@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import type { DirectoryUrlFilters } from "@/lib/directory-query";
 import type { DirectoryMemberDTO } from "@/types/directory";
@@ -63,7 +64,13 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
 
   return (
     <>
-      <DirectoryFilters filters={filters} countryCodes={countryCodes} />
+      <Suspense
+        fallback={
+          <div className="mb-4 h-24 animate-pulse rounded-xl border border-zinc-200 bg-zinc-100/80 dark:border-zinc-800 dark:bg-zinc-900/50" />
+        }
+      >
+        <DirectoryFilters filters={filters} countryCodes={countryCodes} />
+      </Suspense>
 
       {members.length === 0 ? (
         <p className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">

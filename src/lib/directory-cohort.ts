@@ -1,5 +1,5 @@
-/** Miembros con createdAt >= ahora - esto cuentan como "nuevos" en filtros y badges. */
-export const DIRECTORY_NEW_MEMBER_DAYS = 30;
+/** Miembros con alta en los últimos N días cuentan como «nuevos» en filtros y badges (p. ej. primera semana). */
+export const DIRECTORY_NEW_MEMBER_DAYS = 7;
 
 /** Alta reciente y aún en comunidad (no marcó salida). */
 export function memberIsNew(

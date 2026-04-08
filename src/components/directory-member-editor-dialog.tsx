@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   addDirectoryStrike,
   deleteDirectoryMember,
@@ -11,6 +11,7 @@ import {
   toggleDirectoryMemberIsAdmin,
   updateDirectoryMemberNotes,
 } from "@/app/dashboard/actions";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
@@ -31,7 +32,13 @@ type Props = {
 
 export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
   const [pending, startTransition] = useTransition();
+  const [confirm, setConfirm] = useState<"delete" | "left" | null>(null);
+  const confirmRef = useRef(confirm);
   const country = regionLabel(m.phoneCountry);
+
+  useEffect(() => {
+    confirmRef.current = confirm;
+  }, [confirm]);
 
   useEffect(() => {
     if (!open) return;
@@ -45,17 +52,29 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      if (confirmRef.current) {
+        setConfirm(null);
+        return;
+      }
+      onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  function onDelete() {
-    if (!confirm("¿Eliminar esta persona de la lista?")) return;
+  function runDelete() {
+    setConfirm(null);
     startTransition(async () => {
       await deleteDirectoryMember(m.id);
       onClose();
+    });
+  }
+
+  function runMarkLeft() {
+    setConfirm(null);
+    startTransition(async () => {
+      await setDirectoryMemberLeft(m.id, true);
     });
   }
 
@@ -303,17 +322,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => {
-                    if (
-                      !confirm(
-                        "¿Marcar que esta persona se salió de la comunidad?",
-                      )
-                    )
-                      return;
-                    startTransition(async () => {
-                      await setDirectoryMemberLeft(m.id, true);
-                    });
-                  }}
+                  onClick={() => setConfirm("left")}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-900/60 sm:w-auto sm:min-w-[12rem]"
                 >
                   Se salió
@@ -330,7 +339,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
               <button
                 type="button"
                 disabled={pending}
-                onClick={onDelete}
+                onClick={() => setConfirm("delete")}
                 className="w-full rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-left text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200 dark:hover:bg-red-950/50 sm:w-auto sm:min-w-[12rem]"
               >
                 Eliminar
@@ -339,6 +348,27 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirm === "delete"}
+        title="Eliminar persona"
+        message="¿Eliminar esta persona de la lista? No se puede deshacer."
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        onConfirm={runDelete}
+        onCancel={() => setConfirm(null)}
+      />
+      <ConfirmDialog
+        open={confirm === "left"}
+        title="Salida de la comunidad"
+        message="¿Marcar que esta persona se salió de la comunidad?"
+        confirmLabel="Sí, marcar salida"
+        cancelLabel="Cancelar"
+        variant="neutral"
+        onConfirm={runMarkLeft}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

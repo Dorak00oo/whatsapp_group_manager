@@ -16,6 +16,18 @@ export type DirectoryUrlFilters = {
   banned: "all" | "only";
 };
 
+/** Serializa filtros a query string (inverso coherente de `parseDirectoryFilters`). */
+export function filtersToSearchParams(f: DirectoryUrlFilters): URLSearchParams {
+  const p = new URLSearchParams();
+  if (f.cohort !== "all") p.set("cohort", f.cohort);
+  if (f.status !== "all") p.set("status", f.status);
+  if (f.view === "single") p.set("view", "single");
+  if (f.country) p.set("country", f.country);
+  if (f.q) p.set("q", f.q);
+  if (f.banned === "only") p.set("banned", "only");
+  return p;
+}
+
 export function parseDirectoryFilters(
   raw: Record<string, string | string[] | undefined>,
 ): DirectoryUrlFilters {
@@ -37,7 +49,7 @@ export function parseDirectoryFilters(
         : status === "inactive"
           ? "inactive"
           : "all",
-    view: view === "split" ? "split" : "single",
+    view: view === "single" ? "single" : "split",
     cohort,
     country: country.length === 2 ? country : "",
     q,
