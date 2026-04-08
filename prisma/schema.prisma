@@ -1,0 +1,54 @@
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String            @id @default(cuid())
+  email            String            @unique
+  name             String?
+  passwordHash     String            @map("password_hash")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  directoryMembers DirectoryMember[]
+
+  @@map("users")
+}
+
+model DirectoryMember {
+  id           String            @id @default(cuid())
+  gamertag     String
+  phone        String
+  phoneCountry String?           @map("phone_country")
+  active       Boolean           @default(true) @map("is_active")
+  isAdmin      Boolean           @default(false) @map("is_admin")
+  banExempt    Boolean           @default(false) @map("ban_exempt")
+  leftAt       DateTime?         @map("left_at")
+  banned       Boolean           @default(false) @map("banned")
+  bannedReason String?           @map("banned_reason")
+  notes        String?
+  userId       String            @map("user_id")
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strikes      DirectoryStrike[]
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@map("directory_members")
+}
+
+model DirectoryStrike {
+  id        String          @id @default(cuid())
+  reason    String
+  memberId  String          @map("member_id")
+  member    DirectoryMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  @@index([memberId])
+  @@map("directory_strikes")
+}
