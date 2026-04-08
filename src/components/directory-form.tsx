@@ -23,25 +23,27 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
       className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
     >
       <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-        Agregar persona (gamertag + celular)
+        Agregar persona (nick de Minecraft + celular)
       </h2>
       <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-        Gamertag <span className="font-normal text-zinc-500">(principal)</span>
+        Nick de Minecraft{" "}
+        <span className="font-normal text-zinc-500">(principal)</span>
         <input
           name="gamertag"
           required
           autoComplete="nickname"
-          placeholder="Ej. siabix, PlayerPro123"
+          placeholder="Ej. CabraTNT, minero_feliz"
           className={inputClass}
         />
       </label>
       <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-        Nombre <span className="font-normal text-zinc-500">(opcional)</span>
+        Nombre en WhatsApp{" "}
+        <span className="font-normal text-zinc-500">(opcional)</span>
         <input
           name="displayName"
           type="text"
           autoComplete="name"
-          placeholder="Ej. Chivis, como en la hoja «nombres»"
+          placeholder="Ej. Toño papá, María del salón 3B"
           className={inputClass}
         />
       </label>
