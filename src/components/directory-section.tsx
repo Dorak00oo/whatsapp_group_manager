@@ -34,7 +34,7 @@ function MemberList({
 }) {
   if (members.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700">
+      <p className="rounded-[1.75rem] border border-dashed border-zinc-300/90 bg-zinc-50/80 p-6 text-center text-sm text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900/30 dark:text-zinc-400">
         {empty}
       </p>
     );
@@ -66,27 +66,34 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
     <>
       <Suspense
         fallback={
-          <div className="mb-4 h-24 animate-pulse rounded-xl border border-zinc-200 bg-zinc-100/80 dark:border-zinc-800 dark:bg-zinc-900/50" />
+          <div className="mb-4 h-24 animate-pulse rounded-[1.75rem] bg-zinc-100 ring-1 ring-zinc-200/80 dark:bg-zinc-800/50 dark:ring-zinc-700/50" />
         }
       >
         <DirectoryFilters filters={filters} countryCodes={countryCodes} />
       </Suspense>
 
       {members.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-zinc-700">
-          No hay personas con estos filtros. Cambia los filtros o{" "}
+        <p className="rounded-[1.75rem] border border-dashed border-zinc-300/90 bg-zinc-50/80 p-8 text-center text-sm text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900/30 dark:text-zinc-400">
+          No hay personas con estos filtros. Cambia los filtros,{" "}
           <Link
             href="/dashboard/agregar"
-            className="font-medium text-emerald-600 underline-offset-2 hover:underline dark:text-emerald-400"
+            className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-100"
           >
             agrega una persona
+          </Link>{" "}
+          o{" "}
+          <Link
+            href="/dashboard/importar"
+            className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-100"
+          >
+            importa / pega log
           </Link>
           .
         </p>
       ) : showSplit ? (
         <div className="grid gap-8 lg:grid-cols-3">
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            <h3 className="mb-3 rounded-xl border-l-4 border-l-green-500 bg-green-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(34,197,94,0.35)] ring-1 ring-green-200/90 dark:border-l-green-700 dark:bg-green-950/70 dark:text-zinc-100 dark:ring-green-900/60 dark:shadow-[0_0_22px_-8px_rgba(22,163,74,0.12)]">
               Los que estuvieron activos ({activeRoster.length})
             </h3>
             <MemberList
@@ -95,7 +102,7 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
             />
           </div>
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            <h3 className="mb-3 rounded-xl border-l-4 border-l-sky-500 bg-sky-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(14,165,233,0.34)] ring-1 ring-sky-200/90 dark:border-l-sky-700 dark:bg-sky-950/70 dark:text-zinc-100 dark:ring-sky-900/60 dark:shadow-[0_0_22px_-8px_rgba(3,105,161,0.12)]">
               Los inactivos ({inactiveRoster.length})
             </h3>
             <MemberList
@@ -104,7 +111,7 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
             />
           </div>
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+            <h3 className="mb-3 rounded-xl border-l-4 border-l-violet-500 bg-violet-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(139,92,246,0.38)] ring-1 ring-violet-200/90 dark:border-l-violet-700 dark:bg-violet-950/70 dark:text-zinc-100 dark:ring-violet-900/60 dark:shadow-[0_0_22px_-8px_rgba(91,33,182,0.14)]">
               Los que se salieron ({leftCommunity.length})
             </h3>
             <MemberList

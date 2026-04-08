@@ -1,8 +1,20 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fbf9f7;
+  --foreground: #1a1a1a;
+  --surface: #f5f0eb;
+  color-scheme: light;
+}
+
+html.dark {
+  --background: #050506;
+  --foreground: #e8e8ec;
+  --surface: #0c0c0f;
+  background-color: var(--background);
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -11,17 +23,196 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas,
     monospace;
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Zinc: neutros cálidos (crema / carbón) */
+  --color-zinc-50: #fbf9f7;
+  --color-zinc-100: #f5f0eb;
+  --color-zinc-200: #ebe4dc;
+  --color-zinc-300: #d9cfc3;
+  --color-zinc-400: #a89b8f;
+  --color-zinc-500: #7d7167;
+  --color-zinc-600: #5c534c;
+  --color-zinc-700: #453e38;
+  --color-zinc-800: #2e2a26;
+  --color-zinc-900: #1a1a1a;
+  --color-zinc-950: #141210;
+
+  /* Esmeralda: menta (filtros / notas; distinto del verde roster) */
+  --color-emerald-50: #f0fdf8;
+  --color-emerald-100: #d6f5eb;
+  --color-emerald-200: #b0e8d4;
+  --color-emerald-300: #7dd4b8;
+  --color-emerald-400: #45b894;
+  --color-emerald-500: #1f9b78;
+  --color-emerald-600: #167d62;
+  --color-emerald-700: #15634f;
+  --color-emerald-800: #145042;
+  --color-emerald-900: #124236;
+  --color-emerald-950: #052e24;
+
+  /* Verde roster: más “verde puro”, pastel con margen para acentos neón */
+  --color-green-50: #f0fdf4;
+  --color-green-100: #d2f9dc;
+  --color-green-200: #a8f0bb;
+  --color-green-300: #6ee096;
+  --color-green-400: #3dd174;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
+  --color-green-700: #15803d;
+  --color-green-800: #166534;
+  --color-green-900: #14532d;
+  --color-green-950: #052e16;
+
+  /* Azul cielo: inactivos en comunidad (pastel + acento vivo) */
+  --color-sky-50: #f0f9ff;
+  --color-sky-100: #dff2fe;
+  --color-sky-200: #b8e6fd;
+  --color-sky-300: #7ad3fb;
+  --color-sky-400: #38bdf8;
+  --color-sky-500: #0ea5e9;
+  --color-sky-600: #0284c7;
+  --color-sky-700: #0369a1;
+  --color-sky-800: #075985;
+  --color-sky-900: #0c4a6e;
+  --color-sky-950: #082f49;
+
+  --color-slate-50: #f6f5f3;
+  --color-slate-100: #ebe8e4;
+  --color-slate-200: #d9d4cd;
+  --color-slate-300: #c0b8ae;
+  --color-slate-400: #9a9085;
+  --color-slate-500: #7a7168;
+  --color-slate-600: #625a52;
+  --color-slate-700: #4f4842;
+  --color-slate-800: #3f3a35;
+  --color-slate-900: #2e2b28;
+  --color-slate-950: #1a1816;
+
+  /* Ámbar / melocotón suave */
+  --color-amber-50: #fffbf5;
+  --color-amber-100: #feead3;
+  --color-amber-200: #fdd9b0;
+  --color-amber-300: #f8c078;
+  --color-amber-400: #f0a040;
+  --color-amber-500: #e08520;
+  --color-amber-600: #c26a16;
+  --color-amber-700: #9f5414;
+  --color-amber-800: #824419;
+  --color-amber-900: #6c3818;
+  --color-amber-950: #3d1c09;
+
+  /* Rosa / rojo pastel */
+  --color-red-50: #fff5f5;
+  --color-red-100: #fce8e8;
+  --color-red-200: #f8d7da;
+  --color-red-300: #f3b8bd;
+  --color-red-400: #ea8690;
+  --color-red-500: #d85568;
+  --color-red-600: #c4354f;
+  --color-red-700: #a62a42;
+  --color-red-800: #8b263d;
+  --color-red-900: #77263a;
+  --color-red-950: #42101d;
+
+  /* Violeta / morado “se salieron”: lavanda pastel + tronco más vivo para neón suave */
+  --color-violet-50: #faf8ff;
+  --color-violet-100: #ddd6ff;
+  --color-violet-200: #c4b5fc;
+  --color-violet-300: #a78bfa;
+  --color-violet-400: #8b5cf6;
+  --color-violet-500: #7c3aed;
+  --color-violet-600: #6d28d9;
+  --color-violet-700: #5b21b6;
+  --color-violet-800: #4c1d95;
+  --color-violet-900: #3b0764;
+  --color-violet-950: #2e1065;
+
+  --color-cyan-50: #f0fbfd;
+  --color-cyan-100: #daf4f8;
+  --color-cyan-200: #b5e8f0;
+  --color-cyan-300: #84d5e4;
+  --color-cyan-400: #4db8d0;
+  --color-cyan-500: #289bb5;
+  --color-cyan-600: #1f7d96;
+  --color-cyan-700: #1d657a;
+  --color-cyan-800: #1d5465;
+  --color-cyan-900: #1c4655;
+  --color-cyan-950: #0d2e3a;
+
+  --color-rose-50: #fff6f7;
+  --color-rose-100: #fce8ec;
+  --color-rose-200: #f8d7da;
+  --color-rose-300: #f3b8c4;
+  --color-rose-400: #ea869e;
+  --color-rose-500: #d85578;
+  --color-rose-600: #c4355f;
+  --color-rose-700: #a62a52;
+  --color-rose-800: #8b2649;
+  --color-rose-900: #772644;
+  --color-rose-950: #42101f;
+
+  --color-teal-50: #f0fdfa;
+  --color-teal-100: #ccfbf1;
+  --color-teal-200: #99f6e0;
+  --color-teal-300: #5eead4;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #14b8a6;
+  --color-teal-600: #0d9488;
+  --color-teal-700: #0f766e;
+  --color-teal-800: #115e59;
+  --color-teal-900: #134e4a;
+  --color-teal-950: #042f2e;
+
+  --color-lime-50: #f7fee7;
+  --color-lime-100: #ecfccb;
+  --color-lime-200: #d9f99d;
+  --color-lime-300: #bef264;
+  --color-lime-400: #a3e635;
+  --color-lime-500: #84cc16;
+  --color-lime-600: #65a30d;
+  --color-lime-700: #4d7c0f;
+  --color-lime-800: #3f6212;
+  --color-lime-900: #365314;
+  --color-lime-950: #1a2e05;
+
+  --color-fuchsia-50: #fdf7ff;
+  --color-fuchsia-100: #f3e8ff;
+  --color-fuchsia-200: #e9d5ff;
+  --color-fuchsia-300: #dab4ff;
+  --color-fuchsia-400: #c585fc;
+  --color-fuchsia-500: #ad56f8;
+  --color-fuchsia-600: #963aea;
+  --color-fuchsia-700: #7e2cc8;
+  --color-fuchsia-800: #6a26a3;
+  --color-fuchsia-900: #572183;
+  --color-fuchsia-950: #3b0d5c;
+
+  --color-black: #1a1a1a;
+  --color-white: #fffefb;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+html.dark::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 100% 65% at 70% -15%,
+    rgba(124, 58, 237, 0.035),
+    transparent 52%
+  );
+}
+
+html.dark body {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: var(--foreground);
 }

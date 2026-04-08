@@ -40,14 +40,20 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
   const country = regionLabel(m.phoneCountry);
   const initial = (m.gamertag.trim().charAt(0) || "?").toUpperCase();
 
-  const accent =
-    m.banned
-      ? "from-red-500 to-rose-600"
-      : m.leftAt
-        ? "from-slate-400 to-slate-500"
-        : m.active
-          ? "from-emerald-500 to-teal-600"
-          : "from-zinc-400 to-zinc-500";
+  const neonGreen =
+    "border-l-4 border-l-green-500 shadow-[0_0_22px_-8px_rgba(34,197,94,0.38)] dark:border-l-green-700 dark:shadow-[0_0_26px_-10px_rgba(22,163,74,0.12)]";
+  const neonSky =
+    "border-l-4 border-l-sky-500 shadow-[0_0_22px_-8px_rgba(14,165,233,0.36)] dark:border-l-sky-700 dark:shadow-[0_0_26px_-10px_rgba(3,105,161,0.12)]";
+  const neonViolet =
+    "border-l-4 border-l-violet-500 shadow-[0_0_24px_-8px_rgba(139,92,246,0.42)] dark:border-l-violet-700 dark:shadow-[0_0_26px_-10px_rgba(91,33,182,0.14)]";
+
+  const surface = m.banned
+    ? "bg-rose-100 ring-rose-200/90 dark:bg-rose-950/45 dark:ring-rose-900/50"
+    : m.leftAt
+      ? `bg-violet-100 ring-violet-200/90 dark:bg-violet-950/70 dark:ring-violet-900/60 ${neonViolet}`
+      : m.active
+        ? `bg-green-100 ring-green-200/90 dark:bg-green-950/70 dark:ring-green-900/60 ${neonGreen}`
+        : `bg-sky-100 ring-sky-200/90 dark:bg-sky-950/70 dark:ring-sky-900/60 ${neonSky}`;
 
   function openEditor() {
     setFormKey((k) => k + 1);
@@ -57,23 +63,11 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
   return (
     <li className="list-none">
       <div
-        className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br from-white via-white to-zinc-50/90 shadow-sm transition-[box-shadow,transform] duration-200 hover:shadow-md hover:shadow-zinc-200/60 dark:from-zinc-950 dark:via-zinc-950 dark:to-zinc-900/90 dark:hover:shadow-black/40 ${
-          m.banned
-            ? "border-red-200/90 dark:border-red-900/60"
-            : m.leftAt
-              ? "border-slate-300/80 dark:border-slate-600"
-              : m.active
-                ? "border-emerald-200/70 dark:border-emerald-900/40"
-                : "border-zinc-200/90 opacity-95 dark:border-zinc-700/80"
-        }`}
+        className={`group relative overflow-hidden rounded-[1.75rem] p-4 pl-5 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200/60 transition-[box-shadow,transform] duration-200 hover:scale-[1.005] hover:shadow-md dark:shadow-none dark:ring-zinc-800/65 ${surface}`}
       >
-        <div
-          className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${accent}`}
-          aria-hidden
-        />
-        <div className="flex gap-3 p-3 pl-4 sm:gap-4 sm:p-4 sm:pl-5">
+        <div className="flex gap-3 sm:gap-4">
           <div
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-bold text-white shadow-inner ${accent}`}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-zinc-900 text-base font-bold text-white dark:bg-zinc-100 dark:text-zinc-900"
             aria-hidden
           >
             {initial}
@@ -89,18 +83,18 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
                   <button
                     type="button"
                     onClick={openEditor}
-                    className="inline-flex items-center justify-center rounded-lg border border-zinc-200/90 bg-white p-1.5 text-zinc-500 shadow-sm transition-colors hover:border-emerald-300/80 hover:text-emerald-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:border-emerald-700 dark:hover:text-emerald-400"
+                    className="inline-flex items-center justify-center rounded-xl bg-white/90 p-1.5 text-zinc-700 ring-1 ring-zinc-200/90 transition-colors hover:bg-white dark:bg-zinc-800/90 dark:text-zinc-200 dark:ring-zinc-600/60"
                     title="Editar persona"
                     aria-label={`Editar ${m.gamertag}`}
                   >
                     <PencilIcon />
                   </button>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900 dark:bg-amber-950/80 dark:text-amber-200">
+                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-zinc-900 ring-1 ring-amber-300/80 dark:bg-amber-900/50 dark:text-amber-100 dark:ring-amber-700/50">
                     {m.strikes.length} strike{m.strikes.length === 1 ? "" : "s"}
                   </span>
                 </div>
                 {m.displayName ? (
-                  <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
                     {m.displayName.trim()}
                   </p>
                 ) : null}
@@ -109,16 +103,16 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
 
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               {country ? (
-                <span className="text-zinc-500 dark:text-zinc-400">{country}</span>
+                <span className="text-zinc-600 dark:text-zinc-400">{country}</span>
               ) : null}
               <a
                 href={`tel:${m.phone.replace(/\s/g, "")}`}
-                className="font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                className="font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
               >
                 {m.phone}
               </a>
               <time
-                className="text-xs text-zinc-400 dark:text-zinc-500"
+                className="text-xs text-zinc-500 dark:text-zinc-500"
                 dateTime={m.createdAt}
                 suppressHydrationWarning
               >
@@ -129,13 +123,13 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
             <DirectoryMemberRoleChips m={m} compact />
 
             {m.banned && m.bannedReason ? (
-              <p className="mt-2 line-clamp-2 text-xs text-red-600 dark:text-red-400">
+              <p className="mt-2 line-clamp-2 text-xs text-red-700 dark:text-red-400">
                 <span className="font-medium">Ban:</span> {m.bannedReason}
               </p>
             ) : null}
 
             {m.leftAt && !m.banned ? (
-              <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+              <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
                 Salida{" "}
                 <time dateTime={m.leftAt} suppressHydrationWarning>
                   {new Date(m.leftAt).toLocaleDateString("es")}
@@ -145,7 +139,7 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
 
             {m.notes ? (
               <p
-                className="mt-2 line-clamp-2 border-l-2 border-zinc-200 pl-2 text-xs text-zinc-500 dark:border-zinc-600 dark:text-zinc-400"
+                className="mt-2 line-clamp-2 border-l-2 border-zinc-300/80 pl-2 text-xs text-zinc-600 dark:border-zinc-600 dark:text-zinc-400"
                 title={m.notes}
               >
                 {m.notes}

@@ -12,21 +12,21 @@ export function DirectoryFormSituation() {
   const [left, setLeft] = useState(false);
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white/80 px-3 py-3 dark:border-zinc-700 dark:bg-zinc-950/50">
-      <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+    <div className="flex flex-col gap-3 rounded-2xl bg-cyan-100 p-4 ring-1 ring-cyan-200/90 dark:bg-cyan-950/30 dark:ring-cyan-800/45">
+      <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
         Situación en la comunidad
       </p>
 
-      <div className="flex flex-col gap-2 rounded-lg border border-lime-200/80 bg-lime-50/50 px-3 py-2 dark:border-lime-900/50 dark:bg-lime-950/20">
+      <div className="flex flex-col gap-2 rounded-2xl bg-lime-100 px-3 py-2.5 ring-1 ring-lime-200/90 dark:bg-lime-950/35 dark:ring-lime-800/40">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-medium text-lime-950 dark:text-lime-100">
+          <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
             Los nuevos
           </span>
-          <span className="rounded-full bg-lime-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+          <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white dark:bg-zinc-100 dark:text-zinc-900">
             Sí, automático
           </span>
         </div>
-        <p className="text-[11px] leading-snug text-lime-900/90 dark:text-lime-200/90">
+        <p className="text-[11px] leading-snug text-zinc-600 dark:text-zinc-400">
           Los primeros {DIRECTORY_NEW_MEMBER_DAYS} días tras guardar contará en el
           filtro y en la ficha como «Los nuevos».
         </p>
@@ -55,12 +55,12 @@ export function DirectoryFormSituation() {
       />
 
       {!left ? (
-        <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-500">
+        <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
           Si lo apagas, la persona queda en «Los inactivos» (sigue en la lista,
           sin participar).
         </p>
       ) : (
-        <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-500">
+        <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
           Con «Los que se salieron» activo no aplica roster ni inactivos: queda
           registrada la salida.
         </p>

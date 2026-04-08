@@ -8,10 +8,12 @@ import {
   normalizePhoneForDirectory,
   normalizePhoneFreeform,
 } from "@/lib/phone-normalize";
+import { parseGamertagsFromInactiveLog } from "@/lib/minecraft-inactive-log";
 import {
   isMissingDisplayNameColumnError,
   MISSING_DISPLAY_NAME_COLUMN_MESSAGE,
 } from "@/lib/prisma-migration-hints";
+import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import { parseMemberSpreadsheet } from "@/lib/spreadsheet-members";
 
@@ -175,6 +177,7 @@ export async function bulkImportDirectoryMembers(
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/agregar");
+  revalidatePath("/dashboard/importar");
 
   return { ok: true, created, errors };
 }
@@ -345,4 +348,123 @@ export async function setDirectoryMemberLeft(id: string, left: boolean) {
   });
 
   revalidatePath("/dashboard");
+}
+
+const MINECRAFT_LOG_MAX_CHARS = 400_000;
+
+export type InactiveLogResult =
+  | { error: string }
+  | {
+      ok: true;
+      parsed: number;
+      updated: number;
+      alreadyInactive: number;
+      skippedLeft: number;
+      notFound: string[];
+    };
+
+/**
+ * Solo afecta a miembros activos en comunidad (roster): active=true y sin salida.
+ * Quienes ya se salieron o ya estaban inactivos no cambian de columna.
+ */
+export async function bulkMarkInactiveFromMinecraftLog(
+  _prev: InactiveLogResult | null,
+  formData: FormData,
+): Promise<InactiveLogResult> {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado" };
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return { error: STALE_SESSION_ERROR };
+
+  const raw = String(formData.get("log") ?? "");
+  if (raw.length > MINECRAFT_LOG_MAX_CHARS) {
+    return {
+      error: `Texto demasiado largo (máximo ${MINECRAFT_LOG_MAX_CHARS} caracteres)`,
+    };
+  }
+
+  const gamertags = parseGamertagsFromInactiveLog(raw);
+  if (gamertags.length === 0) {
+    return {
+      error:
+        "No se detectaron líneas con [INACTIVO] … última conexión. Pega el log tal cual lo genera el servidor.",
+    };
+  }
+
+  try {
+    const members = await prisma.directoryMember.findMany({
+      where: {
+        userId,
+        OR: gamertags.map((g) => ({
+          gamertag: { equals: g, mode: "insensitive" as const },
+        })),
+      },
+      select: { id: true, gamertag: true, active: true, leftAt: true },
+    });
+
+    const byTagLower = new Map<string, typeof members>();
+    for (const row of members) {
+      const k = row.gamertag.toLowerCase();
+      const arr = byTagLower.get(k);
+      if (arr) arr.push(row);
+      else byTagLower.set(k, [row]);
+    }
+
+    const matchedLogTags = new Set<string>();
+    const idsToDeactivate = new Set<string>();
+    let alreadyInactive = 0;
+    let skippedLeft = 0;
+
+    for (const g of gamertags) {
+      const list = byTagLower.get(g.toLowerCase());
+      if (!list?.length) continue;
+      matchedLogTags.add(g.toLowerCase());
+      for (const row of list) {
+        if (row.leftAt != null) {
+          skippedLeft++;
+          continue;
+        }
+        if (!row.active) {
+          alreadyInactive++;
+          continue;
+        }
+        idsToDeactivate.add(row.id);
+      }
+    }
+
+    if (idsToDeactivate.size > 0) {
+      await prisma.directoryMember.updateMany({
+        where: {
+          id: { in: [...idsToDeactivate] },
+          userId,
+          active: true,
+          leftAt: null,
+        },
+        data: { active: false },
+      });
+    }
+
+    const notFound = gamertags.filter((g) => !matchedLogTags.has(g.toLowerCase()));
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/agregar");
+    revalidatePath("/dashboard/importar");
+
+    return {
+      ok: true,
+      parsed: gamertags.length,
+      updated: idsToDeactivate.size,
+      alreadyInactive,
+      skippedLeft,
+      notFound,
+    };
+  } catch (e) {
+    if (isDatabaseUnreachableError(e)) {
+      return {
+        error:
+          "No hay conexión con la base de datos. Revisa Neon o la red e inténtalo de nuevo.",
+      };
+    }
+    throw e;
+  }
 }

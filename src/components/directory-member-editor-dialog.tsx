@@ -98,7 +98,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
         role="dialog"
         aria-modal
         aria-labelledby={`member-edit-title-${m.id}`}
-        className="relative z-10 flex max-h-[min(90vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-[0_24px_80px_-12px_rgba(0,0,0,0.25)] dark:border-zinc-700/80 dark:bg-zinc-950 dark:shadow-[0_24px_80px_-12px_rgba(0,0,0,0.5)]"
+        className="relative z-10 flex max-h-[min(90vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200/90 dark:bg-zinc-900 dark:shadow-none dark:ring-zinc-700/60"
       >
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800 sm:px-5 sm:py-4">
           <div className="min-w-0">
@@ -117,7 +117,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
               {country ? `${country} · ` : null}
               <a
                 href={`tel:${m.phone.replace(/\s/g, "")}`}
-                className="font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+                className="font-medium text-zinc-800 hover:underline dark:text-zinc-200"
               >
                 {m.phone}
               </a>

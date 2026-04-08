@@ -1,7 +1,8 @@
 import { memberIsNew } from "@/lib/directory-cohort";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
-const base = "rounded-full px-2 py-0.5 text-xs font-medium";
+const base =
+  "rounded-full border-0 px-2.5 py-0.5 text-xs font-medium ring-1 ring-zinc-900/10 dark:ring-white/10";
 
 type Props = { m: DirectoryMemberDTO; compact?: boolean };
 
@@ -20,7 +21,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       key: "admin",
       label: "Admin",
       short: "Admin",
-      className: `${base} bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-200`,
+      className: `${base} bg-fuchsia-200 text-fuchsia-950 ring-fuchsia-400/85 shadow-[0_0_12px_-4px_rgba(217,70,239,0.35)] dark:bg-fuchsia-950/75 dark:text-fuchsia-200 dark:ring-fuchsia-700/65 dark:shadow-[0_0_12px_-4px_rgba(162,28,175,0.16)]`,
     });
   }
   if (m.banExempt) {
@@ -28,7 +29,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       key: "protected",
       label: "Protegido (sin ban)",
       short: "Protegido",
-      className: `${base} bg-cyan-100 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-200`,
+      className: `${base} bg-cyan-200 text-cyan-950 ring-cyan-300/80 dark:bg-cyan-900/45 dark:text-cyan-100 dark:ring-cyan-700/50`,
     });
   }
   if (m.leftAt) {
@@ -36,21 +37,21 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       key: "left",
       label: "Los que se salieron",
       short: "Salió",
-      className: `${base} bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200`,
+      className: `${base} bg-violet-200 text-violet-950 ring-violet-400/90 shadow-[0_0_14px_-4px_rgba(139,92,246,0.45)] dark:bg-violet-950/80 dark:text-violet-200 dark:ring-violet-700/70 dark:shadow-[0_0_14px_-4px_rgba(91,33,182,0.2)]`,
     });
   } else if (m.active) {
     chips.push({
       key: "roster",
       label: "Los que estuvieron activos",
       short: "Activo",
-      className: `${base} bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200`,
+      className: `${base} bg-green-200 text-green-950 ring-green-400/90 shadow-[0_0_14px_-4px_rgba(34,197,94,0.4)] dark:bg-green-950/80 dark:text-green-200 dark:ring-green-700/70 dark:shadow-[0_0_14px_-4px_rgba(22,163,74,0.18)]`,
     });
   } else {
     chips.push({
       key: "inactive",
       label: "Los inactivos",
       short: "Inactivo",
-      className: `${base} bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200`,
+      className: `${base} bg-sky-200 text-sky-950 ring-sky-400/90 shadow-[0_0_14px_-4px_rgba(14,165,233,0.38)] dark:bg-sky-950/80 dark:text-sky-200 dark:ring-sky-700/70 dark:shadow-[0_0_14px_-4px_rgba(3,105,161,0.18)]`,
     });
   }
   if (isNew && !m.leftAt) {
@@ -58,7 +59,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       key: "new",
       label: "Los nuevos",
       short: "Nuevo",
-      className: `${base} bg-lime-100 text-lime-950 dark:bg-lime-950 dark:text-lime-200`,
+      className: `${base} bg-lime-200 text-lime-950 ring-lime-300/80 dark:bg-lime-900/45 dark:text-lime-100 dark:ring-lime-700/50`,
     });
   }
   if (m.banned) {
@@ -66,7 +67,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       key: "banned",
       label: "Baneado",
       short: "Ban",
-      className: `${base} bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-200`,
+      className: `${base} bg-red-200 text-red-950 ring-red-300/80 dark:bg-red-900/45 dark:text-red-100 dark:ring-red-700/50`,
     });
   }
 

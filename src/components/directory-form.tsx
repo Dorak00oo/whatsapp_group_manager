@@ -5,9 +5,14 @@ import { createDirectoryMember } from "@/app/dashboard/actions";
 import { DirectoryFormSituation } from "@/components/directory-form-situation";
 import { FormSwitch } from "@/components/form-switch";
 import type { CallingCodeOption } from "@/lib/phone-calling-codes";
-
-const inputClass =
-  "rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100";
+import {
+  softBtnPrimary,
+  softInputAmber,
+  softInputEmerald,
+  softInputRose,
+  softInputViolet,
+  softPanel,
+} from "@/lib/soft-ui";
 
 type Props = { phoneCountryOptions: CallingCodeOption[] };
 
@@ -18,36 +23,42 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
   );
 
   return (
-    <form
-      action={formAction}
-      className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
-    >
-      <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-        Agregar persona (nick de Minecraft + celular)
-      </h2>
-      <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+    <form action={formAction} className={`${softPanel} gap-3`}>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-800 dark:text-zinc-200">
+          Alta manual
+        </h2>
+      </div>
+      <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+        Nick de Minecraft + celular
+      </p>
+      <label className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
         Nick de Minecraft{" "}
-        <span className="font-normal text-zinc-500">(principal)</span>
+        <span className="font-normal text-zinc-500 dark:text-zinc-400">
+          (principal)
+        </span>
         <input
           name="gamertag"
           required
           autoComplete="nickname"
           placeholder="Ej. CabraTNT, minero_feliz"
-          className={inputClass}
+          className={softInputViolet}
         />
       </label>
-      <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+      <label className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
         Nombre en WhatsApp{" "}
-        <span className="font-normal text-zinc-500">(opcional)</span>
+        <span className="font-normal text-zinc-500 dark:text-zinc-400">
+          (opcional)
+        </span>
         <input
           name="displayName"
           type="text"
           autoComplete="name"
           placeholder="Ej. Toño papá, María del salón 3B"
-          className={inputClass}
+          className={softInputRose}
         />
       </label>
-      <div className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+      <div className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
         <span>Celular</span>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
           <label className="sr-only" htmlFor="directory-phone-country">
@@ -58,7 +69,7 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
             name="phoneCountry"
             required
             defaultValue="MX"
-            className={`${inputClass} shrink-0 sm:max-w-[min(100%,14rem)]`}
+            className={`${softInputAmber} shrink-0 sm:max-w-[min(100%,14rem)]`}
           >
             {phoneCountryOptions.map(({ iso, label }) => (
               <option key={iso} value={iso}>
@@ -73,17 +84,17 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
             required
             autoComplete="tel-national"
             placeholder="Ej. 55 1234 5678 o 55-1234-5678"
-            className={`${inputClass} min-w-0 flex-1`}
+            className={`${softInputEmerald} min-w-0 flex-1`}
           />
         </div>
-        <p className="font-normal text-zinc-500 dark:text-zinc-500">
+        <p className="font-normal text-zinc-500 dark:text-zinc-400">
           El prefijo internacional va en el desplegable; aquí el número nacional.
           Puedes usar espacios, guiones o puntos.
         </p>
       </div>
       <DirectoryFormSituation />
-      <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white/80 px-3 py-3 dark:border-zinc-700 dark:bg-zinc-950/50">
-        <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+      <div className="flex flex-col gap-3 rounded-2xl bg-violet-100 p-4 ring-1 ring-violet-200/90 dark:bg-violet-950/35 dark:ring-violet-800/50">
+        <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
           Rol y protección
         </p>
         <FormSwitch name="isAdmin" label="Admin" accent="violet" />
@@ -93,13 +104,13 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
           accent="cyan"
         />
       </div>
-      <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+      <label className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
         Nota (opcional)
         <textarea
           name="notes"
           rows={2}
           placeholder="Comentarios, plataforma, grupo…"
-          className={`resize-y ${inputClass}`}
+          className={`${softInputEmerald} resize-y`}
         />
       </label>
       {state?.error ? (
@@ -108,7 +119,7 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+        className={softBtnPrimary}
       >
         {isPending ? "Guardando…" : "Guardar persona"}
       </button>
