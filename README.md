@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Panel de directorio (WhatsApp / comunidad)
 
-## Getting Started
+Aplicación web para gestionar un **directorio de personas** (gamertag, teléfono, situación en la comunidad, strikes y baneos). Incluye autenticación con una sola cuenta comunitaria, filtros por rol o situación e **importación masiva desde Excel o archivos exportados de Google Sheets**.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Next.js** 16 (App Router), **React** 19, **TypeScript**
+- **PostgreSQL** con **Prisma** 7 y adaptador `pg` (p. ej. [Neon](https://neon.tech))
+- **Auth.js** (NextAuth v5) con proveedor **Credentials** (sin registro público)
+- **Tailwind CSS** 4
+- **SheetJS** (`xlsx`) para lectura de hojas de cálculo
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Requisitos
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Node.js 20+
+- Una base PostgreSQL accesible (cadena `DATABASE_URL`)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Configuración local
 
-## Learn More
+1. Clona el repositorio e instala dependencias:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Copia variables de entorno y rellénalas:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   cp .env.example .env
+   ```
 
-## Deploy on Vercel
+   Variables importantes (ver comentarios en `.env.example`):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   | Variable | Descripción |
+   |----------|-------------|
+   | `DATABASE_URL` | URL `postgresql://…` (Neon u otro Postgres) |
+   | `AUTH_SECRET` | Secreto para sesiones (`openssl rand -base64 32`) |
+   | `COMMUNITY_EMAIL` / `COMMUNITY_PASSWORD` | Única cuenta de acceso al panel |
+   | `AUTH_URL` | Origen completo en local si no usas el puerto 3000 (ej. `http://localhost:3001`) |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. Aplica migraciones:
+
+   ```bash
+   npx prisma migrate deploy
+   ```
+
+4. Arranca el servidor de desarrollo:
+
+   ```bash
+   npm run dev
+   ```
+
+   Abre [http://localhost:3000](http://localhost:3000), inicia sesión y entra a **Panel → Lista de personas** o **Agregar persona**.
+
+## Scripts npm
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | `prisma generate` + build de producción |
+| `npm run start` | Servidor tras `build` |
+| `npm run lint` | ESLint |
+
+`postinstall` ejecuta `prisma generate` (el cliente se genera en `src/generated/prisma`, ignorado en git).
+
+## Funcionalidades del panel
+
+- **Lista** (`/dashboard`): búsqueda, filtros por estado, país, cohortes (nuevos, activos, inactivos, se salieron, admins, protegidos, etc.).
+- **Agregar** (`/dashboard/agregar`): alta manual y bloque **Importar desde Excel o Google Sheets**.
+  - Formatos: `.xlsx`, `.xls`, `.csv`, `.tsv`.
+  - Se procesan **todas las hojas** del libro que tengan cabeceras reconocibles (jugador + teléfono).
+  - Plantillas: `GET /dashboard/agregar/plantilla` (Excel) y `?format=csv` (CSV).
+  - Sin `+` en el número hace falta columna de **país** (ISO2, ej. `MX`) o número en formato internacional.
+
+## Despliegue en Vercel
+
+1. Crea el proyecto en Vercel enlazado al mismo repositorio y rama que uses en desarrollo.
+2. En **Settings → Environment Variables**, define al menos:
+   - `DATABASE_URL`
+   - `AUTH_SECRET`
+   - `COMMUNITY_EMAIL` y `COMMUNITY_PASSWORD`
+   - Opcional: `AUTH_URL` con la URL pública del sitio si hiciera falta para el callback de auth.
+3. El build usa `npm run build` (incluye `prisma generate`). Asegúrate de que las migraciones estén aplicadas en la base de producción (`npx prisma migrate deploy` contra la URL de Neon, desde CI o manualmente).
+
+La sección de importación Excel está en **`/dashboard/agregar`**, debajo del formulario manual (no en la vista solo-lista).
+
+## Documentación Next.js
+
+- [Documentación Next.js](https://nextjs.org/docs)
+- [Despliegue](https://nextjs.org/docs/app/building-your-application/deploying)
