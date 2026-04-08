@@ -88,6 +88,7 @@ export function directoryMemberWhere(
     parts.push({
       OR: [
         { gamertag: { contains: q, mode: "insensitive" } },
+        { displayName: { contains: q, mode: "insensitive" } },
         { phone: { contains: q } },
         { notes: { contains: q, mode: "insensitive" } },
         { bannedReason: { contains: q, mode: "insensitive" } },

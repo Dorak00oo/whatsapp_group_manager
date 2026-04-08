@@ -8,15 +8,27 @@ import {
   normalizePhoneForDirectory,
   normalizePhoneFreeform,
 } from "@/lib/phone-normalize";
+import {
+  isMissingDisplayNameColumnError,
+  MISSING_DISPLAY_NAME_COLUMN_MESSAGE,
+} from "@/lib/prisma-migration-hints";
+import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import { parseMemberSpreadsheet } from "@/lib/spreadsheet-members";
+
+const STALE_SESSION_ERROR =
+  "Sesión desactualizada respecto a la base de datos. Cierra sesión y vuelve a entrar.";
+
 export async function createDirectoryMember(
   _prev: { error?: string } | null,
   formData: FormData,
 ) {
   const session = await auth();
-  if (!session?.user?.id) return { error: "No autorizado" };
+  if (!session?.user) return { error: "No autorizado" };
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return { error: STALE_SESSION_ERROR };
 
   const gamertag = String(formData.get("gamertag") ?? "").trim();
+  const displayName = String(formData.get("displayName") ?? "").trim();
   const phoneIso = String(formData.get("phoneCountry") ?? "")
     .trim()
     .toUpperCase();
@@ -34,19 +46,27 @@ export async function createDirectoryMember(
   }
   const { phone, phoneCountry } = normalized;
 
-  await prisma.directoryMember.create({
-    data: {
-      gamertag,
-      phone,
-      phoneCountry,
-      active: markedLeft ? false : active,
-      leftAt: markedLeft ? new Date() : null,
-      isAdmin,
-      banExempt,
-      notes: notesRaw || null,
-      userId: session.user.id,
-    },
-  });
+  try {
+    await prisma.directoryMember.create({
+      data: {
+        gamertag,
+        displayName: displayName || null,
+        phone,
+        phoneCountry,
+        active: markedLeft ? false : active,
+        leftAt: markedLeft ? new Date() : null,
+        isAdmin,
+        banExempt,
+        notes: notesRaw || null,
+        userId,
+      },
+    });
+  } catch (e) {
+    if (isMissingDisplayNameColumnError(e)) {
+      return { error: MISSING_DISPLAY_NAME_COLUMN_MESSAGE };
+    }
+    throw e;
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/agregar");
@@ -68,7 +88,9 @@ export async function bulkImportDirectoryMembers(
   formData: FormData,
 ): Promise<BulkImportResult> {
   const session = await auth();
-  if (!session?.user?.id) return { error: "No autorizado" };
+  if (!session?.user) return { error: "No autorizado" };
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return { error: STALE_SESSION_ERROR };
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
@@ -130,6 +152,7 @@ export async function bulkImportDirectoryMembers(
       await prisma.directoryMember.create({
         data: {
           gamertag: row.gamertag,
+          displayName: row.displayName,
           phone: phoneResult.phone,
           phoneCountry: phoneResult.phoneCountry,
           active: row.seSalio ? false : row.activo,
@@ -137,11 +160,14 @@ export async function bulkImportDirectoryMembers(
           isAdmin: row.admin,
           banExempt: row.protegido,
           notes: row.notas,
-          userId: session.user.id,
+          userId,
         },
       });
       created++;
     } catch (err) {
+      if (isMissingDisplayNameColumnError(err)) {
+        return { error: MISSING_DISPLAY_NAME_COLUMN_MESSAGE };
+      }
       const msg = err instanceof Error ? err.message : "Error al guardar";
       errors.push({ ...loc, message: msg });
     }
@@ -155,10 +181,12 @@ export async function bulkImportDirectoryMembers(
 
 export async function deleteDirectoryMember(id: string) {
   const session = await auth();
-  if (!session?.user?.id) return { error: "No autorizado" };
+  if (!session?.user) return { error: "No autorizado" };
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return { error: STALE_SESSION_ERROR };
 
   const result = await prisma.directoryMember.deleteMany({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
   });
 
   if (result.count === 0) return { error: "No encontrado" };
@@ -169,15 +197,21 @@ export async function deleteDirectoryMember(id: string) {
 
 export async function updateDirectoryMemberNotes(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.id) return;
+  if (!session?.user) return;
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return;
 
   const id = String(formData.get("memberId") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
+  const displayName = String(formData.get("displayName") ?? "").trim();
   if (!id) return;
 
   await prisma.directoryMember.updateMany({
-    where: { id, userId: session.user.id },
-    data: { notes: notes || null },
+    where: { id, userId },
+    data: {
+      notes: notes || null,
+      displayName: displayName || null,
+    },
   });
 
   revalidatePath("/dashboard");
@@ -185,10 +219,12 @@ export async function updateDirectoryMemberNotes(formData: FormData) {
 
 export async function setDirectoryMemberActive(id: string, active: boolean) {
   const session = await auth();
-  if (!session?.user?.id) return { error: "No autorizado" };
+  if (!session?.user) return { error: "No autorizado" };
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return { error: STALE_SESSION_ERROR };
 
   const result = await prisma.directoryMember.updateMany({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     data: { active },
   });
 
@@ -200,14 +236,16 @@ export async function setDirectoryMemberActive(id: string, active: boolean) {
 
 export async function addDirectoryStrike(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.id) return;
+  if (!session?.user) return;
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return;
 
   const memberId = String(formData.get("memberId") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
   if (!memberId || !reason) return;
 
   const member = await prisma.directoryMember.findFirst({
-    where: { id: memberId, userId: session.user.id },
+    where: { id: memberId, userId },
   });
   if (!member) return;
 
@@ -220,7 +258,9 @@ export async function addDirectoryStrike(formData: FormData) {
 
 export async function setDirectoryMemberBan(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.id) return;
+  if (!session?.user) return;
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return;
 
   const memberId = String(formData.get("memberId") ?? "").trim();
   const action = String(formData.get("banAction") ?? "").trim();
@@ -228,7 +268,7 @@ export async function setDirectoryMemberBan(formData: FormData) {
 
   if (action === "unban") {
     await prisma.directoryMember.updateMany({
-      where: { id: memberId, userId: session.user.id },
+      where: { id: memberId, userId },
       data: { banned: false, bannedReason: null },
     });
   } else if (action === "ban") {
@@ -237,7 +277,7 @@ export async function setDirectoryMemberBan(formData: FormData) {
     await prisma.directoryMember.updateMany({
       where: {
         id: memberId,
-        userId: session.user.id,
+        userId,
         banExempt: false,
       },
       data: { banned: true, bannedReason },
@@ -249,16 +289,18 @@ export async function setDirectoryMemberBan(formData: FormData) {
 
 export async function toggleDirectoryMemberIsAdmin(id: string) {
   const session = await auth();
-  if (!session?.user?.id) return;
+  if (!session?.user) return;
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return;
 
   const member = await prisma.directoryMember.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     select: { isAdmin: true },
   });
   if (!member) return;
 
   await prisma.directoryMember.updateMany({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     data: { isAdmin: !member.isAdmin },
   });
 
@@ -267,17 +309,19 @@ export async function toggleDirectoryMemberIsAdmin(id: string) {
 
 export async function toggleDirectoryMemberBanExempt(id: string) {
   const session = await auth();
-  if (!session?.user?.id) return;
+  if (!session?.user) return;
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return;
 
   const member = await prisma.directoryMember.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     select: { banExempt: true },
   });
   if (!member) return;
 
   const next = !member.banExempt;
   await prisma.directoryMember.updateMany({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     data: {
       banExempt: next,
       ...(next ? { banned: false, bannedReason: null } : {}),
@@ -289,10 +333,12 @@ export async function toggleDirectoryMemberBanExempt(id: string) {
 
 export async function setDirectoryMemberLeft(id: string, left: boolean) {
   const session = await auth();
-  if (!session?.user?.id) return;
+  if (!session?.user) return;
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return;
 
   await prisma.directoryMember.updateMany({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     data: left
       ? { leftAt: new Date(), active: false }
       : { leftAt: null },

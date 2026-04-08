@@ -7,6 +7,7 @@ import {
 } from "@/lib/directory-query";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { prisma } from "@/lib/prisma";
+import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -17,7 +18,8 @@ export default async function DashboardPage({
   searchParams: Promise<Search>;
 }) {
   const session = await auth();
-  const userId = session?.user?.id;
+  if (!session?.user) return null;
+  const userId = await resolveDirectoryUserId(session);
   if (!userId) return null;
 
   const sp = await searchParams;
@@ -59,6 +61,7 @@ export default async function DashboardPage({
   const members: DirectoryMemberDTO[] = membersRaw.map((m) => ({
     id: m.id,
     gamertag: m.gamertag,
+    displayName: m.displayName,
     phone: m.phone,
     phoneCountry: m.phoneCountry,
     active: m.active,

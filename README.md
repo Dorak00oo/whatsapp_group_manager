@@ -38,11 +38,14 @@ Aplicación web para gestionar un **directorio de personas** (gamertag, teléfon
    | `COMMUNITY_EMAIL` / `COMMUNITY_PASSWORD` | Única cuenta de acceso al panel |
    | `AUTH_URL` | Origen completo en local si no usas el puerto 3000 (ej. `http://localhost:3001`) |
 
-3. Aplica migraciones:
+3. Aplica migraciones y regenera el cliente Prisma (obligatorio tras `git pull` si cambió `prisma/schema.prisma`):
 
    ```bash
    npx prisma migrate deploy
+   npx prisma generate
    ```
+
+   Si ves `Unknown argument displayName` (u otro campo nuevo) al importar o guardar, el cliente está desfasado: ejecuta `npx prisma generate` y reinicia `npm run dev`.
 
 4. Arranca el servidor de desarrollo:
 
@@ -80,9 +83,19 @@ Aplicación web para gestionar un **directorio de personas** (gamertag, teléfon
    - `AUTH_SECRET`
    - `COMMUNITY_EMAIL` y `COMMUNITY_PASSWORD`
    - Opcional: `AUTH_URL` con la URL pública del sitio si hiciera falta para el callback de auth.
-3. El build usa `npm run build` (incluye `prisma generate`). Asegúrate de que las migraciones estén aplicadas en la base de producción (`npx prisma migrate deploy` contra la URL de Neon, desde CI o manualmente).
+3. En **Vercel → Settings → General → Build Command**, usa por ejemplo:
+
+   ```bash
+   npx prisma migrate deploy && npm run build
+   ```
+
+   Así cada despliegue aplica migraciones pendientes en Neon (p. ej. la columna `display_name` para nombre + gamertag). `npm run build` ya incluye `prisma generate`.
 
 La sección de importación Excel está en **`/dashboard/agregar`**, debajo del formulario manual (no en la vista solo-lista).
+
+### «El nombre es opcional, ¿por qué falla la importación?»
+
+En la app el nombre es opcional, pero en PostgreSQL hace falta la **columna** `display_name` (puede ser NULL en todas las filas). Si el código nuevo se desplegó pero **no** ejecutaste `npx prisma migrate deploy` en esa base, cualquier alta (Excel o formulario) fallará hasta aplicar la migración.
 
 ## Documentación Next.js
 

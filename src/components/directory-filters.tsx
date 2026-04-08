@@ -103,7 +103,7 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:col-span-2">
-          Buscar (gamertag, teléfono, nota, ban, strikes…)
+          Buscar (gamertag, nombre, teléfono, nota, ban, strikes…)
           <input
             name="q"
             type="search"

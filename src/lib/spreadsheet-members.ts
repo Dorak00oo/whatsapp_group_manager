@@ -6,6 +6,8 @@ export type SheetMemberInput = {
   /** Número de fila en esa hoja (1 = cabecera). */
   rowNumber: number;
   gamertag: string;
+  /** Columna «nombres» / nombre real; el principal para la app es gamertag. */
+  displayName: string | null;
   telefono: string;
   pais: string;
   activo: boolean;
@@ -16,6 +18,7 @@ export type SheetMemberInput = {
 };
 
 type MemberColumn =
+  | "nombre"
   | "gamertag"
   | "telefono"
   | "pais"
@@ -43,26 +46,35 @@ function compactAlnum(s: string): string {
  * (typo, sin acentos, frase larga) y aun así encajar.
  */
 const KEYWORDS: Record<MemberColumn, readonly string[]> = {
+  nombre: [
+    "nombres",
+    "nombre",
+    "nombre completo",
+    "nombre y apellido",
+    "real name",
+    "contact name",
+    "nombre contacto",
+  ],
+  /** Identificador principal en juego / red: no usar sinónimos de «nombre real». */
   gamertag: [
     "gamertag",
+    "gamertags",
     "gamer tag",
     "gamer_tag",
-    "jugador",
-    "nombre",
-    "nombre jugador",
+    "gamer",
     "nick",
     "apodo",
     "alias",
-    "usuario",
-    "miembro",
-    "player",
-    "member",
-    "display name",
+    "handle",
     "tag",
     "id jugador",
     "psn",
     "xbox",
     "steam",
+    "userid",
+    "user id",
+    "cuenta",
+    "ign",
   ],
   telefono: [
     "telefono",
@@ -281,14 +293,34 @@ function scoreHeaderAgainstKeywords(
   return best;
 }
 
+/**
+ * Asigna columnas por cabecera. Reserva primero coincidencias exactas típicas de Sheets
+ * («nombres» vs «gamertags») para no mezclar nombre real con gamertag.
+ */
 function assignHeaderIndices(headerRow: unknown[]): Map<MemberColumn, number> {
   const n = headerRow.length;
   const used = new Set<number>();
   const out = new Map<MemberColumn, number>();
 
+  for (let i = 0; i < n; i++) {
+    const h = normHeader(headerRow[i]).replace(/\s+/g, " ").trim();
+    if (h === "gamertags" || h === "gamertag") {
+      if (!out.has("gamertag")) {
+        out.set("gamertag", i);
+        used.add(i);
+      }
+    } else if (h === "nombres" || h === "nombre") {
+      if (!out.has("nombre")) {
+        out.set("nombre", i);
+        used.add(i);
+      }
+    }
+  }
+
   const order: { col: MemberColumn; required: boolean; minScore: number }[] = [
     { col: "gamertag", required: true, minScore: 0.72 },
     { col: "telefono", required: true, minScore: 0.72 },
+    { col: "nombre", required: false, minScore: 0.78 },
     { col: "pais", required: false, minScore: 0.8 },
     { col: "admin", required: false, minScore: 0.8 },
     { col: "protegido", required: false, minScore: 0.8 },
@@ -298,6 +330,7 @@ function assignHeaderIndices(headerRow: unknown[]): Map<MemberColumn, number> {
   ];
 
   for (const { col, minScore } of order) {
+    if (out.has(col)) continue;
     let bestI = -1;
     let bestScore = minScore;
     const kws = KEYWORDS[col];
@@ -439,6 +472,7 @@ function parseMemberRowsForSheet(
   const idx = assignHeaderIndices(headerRow);
   const ig = idx.get("gamertag") ?? -1;
   const it = idx.get("telefono") ?? -1;
+  const idn = idx.get("nombre") ?? -1;
   const ip = idx.get("pais") ?? -1;
   const ia = idx.get("activo") ?? -1;
   const iad = idx.get("admin") ?? -1;
@@ -454,6 +488,8 @@ function parseMemberRowsForSheet(
     const row = matrix[r] ?? [];
     const gamertag = cellStr(row[ig]);
     const telefono = cellStr(row[it]);
+    const displayNameRaw = idn >= 0 ? cellStr(row[idn]) : "";
+    const displayName = displayNameRaw ? displayNameRaw : null;
     if (!gamertag && !telefono) continue;
 
     const pais = ip >= 0 ? cellStr(row[ip]) : "";
@@ -467,6 +503,7 @@ function parseMemberRowsForSheet(
       sheetName,
       rowNumber: r + 1,
       gamertag,
+      displayName,
       telefono,
       pais,
       activo,
@@ -524,7 +561,7 @@ export function parseMemberSpreadsheet(buffer: Buffer, fileName: string): SheetM
 
   if (combined.length === 0 && sawBadHeaders && !sawOkSheet) {
     throw new Error(
-      "Ninguna hoja tiene columnas reconocibles para gamertag y teléfono. Revisa el título de cada hoja o descarga la plantilla.",
+      "Ninguna hoja tiene columnas reconocibles: hace falta gamertag (o «gamertags») y teléfono. La columna «nombres» es opcional y va aparte. Descarga la plantilla actualizada.",
     );
   }
 

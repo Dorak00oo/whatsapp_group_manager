@@ -27,9 +27,12 @@ export function DirectoryBulkUpload() {
           Descargar). Primera
           fila = títulos de columna. Los títulos se reconocen aunque estén mal escritos o usen
           palabras parecidas a los filtros (por ejemplo «Los que se salieron», «Protegidos (sin
-          ban)», «roster», «administrador»). Obligatorios: una columna de{" "}
-          <strong className="font-medium text-zinc-600 dark:text-zinc-400">nombre / jugador</strong>{" "}
-          y otra de <strong className="font-medium text-zinc-600 dark:text-zinc-400">teléfono</strong>
+          ban)», «roster», «administrador»). Obligatorio: columna de{" "}
+          <strong className="font-medium text-zinc-600 dark:text-zinc-400">gamertag</strong> (o
+          gamertags) y otra de <strong className="font-medium text-zinc-600 dark:text-zinc-400">teléfono</strong>
+          . Opcional: <strong className="font-medium text-zinc-600 dark:text-zinc-400">nombres</strong> o{" "}
+          <strong className="font-medium text-zinc-600 dark:text-zinc-400">nombre</strong> para el nombre
+          real (se guarda aparte del gamertag).
           . Si el número no lleva{" "}
           <code className="rounded bg-zinc-200 px-1 dark:bg-zinc-800">+</code>, usa la columna de{" "}
           <strong className="font-medium text-zinc-600 dark:text-zinc-400">país</strong> (ISO2, ej.{" "}

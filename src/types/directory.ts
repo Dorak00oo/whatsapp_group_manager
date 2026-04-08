@@ -7,6 +7,8 @@ export type StrikeDTO = {
 export type DirectoryMemberDTO = {
   id: string;
   gamertag: string;
+  /** Nombre real u hoja «nombres»; el identificador principal sigue siendo gamertag. */
+  displayName: string | null;
   phone: string;
   phoneCountry: string | null;
   active: boolean;

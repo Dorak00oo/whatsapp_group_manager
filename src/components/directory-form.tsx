@@ -26,12 +26,22 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
         Agregar persona (gamertag + celular)
       </h2>
       <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-        Gamertag
+        Gamertag <span className="font-normal text-zinc-500">(principal)</span>
         <input
           name="gamertag"
           required
           autoComplete="nickname"
-          placeholder="Ej. PlayerPro123"
+          placeholder="Ej. siabix, PlayerPro123"
+          className={inputClass}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+        Nombre <span className="font-normal text-zinc-500">(opcional)</span>
+        <input
+          name="displayName"
+          type="text"
+          autoComplete="name"
+          placeholder="Ej. Chivis, como en la hoja «nombres»"
           className={inputClass}
         />
       </label>

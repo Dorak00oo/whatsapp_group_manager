@@ -13,9 +13,9 @@ export async function GET(request: Request) {
     const csv =
       "\ufeff" +
       [
-        "gamertag,telefono,pais,activo,admin,protegido,se_salio,notas",
-        "PlayerEjemplo,+52 55 1234 5678,,si,no,no,no,",
-        "OtroPlayer,5512345678,MX,si,no,no,no,grupo A",
+        "nombres,gamertag,telefono,pais,activo,admin,protegido,se_salio,notas",
+        "Ana Player,PlayerEjemplo,+52 55 1234 5678,,si,no,no,no,",
+        "Otro nombre,OtroPlayer,5512345678,MX,si,no,no,no,grupo A",
       ].join("\n");
     return new Response(csv, {
       headers: {
@@ -27,6 +27,7 @@ export async function GET(request: Request) {
 
   const ws = XLSX.utils.aoa_to_sheet([
     [
+      "nombres",
       "gamertag",
       "telefono",
       "pais",
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
       "notas",
     ],
     [
+      "Ana Player",
       "PlayerEjemplo",
       "+52 55 1234 5678",
       "",
@@ -46,7 +48,17 @@ export async function GET(request: Request) {
       "no",
       "",
     ],
-    ["OtroPlayer", "5512345678", "MX", "si", "no", "no", "no", "grupo A"],
+    [
+      "Otro nombre",
+      "OtroPlayer",
+      "5512345678",
+      "MX",
+      "si",
+      "no",
+      "no",
+      "no",
+      "grupo A",
+    ],
   ]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "jugadores");
