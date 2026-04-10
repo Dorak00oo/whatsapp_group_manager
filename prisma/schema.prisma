@@ -53,3 +53,12 @@ model DirectoryStrike {
   @@index([memberId])
   @@map("directory_strikes")
 }
+
+/** Parámetros JSON editables desde el panel; el bot puede leerlos vía GET /api/bot/panel-config */
+model BotPanelSettings {
+  id        String   @id
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("bot_panel_settings")
+}

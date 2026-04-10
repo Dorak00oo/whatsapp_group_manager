@@ -47,3 +47,6 @@ next-env.d.ts
 /docs
 
 /scripts
+
+# Clon local YukiBot-MD (WhatsApp / Baileys); no versionar
+/YukiBot-MD

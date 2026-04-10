@@ -35,10 +35,14 @@ function createPrismaClient(): PrismaClient {
 
 /** Tras `prisma generate` o HMR, `globalThis.prisma` puede ser un cliente viejo sin los modelos nuevos. */
 function isCurrentPrismaClient(c: PrismaClient | undefined): boolean {
+  const x = c as {
+    directoryMember?: { findMany?: unknown };
+    botPanelSettings?: { findUnique?: unknown };
+  };
   return (
     c != null &&
-    typeof (c as { directoryMember?: { findMany?: unknown } }).directoryMember
-      ?.findMany === "function"
+    typeof x.directoryMember?.findMany === "function" &&
+    typeof x.botPanelSettings?.findUnique === "function"
   );
 }
 

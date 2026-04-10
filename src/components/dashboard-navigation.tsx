@@ -75,12 +75,37 @@ function IconUpload({ className }: { className?: string }) {
 const linkBase =
   "flex size-12 items-center justify-center rounded-full transition-colors duration-200";
 
+function IconBot({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className ?? iconSm}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 8V4H8" />
+      <rect width="16" height="12" x="4" y="8" rx="2" />
+      <path d="M2 14h2" />
+      <path d="M20 14h2" />
+      <path d="M15 13v2" />
+      <path d="M9 13v2" />
+    </svg>
+  );
+}
+
 function useNavActive() {
   const pathname = usePathname();
   const list = pathname === "/dashboard";
   const add = pathname.startsWith("/dashboard/agregar");
   const bulk = pathname.startsWith("/dashboard/importar");
-  return { list, add, bulk };
+  const bot = pathname.startsWith("/dashboard/bot");
+  return { list, add, bulk, bot };
 }
 
 function activeCls(on: boolean) {
@@ -91,7 +116,7 @@ function activeCls(on: boolean) {
 
 /** Barra lateral estrecha con iconos (desktop / tablet). */
 export function DashboardSidebarNav() {
-  const { list, add, bulk } = useNavActive();
+  const { list, add, bulk, bot } = useNavActive();
 
   return (
     <nav
@@ -122,13 +147,21 @@ export function DashboardSidebarNav() {
       >
         <IconUpload />
       </Link>
+      <Link
+        href="/dashboard/bot"
+        className={`${linkBase} ${activeCls(bot)}`}
+        title="Bot WhatsApp"
+        aria-current={bot ? "page" : undefined}
+      >
+        <IconBot />
+      </Link>
     </nav>
   );
 }
 
 /** Solo iconos en fila (móvil); cerrar sesión va debajo en el layout. */
 export function DashboardNavMobile() {
-  const { list, add, bulk } = useNavActive();
+  const { list, add, bulk, bot } = useNavActive();
 
   return (
     <nav
@@ -155,6 +188,13 @@ export function DashboardNavMobile() {
         aria-current={bulk ? "page" : undefined}
       >
         <IconUpload />
+      </Link>
+      <Link
+        href="/dashboard/bot"
+        className={`${linkBase} ${activeCls(bot)}`}
+        aria-current={bot ? "page" : undefined}
+      >
+        <IconBot />
       </Link>
     </nav>
   );
