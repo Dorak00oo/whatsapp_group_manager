@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { getBotRemoteEnv, pushConfigToBotRemote } from "@/lib/bot-dashboard-server";
 import {
@@ -39,12 +40,13 @@ export async function PATCH(request: Request) {
   }
 
   const data = body.data as Record<string, unknown>;
+  const dataJson = data as Prisma.InputJsonValue;
 
   try {
     await prisma.botPanelSettings.upsert({
       where: { id: DEFAULT_ID },
-      create: { id: DEFAULT_ID, data },
-      update: { data },
+      create: { id: DEFAULT_ID, data: dataJson },
+      update: { data: dataJson },
     });
   } catch (e) {
     if (isPrismaMissingTableError(e)) {
