@@ -16,6 +16,8 @@ export function getBotRemoteEnv(): {
 export type BotRemoteState = {
   sessionConnected: boolean;
   qrDataUrl: string | null;
+  /** Código de 8 dígitos formateado (ej. XXXX-XXXX), si el bot lo generó vía panel. */
+  pairingCode?: string | null;
   logs: string[];
   runtimeConfig: Record<string, unknown>;
   panelConfigFromWeb: Record<string, unknown>;
@@ -84,6 +86,58 @@ export type RequestQrResult = {
 };
 
 /** Pide al proceso del bot que borre la sesión Owner y reinicie el socket (nuevo QR). */
+export type RequestPairingCodeResult = {
+  ok: boolean;
+  error?: string;
+  message?: string;
+  pairingCode?: string;
+};
+
+/** Pide al bot un código de emparejamiento de 8 dígitos (número en formato internacional). */
+export async function requestPairingCodeFromBotRemote(
+  phone: string,
+): Promise<RequestPairingCodeResult> {
+  const { base, secret, configured } = getBotRemoteEnv();
+  if (!configured) {
+    return {
+      ok: false,
+      error: "not_configured",
+      message: "BOT_REMOTE_BASE_URL o BOT_DASHBOARD_SECRET no configurados.",
+    };
+  }
+  const url = `${base}/__bot/pairing/request-code`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ phone: phone.trim() }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  try {
+    const o = await readBotJsonResponse<RequestPairingCodeResult>(
+      r,
+      `POST ${url}`,
+    );
+    if (!o.ok) {
+      return {
+        ok: false,
+        error: o.error || "unknown",
+        message: o.message || "El bot rechazó la operación.",
+      };
+    }
+    return o;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return {
+      ok: false,
+      error: "bad_response",
+      message: msg,
+    };
+  }
+}
+
 export async function requestNewQrFromBotRemote(): Promise<RequestQrResult> {
   const { base, secret, configured } = getBotRemoteEnv();
   if (!configured) {

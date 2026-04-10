@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Remote = {
   sessionConnected: boolean;
   qrDataUrl: string | null;
+  pairingCode?: string | null;
   logs: string[];
   runtimeConfig: Record<string, unknown>;
   panelConfigFromWeb: Record<string, unknown>;
@@ -36,6 +37,9 @@ function statusLabel(
   if (remote.sessionConnected) {
     return { text: "WhatsApp conectado", tone: "ok" };
   }
+  if (remote.pairingCode) {
+    return { text: "Emparejamiento: código de 8 dígitos listo", tone: "warn" };
+  }
   if (remote.qrDataUrl) {
     return { text: "Emparejamiento: escaneá el código", tone: "warn" };
   }
@@ -64,6 +68,10 @@ export function BotConsolePanel() {
   const [pairingMsg, setPairingMsg] = useState<string | null>(null);
   const [pairingLoading, setPairingLoading] = useState(false);
   const [pairingDialogOpen, setPairingDialogOpen] = useState(false);
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingCodeLoading, setPairingCodeLoading] = useState(false);
+  const [pairingCodeMsg, setPairingCodeMsg] = useState<string | null>(null);
+  const [copyPairingOk, setCopyPairingOk] = useState(false);
   const [botRemoteConfigured, setBotRemoteConfigured] = useState<boolean | null>(
     null,
   );
@@ -225,6 +233,56 @@ export function BotConsolePanel() {
     }
   }
 
+  async function requestPairingCode() {
+    setPairingCodeMsg(null);
+    const trimmed = pairingPhone.trim();
+    if (!trimmed) {
+      setPairingCodeMsg("Ingresá el número de WhatsApp (con código de país).");
+      return;
+    }
+    setPairingCodeLoading(true);
+    try {
+      const r = await fetch("/api/dashboard/bot/pairing-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: trimmed }),
+      });
+      const j = (await r.json()) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+        pairingCode?: string;
+      };
+      if (j.ok) {
+        setPairingCodeMsg(
+          j.message ||
+            "Usá este código en el teléfono (Dispositivos vinculados → Vincular con número).",
+        );
+        void pull();
+      } else {
+        setPairingCodeMsg(
+          j.message || j.error || "No se pudo generar el código. Revisá el número y los logs del bot.",
+        );
+      }
+    } catch {
+      setPairingCodeMsg("No hubo respuesta del servidor. Probá de nuevo.");
+    } finally {
+      setPairingCodeLoading(false);
+    }
+  }
+
+  async function copyPairingCodeToClipboard() {
+    const code = remote?.pairingCode;
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code.replace(/-/g, ""));
+      setCopyPairingOk(true);
+      setTimeout(() => setCopyPairingOk(false), 2000);
+    } catch {
+      setCopyPairingOk(false);
+    }
+  }
+
   const status = statusLabel(botRemoteConfigured, remote, error);
 
   return (
@@ -289,8 +347,9 @@ export function BotConsolePanel() {
           Estado del bot
         </h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          El código QR lo genera WhatsApp en el servidor del bot. Desde acá podés
-          ver logs, el QR cuando exista y pedir un emparejamiento limpio.
+          El QR y el código de 8 dígitos los genera WhatsApp en el servidor del
+          bot. Podés escanear el QR o vincular con el número del teléfono usando
+          el código.
         </p>
 
         {botRemoteConfigured === false ? (
@@ -346,23 +405,70 @@ export function BotConsolePanel() {
               dispositivo
             </span>
           ) : null}
+          {remote?.pairingCode && !remote.sessionConnected ? (
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">
+              Misma ruta → &quot;Vincular con número de teléfono&quot; e ingresá
+              el código.
+            </span>
+          ) : null}
         </div>
 
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => setPairingDialogOpen(true)}
-            disabled={pairingLoading || botRemoteConfigured === false}
-            className="rounded-full border border-violet-300 bg-violet-50 px-5 py-2.5 text-sm font-medium text-violet-950 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-violet-700 dark:bg-violet-950/50 dark:text-violet-100 dark:hover:bg-violet-900/60"
-          >
-            {pairingLoading
-              ? "Reiniciando emparejamiento…"
-              : "Pedir un QR nuevo"}
-          </button>
-          {pairingMsg ? (
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-              {pairingMsg}
-            </p>
+        <div className="mt-4 flex flex-col gap-4">
+          <div>
+            <button
+              type="button"
+              onClick={() => setPairingDialogOpen(true)}
+              disabled={pairingLoading || botRemoteConfigured === false}
+              className="rounded-full border border-violet-300 bg-violet-50 px-5 py-2.5 text-sm font-medium text-violet-950 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-45 dark:border-violet-700 dark:bg-violet-950/50 dark:text-violet-100 dark:hover:bg-violet-900/60"
+            >
+              {pairingLoading
+                ? "Reiniciando emparejamiento…"
+                : "Pedir un QR nuevo"}
+            </button>
+            {pairingMsg ? (
+              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+                {pairingMsg}
+              </p>
+            ) : null}
+          </div>
+
+          {!remote?.sessionConnected && botRemoteConfigured !== false ? (
+            <div className="rounded-xl border border-zinc-200/90 bg-zinc-50/80 p-4 dark:border-zinc-700 dark:bg-zinc-900/40">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                Vincular con código (8 dígitos)
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+                Tiene que ser el mismo número que usás en WhatsApp en el teléfono,
+                con código de país (ej. Colombia 57…, México 521…, Argentina
+                549…).
+              </p>
+              <div className="mt-3 flex flex-wrap items-stretch gap-2 sm:items-center">
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="+57 300 123 4567"
+                  value={pairingPhone}
+                  onChange={(e) => setPairingPhone(e.target.value)}
+                  disabled={pairingCodeLoading}
+                  className="min-w-[200px] flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+                  aria-label="Número de WhatsApp para código de emparejamiento"
+                />
+                <button
+                  type="button"
+                  onClick={() => void requestPairingCode()}
+                  disabled={pairingCodeLoading || !botRemoteConfigured}
+                  className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                >
+                  {pairingCodeLoading ? "Generando…" : "Obtener código"}
+                </button>
+              </div>
+              {pairingCodeMsg ? (
+                <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+                  {pairingCodeMsg}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
 
@@ -373,6 +479,26 @@ export function BotConsolePanel() {
           >
             {error}
           </p>
+        ) : null}
+
+        {remote?.pairingCode && !remote.sessionConnected ? (
+          <div className="mt-6 rounded-xl border border-violet-200/90 bg-violet-50/90 p-5 dark:border-violet-800/60 dark:bg-violet-950/35">
+            <p className="text-center text-xs font-medium uppercase tracking-wide text-violet-800 dark:text-violet-200">
+              Código de emparejamiento
+            </p>
+            <p className="mt-2 text-center font-mono text-3xl font-semibold tracking-widest text-violet-950 dark:text-violet-50 sm:text-4xl">
+              {remote.pairingCode}
+            </p>
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => void copyPairingCodeToClipboard()}
+                className="rounded-full border border-violet-400 bg-white px-4 py-2 text-sm font-medium text-violet-950 hover:bg-violet-100 dark:border-violet-600 dark:bg-violet-900/60 dark:text-violet-100 dark:hover:bg-violet-800/60"
+              >
+                {copyPairingOk ? "Copiado" : "Copiar código (solo números)"}
+              </button>
+            </div>
+          </div>
         ) : null}
 
         {remote?.qrDataUrl ? (

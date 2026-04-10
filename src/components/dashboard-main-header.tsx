@@ -16,7 +16,7 @@ export function DashboardMainHeader() {
       </h1>
       <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
         {isBot
-          ? "Logs, QR de emparejamiento y parámetros JSON del bot en Fly (vía API segura en el servidor)."
+          ? "Logs, QR o código de emparejamiento y parámetros JSON del bot en Fly (vía API segura en el servidor)."
           : "Registros WhatsApp y Minecraft: personas, filtros, importación y log de inactivos."}
       </p>
     </header>
