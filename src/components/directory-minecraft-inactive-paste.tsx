@@ -5,7 +5,7 @@ import {
   bulkMarkInactiveFromMinecraftLog,
   type InactiveLogResult,
 } from "@/app/dashboard/actions";
-import { softBtnPeach, softInputAmber, softPanel } from "@/lib/soft-ui";
+import { softBtnPeach, softInputNeutral, softPanel } from "@/lib/soft-ui";
 
 export function DirectoryMinecraftInactivePaste() {
   const [state, formAction, pending] = useActionState<
@@ -51,7 +51,7 @@ export function DirectoryMinecraftInactivePaste() {
             rows={12}
             disabled={pending}
             placeholder={`[2026-04-08 21:14:37:821 WARN] [Scripting] [PlayerStatus] Jugadores inactivos (51):\n\n[2026-04-08 …] [INACTIVO] jugador123 - última conexión: 2026-03-31 20:13\n…`}
-            className={`${softInputAmber} min-h-[12rem] resize-y font-mono text-xs text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 disabled:opacity-60`}
+            className={`${softInputNeutral} min-h-[12rem] resize-y font-mono text-xs disabled:opacity-60`}
           />
         </label>
         <button

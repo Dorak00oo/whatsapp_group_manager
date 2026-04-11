@@ -202,6 +202,11 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
+/* Quita el botón nativo del desplegable (Win/Edge) cuando el <select> usa appearance-none. */
+select:where([class*="appearance-none"])::-ms-expand {
+  display: none;
+}
+
 html.dark::before {
   content: "";
   position: fixed;

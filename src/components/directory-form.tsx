@@ -7,11 +7,9 @@ import { FormSwitch } from "@/components/form-switch";
 import type { CallingCodeOption } from "@/lib/phone-calling-codes";
 import {
   softBtnPrimary,
-  softInputAmber,
-  softInputEmerald,
-  softInputRose,
-  softInputViolet,
+  softInputNeutral,
   softPanel,
+  softSelectNeutral,
 } from "@/lib/soft-ui";
 
 type Props = { phoneCountryOptions: CallingCodeOption[] };
@@ -42,7 +40,7 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
           required
           autoComplete="nickname"
           placeholder="Ej. CabraTNT, minero_feliz"
-          className={softInputViolet}
+          className={softInputNeutral}
         />
       </label>
       <label className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
@@ -55,7 +53,7 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
           type="text"
           autoComplete="name"
           placeholder="Ej. Toño papá, María del salón 3B"
-          className={softInputRose}
+          className={softInputNeutral}
         />
       </label>
       <div className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
@@ -69,7 +67,7 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
             name="phoneCountry"
             required
             defaultValue="MX"
-            className={`${softInputAmber} shrink-0 sm:max-w-[min(100%,14rem)]`}
+            className={`${softSelectNeutral} shrink-0 sm:max-w-[min(100%,14rem)]`}
           >
             {phoneCountryOptions.map(({ iso, label }) => (
               <option key={iso} value={iso}>
@@ -84,7 +82,7 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
             required
             autoComplete="tel-national"
             placeholder="Ej. 55 1234 5678 o 55-1234-5678"
-            className={`${softInputEmerald} min-w-0 flex-1`}
+            className={`${softInputNeutral} min-w-0 flex-1`}
           />
         </div>
         <p className="font-normal text-zinc-500 dark:text-zinc-400">
@@ -110,7 +108,7 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
           name="notes"
           rows={2}
           placeholder="Comentarios, plataforma, grupo…"
-          className={`${softInputEmerald} resize-y`}
+          className={`${softInputNeutral} resize-y`}
         />
       </label>
       {state?.error ? (

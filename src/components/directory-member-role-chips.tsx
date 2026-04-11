@@ -21,7 +21,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       key: "admin",
       label: "Admin",
       short: "Admin",
-      className: `${base} bg-fuchsia-200 text-fuchsia-950 ring-fuchsia-400/85 shadow-[0_0_12px_-4px_rgba(217,70,239,0.35)] dark:bg-fuchsia-950/75 dark:text-fuchsia-200 dark:ring-fuchsia-700/65 dark:shadow-[0_0_12px_-4px_rgba(162,28,175,0.16)]`,
+      className: `${base} bg-fuchsia-200 text-fuchsia-950 ring-fuchsia-400/85 dark:bg-fuchsia-950/75 dark:text-fuchsia-200 dark:ring-fuchsia-700/65`,
     });
   }
   if (m.banExempt) {
@@ -37,21 +37,21 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       key: "left",
       label: "Los que se salieron",
       short: "Salió",
-      className: `${base} bg-violet-200 text-violet-950 ring-violet-400/90 shadow-[0_0_14px_-4px_rgba(139,92,246,0.45)] dark:bg-violet-950/80 dark:text-violet-200 dark:ring-violet-700/70 dark:shadow-[0_0_14px_-4px_rgba(91,33,182,0.2)]`,
+      className: `${base} bg-amber-100 text-amber-950 ring-amber-400/90 dark:bg-amber-950/75 dark:text-amber-100 dark:ring-amber-600/70`,
     });
   } else if (m.active) {
     chips.push({
       key: "roster",
       label: "Los que estuvieron activos",
       short: "Activo",
-      className: `${base} bg-green-200 text-green-950 ring-green-400/90 shadow-[0_0_14px_-4px_rgba(34,197,94,0.4)] dark:bg-green-950/80 dark:text-green-200 dark:ring-green-700/70 dark:shadow-[0_0_14px_-4px_rgba(22,163,74,0.18)]`,
+      className: `${base} bg-emerald-200 text-emerald-950 ring-emerald-500/95 dark:bg-emerald-950/85 dark:text-emerald-50 dark:ring-emerald-500`,
     });
   } else {
     chips.push({
       key: "inactive",
       label: "Los inactivos",
       short: "Inactivo",
-      className: `${base} bg-sky-200 text-sky-950 ring-sky-400/90 shadow-[0_0_14px_-4px_rgba(14,165,233,0.38)] dark:bg-sky-950/80 dark:text-sky-200 dark:ring-sky-700/70 dark:shadow-[0_0_14px_-4px_rgba(3,105,161,0.18)]`,
+      className: `${base} bg-slate-200 text-slate-900 ring-slate-400/90 dark:bg-slate-800/90 dark:text-slate-100 dark:ring-slate-500/70`,
     });
   }
   if (isNew && !m.leftAt) {
@@ -67,7 +67,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       key: "banned",
       label: "Baneado",
       short: "Ban",
-      className: `${base} bg-red-200 text-red-950 ring-red-300/80 dark:bg-red-900/45 dark:text-red-100 dark:ring-red-700/50`,
+      className: `${base} bg-red-200 text-red-950 ring-2 ring-red-600/95 dark:bg-red-950/85 dark:text-red-50 dark:ring-red-500`,
     });
   }
 

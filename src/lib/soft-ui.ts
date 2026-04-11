@@ -8,19 +8,17 @@ export const softPanel =
 const field =
   "rounded-2xl border-0 px-4 py-2.5 text-sm outline-none transition focus:outline-none focus:ring-2 focus:ring-offset-0 dark:focus:ring-offset-0";
 
+/** Campos de formulario (input, select, textarea) en tono zinc, sin acentos de color. */
 export const softInputNeutral = `${field} bg-zinc-100 text-zinc-900 ring-1 ring-zinc-200/90 placeholder:text-zinc-400 focus:ring-zinc-900/15 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-zinc-800/80 dark:placeholder:text-zinc-500 dark:focus:ring-zinc-400/20`;
 
-export const softInputViolet = `${field} bg-violet-100 text-zinc-900 ring-1 ring-violet-200/90 placeholder:text-zinc-500 focus:ring-violet-400/35 dark:bg-violet-950/65 dark:text-zinc-100 dark:ring-violet-800/60 dark:placeholder:text-zinc-400 dark:focus:ring-violet-500/20`;
-
-export const softInputRose = `${field} bg-rose-100 text-zinc-900 ring-1 ring-rose-200/90 placeholder:text-zinc-500 focus:ring-rose-400/35 dark:bg-rose-950/55 dark:text-zinc-100 dark:ring-rose-900/50 dark:placeholder:text-zinc-400 dark:focus:ring-rose-500/20`;
-
-export const softInputCyan = `${field} bg-cyan-100 text-zinc-900 ring-1 ring-cyan-200/90 focus:ring-cyan-400/35 dark:bg-cyan-950/55 dark:text-zinc-100 dark:ring-cyan-900/50 dark:focus:ring-cyan-500/20`;
-
-export const softInputAmber = `${field} bg-amber-100 text-zinc-900 caret-zinc-900 ring-1 ring-amber-200/90 placeholder:text-zinc-500 focus:ring-amber-400/35 dark:bg-amber-950/60 dark:text-zinc-50 dark:caret-zinc-50 dark:ring-amber-900/50 dark:placeholder:text-zinc-400 dark:focus:ring-amber-500/20`;
-
-export const softInputEmerald = `${field} bg-emerald-100 text-zinc-900 ring-1 ring-emerald-200/90 placeholder:text-zinc-500 focus:ring-emerald-400/35 dark:bg-emerald-950/55 dark:text-zinc-100 dark:ring-emerald-900/50 dark:placeholder:text-zinc-400 dark:focus:ring-emerald-500/20`;
-
-export const softInputRed = `${field} bg-red-100 text-zinc-900 ring-1 ring-red-200/90 focus:ring-red-400/35 dark:bg-red-950/55 dark:text-zinc-100 dark:ring-red-900/50 dark:focus:ring-red-500/20`;
+/**
+ * Igual que {@link softInputNeutral} pero sin pintura nativa del navegador en `<select>`
+ * (flecha en caja gris / borde de acento al hover o foco). Flecha SVG + `accent-*` neutro.
+ */
+export const softSelectNeutral =
+  `${softInputNeutral} cursor-pointer appearance-none bg-[length:1.125rem] bg-[position:right_0.75rem_center] bg-no-repeat pr-10 accent-zinc-600 dark:accent-zinc-500 ` +
+  `bg-[url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2352525b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E")] ` +
+  `dark:bg-[url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23a1a1aa%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E")]`;
 
 export const softBtnPrimary =
   "rounded-2xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white";

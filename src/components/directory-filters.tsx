@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DIRECTORY_NEW_MEMBER_DAYS } from "@/lib/directory-cohort";
 import {
@@ -9,15 +9,11 @@ import {
   type DirectoryCohort,
   type DirectoryUrlFilters,
 } from "@/lib/directory-query";
+import { softInputNeutral, softPanel } from "@/lib/soft-ui";
 import {
-  softInputAmber,
-  softInputCyan,
-  softInputEmerald,
-  softInputRed,
-  softInputRose,
-  softInputViolet,
-  softPanel,
-} from "@/lib/soft-ui";
+  SoftListbox,
+  type SoftListboxItem,
+} from "@/components/soft-listbox";
 
 function regionLabel(code: string): string {
   try {
@@ -38,6 +34,13 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const sortedCountries = [...countryCodes].sort();
+
+  const cohortLabelId = useId();
+  const statusLabelId = useId();
+  const viewLabelId = useId();
+  const countryLabelId = useId();
+  const searchLabelId = useId();
+  const bannedLabelId = useId();
 
   const [qDraft, setQDraft] = useState(filters.q);
 
@@ -68,6 +71,84 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
 
   const w = "w-full min-w-0";
 
+  const cohortItems: SoftListboxItem[] = [
+    { kind: "option", value: "all", label: "Todos los grupos", accent: "neutral" },
+    { kind: "heading", label: "Situación" },
+    {
+      kind: "option",
+      value: "new",
+      label: `Los nuevos (últimos ${DIRECTORY_NEW_MEMBER_DAYS} días)`,
+      accent: "lime",
+    },
+    {
+      kind: "option",
+      value: "inactive",
+      label: "Los inactivos (siguen en comunidad)",
+      accent: "slate",
+    },
+    {
+      kind: "option",
+      value: "left",
+      label: "Los que se salieron",
+      accent: "amber",
+    },
+    {
+      kind: "option",
+      value: "roster",
+      label: "Los que estuvieron activos (en roster)",
+      accent: "emerald",
+    },
+    { kind: "heading", label: "Rol" },
+    { kind: "option", value: "admins", label: "Admins", accent: "fuchsia" },
+    {
+      kind: "option",
+      value: "protected",
+      label: "Protegidos (sin ban)",
+      accent: "cyan",
+    },
+  ];
+
+  const statusItems: SoftListboxItem[] = [
+    {
+      kind: "option",
+      value: "all",
+      label: "Todos (activos e inactivos)",
+      accent: "neutral",
+    },
+    { kind: "option", value: "active", label: "Solo activos", accent: "emerald" },
+    {
+      kind: "option",
+      value: "inactive",
+      label: "Solo inactivos",
+      accent: "slate",
+    },
+  ];
+
+  const viewItems: SoftListboxItem[] = [
+    { kind: "option", value: "single", label: "Una sola lista", accent: "neutral" },
+    {
+      kind: "option",
+      value: "split",
+      label: "Tres columnas (activos / inactivos / se salieron)",
+      accent: "neutral",
+    },
+  ];
+
+  const countryItems: SoftListboxItem[] = [
+    { kind: "option", value: "", label: "Todos los países", accent: "neutral" },
+    ...sortedCountries.map((code) => ({
+      kind: "option" as const,
+      value: code,
+      label: `${regionLabel(code)} (${code})`,
+      accent: "neutral" as const,
+    })),
+  ];
+
+  const bannedItems: SoftListboxItem[] = [
+    { kind: "option", value: "all", label: "Todos", accent: "neutral" },
+    { kind: "option", value: "only", label: "Solo baneados", accent: "red" },
+  ];
+
   return (
     <div
       className={`${softPanel} mb-4 gap-3 ${isPending ? "opacity-80" : ""}`}
@@ -83,120 +164,95 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
         ) : null}
       </div>
       <div className="flex w-full flex-col gap-3">
-        <label
+        <div
           className={`flex min-w-0 w-full flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200`}
         >
-          Grupo
-          <select
+          <span id={cohortLabelId}>Grupo</span>
+          <SoftListbox
+            labelId={cohortLabelId}
             value={filters.cohort}
-            onChange={(e) =>
-              navigate({ cohort: e.target.value as DirectoryCohort })
-            }
-            className={`${softInputViolet} ${w}`}
-          >
-            <option value="all">Todos los grupos</option>
-            <optgroup label="Situación">
-              <option value="new">
-                Los nuevos (últimos {DIRECTORY_NEW_MEMBER_DAYS} días)
-              </option>
-              <option value="inactive">
-                Los inactivos (siguen en comunidad)
-              </option>
-              <option value="left">Los que se salieron</option>
-              <option value="roster">
-                Los que estuvieron activos (en roster)
-              </option>
-            </optgroup>
-            <optgroup label="Rol">
-              <option value="admins">Admins</option>
-              <option value="protected">Protegidos (sin ban)</option>
-            </optgroup>
-          </select>
-        </label>
+            onChange={(v) => navigate({ cohort: v as DirectoryCohort })}
+            items={cohortItems}
+            className={w}
+          />
+        </div>
 
         <div className="grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-3">
-          <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-            Estado
-            <select
+          <div className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+            <span id={statusLabelId}>Estado</span>
+            <SoftListbox
+              labelId={statusLabelId}
               value={filters.status}
-              onChange={(e) =>
+              onChange={(v) =>
                 navigate({
-                  status: e.target.value as DirectoryUrlFilters["status"],
+                  status: v as DirectoryUrlFilters["status"],
                 })
               }
-              className={`${softInputCyan} ${w}`}
-            >
-              <option value="all">Todos (activos e inactivos)</option>
-              <option value="active">Solo activos</option>
-              <option value="inactive">Solo inactivos</option>
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-            Vista (solo con «todos»)
-            <select
+              items={statusItems}
+              className={w}
+            />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+            <span id={viewLabelId}>Vista (solo con «todos»)</span>
+            <SoftListbox
+              labelId={viewLabelId}
               value={filters.view}
               disabled={filters.status !== "all"}
-              onChange={(e) =>
-                navigate({
-                  view: e.target.value as DirectoryUrlFilters["view"],
-                })
-              }
               title={
                 filters.status !== "all"
                   ? "Elige «Todos» en estado para usar una o dos listas"
                   : undefined
               }
-              className={`${softInputRose} ${w} disabled:cursor-not-allowed disabled:opacity-55`}
-            >
-              <option value="single">Una sola lista</option>
-              <option value="split">
-                Tres columnas (activos / inactivos / se salieron)
-              </option>
-            </select>
-          </label>
-          <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-            País (desde el teléfono)
-            <select
-              value={filters.country || ""}
-              onChange={(e) => navigate({ country: e.target.value })}
-              className={`${softInputAmber} ${w}`}
-            >
-              <option value="">Todos los países</option>
-              {sortedCountries.map((code) => (
-                <option key={code} value={code}>
-                  {regionLabel(code)} ({code})
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={(v) =>
+                navigate({
+                  view: v as DirectoryUrlFilters["view"],
+                })
+              }
+              items={viewItems}
+              className={w}
+            />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+            <span id={countryLabelId}>País (desde el teléfono)</span>
+            <SoftListbox
+              labelId={countryLabelId}
+              value={filters.country ?? ""}
+              onChange={(v) => navigate({ country: v })}
+              items={countryItems}
+              className={w}
+            />
+          </div>
         </div>
 
         <div className="grid w-full min-w-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(11rem,14rem)]">
-          <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+          <label
+            className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200"
+            htmlFor={searchLabelId}
+          >
             Buscar (gamertag, nombre, teléfono, nota, ban, strikes…)
             <input
+              id={searchLabelId}
               type="search"
               value={qDraft}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Texto libre…"
-              className={`${softInputEmerald} ${w}`}
+              className={`${softInputNeutral} ${w}`}
             />
           </label>
-          <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-            Baneos
-            <select
+          <div className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+            <span id={bannedLabelId}>Baneos</span>
+            <SoftListbox
+              labelId={bannedLabelId}
               value={filters.banned === "only" ? "only" : "all"}
-              onChange={(e) =>
+              onChange={(v) =>
                 navigate({
-                  banned: e.target.value === "only" ? "only" : "all",
+                  banned: v === "only" ? "only" : "all",
                 })
               }
-              className={`${softInputRed} ${w}`}
-            >
-              <option value="all">Todos</option>
-              <option value="only">Solo baneados</option>
-            </select>
-          </label>
+              items={bannedItems}
+              className={w}
+            />
+          </div>
         </div>
       </div>
       <p className="text-[11px] text-zinc-500 dark:text-zinc-400">

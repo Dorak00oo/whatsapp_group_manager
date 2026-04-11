@@ -40,20 +40,22 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
   const country = regionLabel(m.phoneCountry);
   const initial = (m.gamertag.trim().charAt(0) || "?").toUpperCase();
 
-  const neonGreen =
-    "border-l-4 border-l-green-500 shadow-[0_0_22px_-8px_rgba(34,197,94,0.38)] dark:border-l-green-700 dark:shadow-[0_0_26px_-10px_rgba(22,163,74,0.12)]";
-  const neonSky =
-    "border-l-4 border-l-sky-500 shadow-[0_0_22px_-8px_rgba(14,165,233,0.36)] dark:border-l-sky-700 dark:shadow-[0_0_26px_-10px_rgba(3,105,161,0.12)]";
-  const neonViolet =
-    "border-l-4 border-l-violet-500 shadow-[0_0_24px_-8px_rgba(139,92,246,0.42)] dark:border-l-violet-700 dark:shadow-[0_0_26px_-10px_rgba(91,33,182,0.14)]";
+  const neonEmerald =
+    "border-l-[5px] border-l-emerald-800 border-solid dark:border-l-emerald-600";
+  const neonAsh =
+    "border-l-[5px] border-l-slate-700 border-solid dark:border-l-slate-400";
+  const neonAmber =
+    "border-l-[5px] border-l-amber-700 border-solid dark:border-l-amber-500";
+  const neonRed =
+    "border-l-[5px] border-l-red-800 border-solid dark:border-l-red-600";
 
   const surface = m.banned
-    ? "bg-rose-100 ring-rose-200/90 dark:bg-rose-950/45 dark:ring-rose-900/50"
+    ? `bg-red-100 dark:bg-red-950/65 ${neonRed}`
     : m.leftAt
-      ? `bg-violet-100 ring-violet-200/90 dark:bg-violet-950/70 dark:ring-violet-900/60 ${neonViolet}`
+      ? `bg-amber-50 dark:bg-amber-950/40 ${neonAmber}`
       : m.active
-        ? `bg-green-100 ring-green-200/90 dark:bg-green-950/70 dark:ring-green-900/60 ${neonGreen}`
-        : `bg-sky-100 ring-sky-200/90 dark:bg-sky-950/70 dark:ring-sky-900/60 ${neonSky}`;
+        ? `bg-emerald-100 dark:bg-emerald-950/55 ${neonEmerald}`
+        : `bg-slate-100 dark:bg-slate-900/55 ${neonAsh}`;
 
   function openEditor() {
     setFormKey((k) => k + 1);
@@ -63,7 +65,7 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
   return (
     <li className="list-none">
       <div
-        className={`group relative overflow-hidden rounded-[1.75rem] p-4 pl-5 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200/60 transition-[box-shadow,transform] duration-200 hover:shadow-md md:hover:scale-[1.005] dark:shadow-none dark:ring-zinc-800/65 ${surface}`}
+        className={`group relative overflow-hidden rounded-[1.75rem] border border-solid border-zinc-200/80 p-4 pl-5 shadow-sm shadow-zinc-900/[0.04] transition-[box-shadow,transform] duration-200 hover:shadow-md md:hover:scale-[1.005] dark:border-zinc-700/80 dark:shadow-none ${surface}`}
       >
         <div className="flex gap-3 sm:gap-4">
           <div
@@ -123,7 +125,7 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
             <DirectoryMemberRoleChips m={m} compact />
 
             {m.banned && m.bannedReason ? (
-              <p className="mt-2 line-clamp-2 text-xs text-red-700 dark:text-red-400">
+              <p className="mt-2 line-clamp-2 text-xs font-medium text-red-800 dark:text-red-300">
                 <span className="font-medium">Ban:</span> {m.bannedReason}
               </p>
             ) : null}
