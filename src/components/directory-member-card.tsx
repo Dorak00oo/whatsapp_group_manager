@@ -1,6 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { DirectoryMemberEditorDialog } from "@/components/directory-member-editor-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
 import type { DirectoryMemberDTO } from "@/types/directory";
@@ -12,6 +18,57 @@ function regionLabel(code: string | null): string | null {
   } catch {
     return code;
   }
+}
+
+function MemberNotesBlock({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [canToggle, setCanToggle] = useState(false);
+  const pRef = useRef<HTMLParagraphElement>(null);
+
+  const measure = useCallback(() => {
+    const el = pRef.current;
+    if (!el) return;
+    if (expanded) {
+      setCanToggle(true);
+      return;
+    }
+    setCanToggle(el.scrollHeight > el.clientHeight + 1);
+  }, [expanded]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure, text]);
+
+  useEffect(() => {
+    const el = pRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measure]);
+
+  return (
+    <div
+      className="mt-2 border-l-2 border-zinc-300/80 pl-2 dark:border-zinc-600"
+      title={expanded ? undefined : text}
+    >
+      <p
+        ref={pRef}
+        className={`text-xs text-zinc-600 dark:text-zinc-400 ${expanded ? "" : "line-clamp-2"}`}
+      >
+        {text}
+      </p>
+      {canToggle ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs font-medium text-zinc-700 underline decoration-zinc-400/80 underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+        >
+          {expanded ? "Ver menos" : "Ver más"}
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 function PencilIcon({ className }: { className?: string }) {
@@ -139,14 +196,7 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
               </p>
             ) : null}
 
-            {m.notes ? (
-              <p
-                className="mt-2 line-clamp-2 border-l-2 border-zinc-300/80 pl-2 text-xs text-zinc-600 dark:border-zinc-600 dark:text-zinc-400"
-                title={m.notes}
-              >
-                {m.notes}
-              </p>
-            ) : null}
+            {m.notes ? <MemberNotesBlock key={m.notes} text={m.notes} /> : null}
           </div>
         </div>
       </div>
