@@ -3,6 +3,7 @@ import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { DirectorySection } from "@/components/directory-section";
 import {
   directoryMemberWhere,
+  directoryMemberWhereIgnoringListStatus,
   parseDirectoryFilters,
 } from "@/lib/directory-query";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
@@ -35,14 +36,19 @@ export default async function DashboardPage({
   const filters = parseDirectoryFilters(sp);
 
   const whereMembers = directoryMemberWhere(userId, filters);
+  const whereForRosterCounts = directoryMemberWhereIgnoringListStatus(
+    userId,
+    filters,
+  );
 
   let membersRaw: Awaited<
     ReturnType<typeof prisma.directoryMember.findMany<{ include: { strikes: true } }>>
   >;
   let countryRows: { phoneCountry: string | null }[];
+  let rosterCounts: { active: number; inactive: number; left: number };
 
   try {
-    [membersRaw, countryRows] = await Promise.all([
+    [membersRaw, countryRows, rosterCounts] = await Promise.all([
       prisma.directoryMember.findMany({
         where: whereMembers,
         include: {
@@ -55,6 +61,32 @@ export default async function DashboardPage({
         select: { phoneCountry: true },
         distinct: ["phoneCountry"],
       }),
+      (async () => {
+        const [active, inactive, left] = await Promise.all([
+          prisma.directoryMember.count({
+            where: {
+              AND: [
+                whereForRosterCounts,
+                { leftAt: null, active: true },
+              ],
+            },
+          }),
+          prisma.directoryMember.count({
+            where: {
+              AND: [
+                whereForRosterCounts,
+                { leftAt: null, active: false },
+              ],
+            },
+          }),
+          prisma.directoryMember.count({
+            where: {
+              AND: [whereForRosterCounts, { leftAt: { not: null } }],
+            },
+          }),
+        ]);
+        return { active, inactive, left };
+      })(),
     ]);
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
@@ -102,6 +134,7 @@ export default async function DashboardPage({
         filters={filters}
         countryCodes={countryCodes}
         members={members}
+        rosterCounts={rosterCounts}
       />
     </section>
   );

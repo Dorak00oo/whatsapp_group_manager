@@ -25,6 +25,39 @@ function sortMembersSingleList(members: DirectoryMemberDTO[]): DirectoryMemberDT
   });
 }
 
+const stripGreen =
+  "break-words rounded-xl border-l-4 border-l-green-500 bg-green-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(34,197,94,0.35)] ring-1 ring-green-200/90 dark:border-l-green-700 dark:bg-green-950/70 dark:text-zinc-100 dark:ring-green-900/60 dark:shadow-[0_0_22px_-8px_rgba(22,163,74,0.12)]";
+const stripSky =
+  "break-words rounded-xl border-l-4 border-l-sky-500 bg-sky-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(14,165,233,0.34)] ring-1 ring-sky-200/90 dark:border-l-sky-700 dark:bg-sky-950/70 dark:text-zinc-100 dark:ring-sky-900/60 dark:shadow-[0_0_22px_-8px_rgba(3,105,161,0.12)]";
+const stripViolet =
+  "break-words rounded-xl border-l-4 border-l-violet-500 bg-violet-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(139,92,246,0.38)] ring-1 ring-violet-200/90 dark:border-l-violet-700 dark:bg-violet-950/70 dark:text-zinc-100 dark:ring-violet-900/60 dark:shadow-[0_0_22px_-8px_rgba(91,33,182,0.14)]";
+
+export type DirectoryRosterCounts = {
+  active: number;
+  inactive: number;
+  left: number;
+};
+
+function RosterCountsStrip({ counts }: { counts: DirectoryRosterCounts }) {
+  return (
+    <div
+      className="mb-4 grid gap-2 sm:grid-cols-3"
+      role="region"
+      aria-label="Cantidades por situación en roster (cohorte, país, búsqueda y baneos; sin filtro de estado de la lista)"
+    >
+      <div className={stripGreen}>
+        Los que estuvieron activos ({counts.active})
+      </div>
+      <div className={stripSky}>
+        Los inactivos ({counts.inactive})
+      </div>
+      <div className={stripViolet}>
+        Los que se salieron ({counts.left})
+      </div>
+    </div>
+  );
+}
+
 function MemberList({
   members,
   empty,
@@ -52,9 +85,15 @@ type Props = {
   filters: DirectoryUrlFilters;
   countryCodes: string[];
   members: DirectoryMemberDTO[];
+  rosterCounts: DirectoryRosterCounts;
 };
 
-export function DirectorySection({ filters, countryCodes, members }: Props) {
+export function DirectorySection({
+  filters,
+  countryCodes,
+  members,
+  rosterCounts,
+}: Props) {
   const activeRoster = members.filter((m) => !m.leftAt && m.active);
   const inactiveRoster = members.filter((m) => !m.leftAt && !m.active);
   const leftCommunity = members.filter((m) => Boolean(m.leftAt));
@@ -71,6 +110,8 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
       >
         <DirectoryFilters filters={filters} countryCodes={countryCodes} />
       </Suspense>
+
+      {!showSplit ? <RosterCountsStrip counts={rosterCounts} /> : null}
 
       {members.length === 0 ? (
         <p className="rounded-[1.75rem] border border-dashed border-zinc-300/90 bg-zinc-50/80 p-8 text-center text-sm text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900/30 dark:text-zinc-400">
@@ -93,8 +134,8 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
       ) : showSplit ? (
         <div className="grid gap-8 lg:grid-cols-3">
           <div>
-            <h3 className="mb-3 break-words rounded-xl border-l-4 border-l-green-500 bg-green-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(34,197,94,0.35)] ring-1 ring-green-200/90 dark:border-l-green-700 dark:bg-green-950/70 dark:text-zinc-100 dark:ring-green-900/60 dark:shadow-[0_0_22px_-8px_rgba(22,163,74,0.12)]">
-              Los que estuvieron activos ({activeRoster.length})
+            <h3 className={`mb-3 ${stripGreen}`}>
+              Los que estuvieron activos ({rosterCounts.active})
             </h3>
             <MemberList
               members={activeRoster}
@@ -102,8 +143,8 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
             />
           </div>
           <div>
-            <h3 className="mb-3 break-words rounded-xl border-l-4 border-l-sky-500 bg-sky-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(14,165,233,0.34)] ring-1 ring-sky-200/90 dark:border-l-sky-700 dark:bg-sky-950/70 dark:text-zinc-100 dark:ring-sky-900/60 dark:shadow-[0_0_22px_-8px_rgba(3,105,161,0.12)]">
-              Los inactivos ({inactiveRoster.length})
+            <h3 className={`mb-3 ${stripSky}`}>
+              Los inactivos ({rosterCounts.inactive})
             </h3>
             <MemberList
               members={inactiveRoster}
@@ -111,8 +152,8 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
             />
           </div>
           <div>
-            <h3 className="mb-3 break-words rounded-xl border-l-4 border-l-violet-500 bg-violet-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(139,92,246,0.38)] ring-1 ring-violet-200/90 dark:border-l-violet-700 dark:bg-violet-950/70 dark:text-zinc-100 dark:ring-violet-900/60 dark:shadow-[0_0_22px_-8px_rgba(91,33,182,0.14)]">
-              Los que se salieron ({leftCommunity.length})
+            <h3 className={`mb-3 ${stripViolet}`}>
+              Los que se salieron ({rosterCounts.left})
             </h3>
             <MemberList
               members={leftCommunity}

@@ -115,3 +115,16 @@ export function directoryMemberWhere(
 
   return { AND: parts };
 }
+
+/**
+ * Misma base que la lista (grupo, país, búsqueda, baneos…) **sin** el filtro
+ * «Estado» (solo activos / solo inactivos). Sirve para contar las tres franjas
+ * del roster aunque la lista visible esté acotada por estado o vista.
+ */
+export function directoryMemberWhereIgnoringListStatus(
+  userId: string,
+  filters: DirectoryUrlFilters,
+  now?: Date,
+): Prisma.DirectoryMemberWhereInput {
+  return directoryMemberWhere(userId, { ...filters, status: "all" }, now);
+}
