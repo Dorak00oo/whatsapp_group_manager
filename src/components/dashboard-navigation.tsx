@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const iconSm = "size-5";
+const iconSidebar = "size-[18px]";
 
 function IconList({ className }: { className?: string }) {
   return (
@@ -72,8 +73,9 @@ function IconUpload({ className }: { className?: string }) {
   );
 }
 
-const linkBase =
-  "flex size-12 items-center justify-center rounded-full transition-colors duration-200";
+/** Iconos circulares — lateral escritorio (carril estrecho). */
+const linkBaseSidebar =
+  "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
 
 function IconBot({ className }: { className?: string }) {
   return (
@@ -114,87 +116,97 @@ function activeCls(on: boolean) {
     : "bg-white text-zinc-700 ring-1 ring-zinc-900/10 hover:bg-zinc-50 dark:bg-zinc-900/40 dark:text-zinc-300 dark:ring-zinc-700/60 dark:hover:bg-zinc-800/70";
 }
 
-/** Barra lateral estrecha con iconos (desktop / tablet). */
+function activeTabCls(on: boolean) {
+  return on
+    ? "bg-zinc-200/90 text-zinc-900 dark:bg-zinc-800/85 dark:text-zinc-50"
+    : "text-zinc-500 dark:text-zinc-400";
+}
+
+/** Barra lateral: iconos pequeños (md+). */
 export function DashboardSidebarNav() {
   const { list, add, bulk, bot } = useNavActive();
 
   return (
     <nav
-      className="mx-auto flex w-fit flex-col items-center gap-2"
+      className="flex w-full flex-col items-center gap-2"
       aria-label="Secciones del panel"
     >
       <Link
         href="/dashboard"
-        className={`${linkBase} ${activeCls(list)}`}
+        className={`${linkBaseSidebar} ${activeCls(list)}`}
         title="Lista de personas"
         aria-current={list ? "page" : undefined}
       >
-        <IconList />
+        <IconList className={iconSidebar} />
       </Link>
       <Link
         href="/dashboard/agregar"
-        className={`${linkBase} ${activeCls(add)}`}
+        className={`${linkBaseSidebar} ${activeCls(add)}`}
         title="Agregar persona"
         aria-current={add ? "page" : undefined}
       >
-        <IconUserPlus />
+        <IconUserPlus className={iconSidebar} />
       </Link>
       <Link
         href="/dashboard/importar"
-        className={`${linkBase} ${activeCls(bulk)}`}
+        className={`${linkBaseSidebar} ${activeCls(bulk)}`}
         title="Importar y log"
         aria-current={bulk ? "page" : undefined}
       >
-        <IconUpload />
+        <IconUpload className={iconSidebar} />
       </Link>
       <Link
         href="/dashboard/bot"
-        className={`${linkBase} ${activeCls(bot)}`}
+        className={`${linkBaseSidebar} ${activeCls(bot)}`}
         title="Bot WhatsApp"
         aria-current={bot ? "page" : undefined}
       >
-        <IconBot />
+        <IconBot className={iconSidebar} />
       </Link>
     </nav>
   );
 }
 
-/** Solo iconos en fila (móvil); cerrar sesión va debajo en el layout. */
-export function DashboardNavMobile() {
+const tabBase =
+  "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 transition-colors active:bg-zinc-200/60 dark:active:bg-zinc-800/60";
+
+/** Navegación fija inferior (solo móvil): icono + etiqueta; el menú «Más» va aparte en el layout. */
+export function DashboardMobileTabNav() {
   const { list, add, bulk, bot } = useNavActive();
 
   return (
-    <nav
-      className="flex w-full items-center justify-center gap-2"
-      aria-label="Secciones del panel"
-    >
+    <nav className="flex w-full min-w-0 items-stretch justify-between gap-0.5">
       <Link
         href="/dashboard"
-        className={`${linkBase} ${activeCls(list)}`}
+        className={`${tabBase} ${activeTabCls(list)}`}
         aria-current={list ? "page" : undefined}
       >
-        <IconList />
+        <IconList className="size-[1.125rem] shrink-0" />
+        <span className="text-[10px] font-medium leading-none">Lista</span>
       </Link>
       <Link
         href="/dashboard/agregar"
-        className={`${linkBase} ${activeCls(add)}`}
+        className={`${tabBase} ${activeTabCls(add)}`}
         aria-current={add ? "page" : undefined}
       >
-        <IconUserPlus />
+        <IconUserPlus className="size-[1.125rem] shrink-0" />
+        <span className="text-[10px] font-medium leading-none">Agregar</span>
       </Link>
       <Link
         href="/dashboard/importar"
-        className={`${linkBase} ${activeCls(bulk)}`}
+        className={`${tabBase} ${activeTabCls(bulk)}`}
         aria-current={bulk ? "page" : undefined}
       >
-        <IconUpload />
+        <IconUpload className="size-[1.125rem] shrink-0" />
+        <span className="text-[10px] font-medium leading-none">Importar</span>
       </Link>
       <Link
         href="/dashboard/bot"
-        className={`${linkBase} ${activeCls(bot)}`}
+        className={`${tabBase} ${activeTabCls(bot)}`}
         aria-current={bot ? "page" : undefined}
       >
-        <IconBot />
+        <IconBot className="size-[1.125rem] shrink-0" />
+        <span className="text-[10px] font-medium leading-none">Bot</span>
       </Link>
     </nav>
   );

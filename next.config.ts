@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     "@prisma/client",
     "prisma",
   ],
+  allowedDevOrigins: ["192.168.40.95"],
 };
 
 export default nextConfig;

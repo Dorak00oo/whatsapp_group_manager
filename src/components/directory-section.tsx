@@ -93,7 +93,7 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
       ) : showSplit ? (
         <div className="grid gap-8 lg:grid-cols-3">
           <div>
-            <h3 className="mb-3 rounded-xl border-l-4 border-l-green-500 bg-green-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(34,197,94,0.35)] ring-1 ring-green-200/90 dark:border-l-green-700 dark:bg-green-950/70 dark:text-zinc-100 dark:ring-green-900/60 dark:shadow-[0_0_22px_-8px_rgba(22,163,74,0.12)]">
+            <h3 className="mb-3 break-words rounded-xl border-l-4 border-l-green-500 bg-green-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(34,197,94,0.35)] ring-1 ring-green-200/90 dark:border-l-green-700 dark:bg-green-950/70 dark:text-zinc-100 dark:ring-green-900/60 dark:shadow-[0_0_22px_-8px_rgba(22,163,74,0.12)]">
               Los que estuvieron activos ({activeRoster.length})
             </h3>
             <MemberList
@@ -102,7 +102,7 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
             />
           </div>
           <div>
-            <h3 className="mb-3 rounded-xl border-l-4 border-l-sky-500 bg-sky-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(14,165,233,0.34)] ring-1 ring-sky-200/90 dark:border-l-sky-700 dark:bg-sky-950/70 dark:text-zinc-100 dark:ring-sky-900/60 dark:shadow-[0_0_22px_-8px_rgba(3,105,161,0.12)]">
+            <h3 className="mb-3 break-words rounded-xl border-l-4 border-l-sky-500 bg-sky-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(14,165,233,0.34)] ring-1 ring-sky-200/90 dark:border-l-sky-700 dark:bg-sky-950/70 dark:text-zinc-100 dark:ring-sky-900/60 dark:shadow-[0_0_22px_-8px_rgba(3,105,161,0.12)]">
               Los inactivos ({inactiveRoster.length})
             </h3>
             <MemberList
@@ -111,7 +111,7 @@ export function DirectorySection({ filters, countryCodes, members }: Props) {
             />
           </div>
           <div>
-            <h3 className="mb-3 rounded-xl border-l-4 border-l-violet-500 bg-violet-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(139,92,246,0.38)] ring-1 ring-violet-200/90 dark:border-l-violet-700 dark:bg-violet-950/70 dark:text-zinc-100 dark:ring-violet-900/60 dark:shadow-[0_0_22px_-8px_rgba(91,33,182,0.14)]">
+            <h3 className="mb-3 break-words rounded-xl border-l-4 border-l-violet-500 bg-violet-100 px-3 py-2 text-sm font-semibold text-zinc-800 shadow-[0_0_18px_-6px_rgba(139,92,246,0.38)] ring-1 ring-violet-200/90 dark:border-l-violet-700 dark:bg-violet-950/70 dark:text-zinc-100 dark:ring-violet-900/60 dark:shadow-[0_0_22px_-8px_rgba(91,33,182,0.14)]">
               Los que se salieron ({leftCommunity.length})
             </h3>
             <MemberList

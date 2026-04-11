@@ -10,7 +10,7 @@ export function LoginForm() {
   return (
     <form
       action={formAction}
-      className="flex w-full max-w-sm flex-col gap-4 rounded-[1.75rem] bg-white p-8 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200/90 dark:bg-zinc-900/50 dark:ring-zinc-700/60"
+      className="flex w-full max-w-sm flex-col gap-4 rounded-[1.75rem] bg-white p-5 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200/90 sm:p-8 dark:bg-zinc-900/50 dark:ring-zinc-700/60"
     >
       <div>
         <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">

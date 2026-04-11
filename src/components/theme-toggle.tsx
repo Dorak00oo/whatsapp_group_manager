@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore, type ReactNode } from "react";
 
 const THEME_COOKIE_ATTRS = "path=/;max-age=31536000;SameSite=Lax";
 
@@ -64,8 +64,12 @@ type Props = {
   wrapperClassName?: string;
   /** Botones más pequeños (barra de perfil / cabecera). */
   compact?: boolean;
-  /** Columna de círculos como la navbar lateral (`row` = horizontal por defecto). */
-  layout?: "row" | "column";
+  /** `segmented` = control tipo pestaña (p. ej. móvil). */
+  layout?: "row" | "column" | "segmented";
+  /** En columna: botones más chicos (rail lateral estrecho). */
+  columnCompact?: boolean;
+  /** En columna: subtítulos «Claro» / «Oscuro» bajo cada botón. */
+  columnShowLabels?: boolean;
 };
 
 const defaultWrapperClass =
@@ -76,6 +80,8 @@ export function ThemeToggle({
   wrapperClassName,
   compact,
   layout = "row",
+  columnCompact = false,
+  columnShowLabels = false,
 }: Props) {
   const router = useRouter();
   const isDark = useSyncExternalStore(
@@ -100,18 +106,26 @@ export function ThemeToggle({
   const rad = compact ? "rounded-lg" : "rounded-xl";
   const icon = compact ? 18 : 20;
 
-  const columnBtn =
-    "flex size-12 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
-  const columnIcon = 22;
+  const columnBtn = columnCompact
+    ? "flex size-9 shrink-0 items-center justify-center rounded-full transition-colors duration-200"
+    : "flex size-12 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
+  const columnIcon = columnCompact ? 18 : 22;
   const columnActive =
     "bg-zinc-900 text-white shadow-md dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-none";
   const columnIdle =
     "bg-white text-zinc-600 ring-1 ring-zinc-900/10 hover:bg-zinc-50 dark:bg-zinc-900/40 dark:text-zinc-400 dark:ring-zinc-700/60 dark:hover:bg-zinc-800/70";
 
-  if (layout === "column") {
+  if (layout === "segmented") {
+    const segBtn = (active: boolean) =>
+      active
+        ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-900/10 dark:bg-zinc-600 dark:text-zinc-50 dark:ring-zinc-500/40"
+        : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200";
     return (
       <div
-        className={wrapperClassName ?? "flex flex-col items-center gap-2"}
+        className={
+          wrapperClassName ??
+          "inline-flex min-w-0 flex-1 rounded-full bg-zinc-200/85 p-0.5 ring-1 ring-zinc-300/50 dark:bg-zinc-800/90 dark:ring-zinc-600/50"
+        }
         role="group"
         aria-label="Tema de la interfaz"
       >
@@ -119,22 +133,74 @@ export function ThemeToggle({
           type="button"
           onClick={setLight}
           aria-pressed={!isDark}
-          aria-label="Modo claro"
-          title="Modo claro"
-          className={`${columnBtn} ${!isDark ? columnActive : columnIdle}`}
+          aria-label="Tema día (claro)"
+          className={`flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition ${segBtn(!isDark)}`}
         >
-          <SunIcon size={columnIcon} />
+          <SunIcon size={17} />
+          Claro
         </button>
         <button
           type="button"
           onClick={setDark}
           aria-pressed={isDark}
-          aria-label="Modo oscuro"
-          title="Modo oscuro"
-          className={`${columnBtn} ${isDark ? columnActive : columnIdle}`}
+          aria-label="Tema noche (oscuro)"
+          className={`flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition ${segBtn(isDark)}`}
         >
-          <MoonIcon size={columnIcon} />
+          <MoonIcon size={17} />
+          Oscuro
         </button>
+      </div>
+    );
+  }
+
+  if (layout === "column") {
+    const wrapLabel = (
+      label: string,
+      node: ReactNode,
+    ) =>
+      columnShowLabels ? (
+        <div className="flex flex-col items-center gap-1">
+          {node}
+          <span className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">
+            {label}
+          </span>
+        </div>
+      ) : (
+        node
+      );
+
+    return (
+      <div
+        className={wrapperClassName ?? "flex flex-col items-center gap-2"}
+        role="group"
+        aria-label="Tema de la interfaz"
+      >
+        {wrapLabel(
+          "Claro",
+          <button
+            type="button"
+            onClick={setLight}
+            aria-pressed={!isDark}
+            aria-label="Modo claro"
+            title="Modo claro"
+            className={`${columnBtn} ${!isDark ? columnActive : columnIdle}`}
+          >
+            <SunIcon size={columnIcon} />
+          </button>
+        )}
+        {wrapLabel(
+          "Oscuro",
+          <button
+            type="button"
+            onClick={setDark}
+            aria-pressed={isDark}
+            aria-label="Modo oscuro"
+            title="Modo oscuro"
+            className={`${columnBtn} ${isDark ? columnActive : columnIdle}`}
+          >
+            <MoonIcon size={columnIcon} />
+          </button>
+        )}
       </div>
     );
   }

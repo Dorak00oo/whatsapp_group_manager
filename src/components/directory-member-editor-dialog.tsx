@@ -87,7 +87,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6">
       <button
         type="button"
         className="absolute inset-0 bg-zinc-950/55 backdrop-blur-[2px] transition-opacity dark:bg-black/65"
@@ -98,7 +98,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
         role="dialog"
         aria-modal
         aria-labelledby={`member-edit-title-${m.id}`}
-        className="relative z-10 flex max-h-[min(90vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-[1.75rem] bg-white shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200/90 dark:bg-zinc-900 dark:shadow-none dark:ring-zinc-700/60"
+        className="relative z-10 flex max-h-[min(100dvh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[1.75rem] bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200/90 sm:max-h-[min(90vh,720px)] sm:rounded-[1.75rem] sm:pb-0 dark:bg-zinc-900 dark:shadow-none dark:ring-zinc-700/60"
       >
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800 sm:px-5 sm:py-4">
           <div className="min-w-0">

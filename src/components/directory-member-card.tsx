@@ -63,7 +63,7 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
   return (
     <li className="list-none">
       <div
-        className={`group relative overflow-hidden rounded-[1.75rem] p-4 pl-5 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200/60 transition-[box-shadow,transform] duration-200 hover:scale-[1.005] hover:shadow-md dark:shadow-none dark:ring-zinc-800/65 ${surface}`}
+        className={`group relative overflow-hidden rounded-[1.75rem] p-4 pl-5 shadow-sm shadow-zinc-900/[0.04] ring-1 ring-zinc-200/60 transition-[box-shadow,transform] duration-200 hover:shadow-md md:hover:scale-[1.005] dark:shadow-none dark:ring-zinc-800/65 ${surface}`}
       >
         <div className="flex gap-3 sm:gap-4">
           <div

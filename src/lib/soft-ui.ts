@@ -3,7 +3,7 @@
  */
 
 export const softPanel =
-  "flex w-full min-w-0 flex-col gap-4 rounded-[1.75rem] border border-zinc-200/70 bg-white p-5 shadow-sm shadow-zinc-900/[0.04] dark:border-zinc-800/90 dark:bg-zinc-950/90 dark:shadow-none";
+  "flex w-full min-w-0 flex-col gap-4 rounded-[1.75rem] border border-zinc-200/70 bg-white p-4 shadow-sm shadow-zinc-900/[0.04] sm:p-5 dark:border-zinc-800/90 dark:bg-zinc-950/90 dark:shadow-none";
 
 const field =
   "rounded-2xl border-0 px-4 py-2.5 text-sm outline-none transition focus:outline-none focus:ring-2 focus:ring-offset-0 dark:focus:ring-offset-0";

@@ -1,53 +1,26 @@
-import { SignOutButton } from "@/components/sign-out-button";
-import { DashboardProfilePanel } from "@/components/dashboard-profile-panel";
-import { DashboardProfileTheme } from "@/components/dashboard-profile-theme";
-import { DashboardNavMobile } from "@/components/dashboard-navigation";
+"use client";
 
-const mobileRailClass =
-  "flex flex-col gap-3 rounded-[1.75rem] bg-zinc-100 px-3.5 py-5 shadow-sm ring-1 ring-zinc-900/[0.06] dark:bg-zinc-950 dark:shadow-none dark:ring-zinc-800/80";
-
-const identityBandClass =
-  "flex w-full flex-col items-center rounded-2xl bg-white/75 py-3 ring-1 ring-zinc-200/55 dark:bg-zinc-900/55 dark:ring-zinc-700/55";
-
-const themeBandClass =
-  "flex w-full flex-col items-center rounded-2xl bg-amber-50/90 py-3.5 ring-1 ring-amber-200/60 dark:bg-amber-950/35 dark:ring-amber-800/45";
-
-const pagesBandClass =
-  "flex w-full flex-col items-center rounded-2xl bg-sky-100/65 py-3.5 ring-1 ring-sky-200/55 dark:bg-sky-950/32 dark:ring-sky-900/45";
-
-const signOutSepClass =
-  "mt-0.5 flex w-full justify-center border-t border-zinc-300/45 pt-3.5 dark:border-zinc-700/55";
-
-type User = {
-  email?: string | null;
-  name?: string | null;
-};
+import { DashboardMobileMoreDrawer } from "@/components/dashboard-mobile-more-drawer";
+import { DashboardMobileTabNav } from "@/components/dashboard-navigation";
 
 type Props = {
-  user: User;
   defaultThemeDark: boolean;
 };
 
-/** Móvil: perfil → nav → cerrar sesión (misma jerarquía que desktop). */
-export function DashboardMobileChrome({ user, defaultThemeDark }: Props) {
+/**
+ * Móvil: barra superior con tabs + menú «Más» (tema y cerrar sesión).
+ */
+export function DashboardMobileChrome({ defaultThemeDark }: Props) {
   return (
-    <div className={mobileRailClass}>
-      <div className={identityBandClass}>
-        <DashboardProfilePanel
-          user={user}
-          defaultThemeDark={defaultThemeDark}
-          embedded
-          showTheme={false}
-        />
+    <div
+      className="fixed inset-x-0 top-0 z-[100] flex items-stretch gap-0 overflow-visible border-b border-zinc-200/90 bg-background/95 pb-1.5 pl-[max(0.25rem,env(safe-area-inset-left,0px))] pr-[max(0.25rem,env(safe-area-inset-right,0px))] pt-[max(0.5rem,env(safe-area-inset-top,0px))] backdrop-blur-md dark:border-zinc-800/90 md:hidden"
+      role="presentation"
+    >
+      <div className="flex min-w-0 flex-1 items-stretch overflow-visible px-0.5">
+        <DashboardMobileTabNav />
       </div>
-      <div className={themeBandClass} aria-label="Tema claro u oscuro">
-        <DashboardProfileTheme defaultThemeDark={defaultThemeDark} />
-      </div>
-      <div className={pagesBandClass}>
-        <DashboardNavMobile />
-      </div>
-      <div className={signOutSepClass}>
-        <SignOutButton iconOnly />
+      <div className="relative z-[1] flex w-[3.25rem] shrink-0 flex-col justify-stretch overflow-visible border-l border-zinc-200/80 dark:border-zinc-800/70">
+        <DashboardMobileMoreDrawer defaultThemeDark={defaultThemeDark} />
       </div>
     </div>
   );

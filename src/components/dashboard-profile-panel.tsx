@@ -12,6 +12,10 @@ type Props = {
   embedded?: boolean;
   /** Si es false, solo identidad (el toggle va en otra franja del carril). */
   showTheme?: boolean;
+  /** Avatar y texto más chicos (rail lateral o barra móvil). */
+  compact?: boolean;
+  /** Con `embedded`: fila horizontal (barra superior móvil). */
+  embeddedInline?: boolean;
 };
 
 function initialFromUser(user: User): string {
@@ -27,24 +31,56 @@ export function DashboardProfilePanel({
   defaultThemeDark,
   embedded = false,
   showTheme = true,
+  compact = false,
+  embeddedInline = false,
 }: Props) {
   const initial = initialFromUser(user);
 
   const inner = (
     <>
       <div
-        className="flex size-14 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xl font-bold text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-none"
+        className={`flex shrink-0 items-center justify-center rounded-full bg-zinc-900 font-bold text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-none ${
+          compact
+            ? "size-10 text-sm"
+            : "size-14 text-xl"
+        }`}
         aria-hidden
       >
         {initial}
       </div>
 
-      <div className="max-w-[11rem] px-1 text-center">
-        <p className="text-[0.9375rem] font-semibold leading-tight text-zinc-900 dark:text-zinc-50">
+      <div
+        className={`min-w-0 w-full ${
+          embeddedInline ? "flex-1 px-0 text-left" : "text-center"
+        } ${
+          embeddedInline
+            ? ""
+            : compact
+              ? "max-w-[9rem]"
+              : "w-full max-w-full"
+        }`}
+      >
+        <p
+          className={`font-semibold leading-tight text-zinc-900 dark:text-zinc-50 ${
+            embeddedInline
+              ? "truncate text-sm"
+              : compact
+                ? "text-xs"
+                : "text-[0.9375rem]"
+          }`}
+        >
           {user.name?.trim() || "Cuenta comunitaria"}
         </p>
         {user.email ? (
-          <p className="mt-1.5 break-all text-xs leading-snug text-zinc-500 dark:text-zinc-400">
+          <p
+            className={`text-zinc-500 dark:text-zinc-400 ${
+              embeddedInline
+                ? "truncate text-[11px] leading-snug"
+                : `break-all leading-snug ${
+                    compact ? "mt-1 text-[10px]" : "mt-1.5 text-xs"
+                  }`
+            }`}
+          >
             {user.email}
           </p>
         ) : null}
@@ -57,9 +93,19 @@ export function DashboardProfilePanel({
   );
 
   if (embedded) {
+    if (embeddedInline) {
+      return (
+        <div
+          className="flex min-w-0 flex-1 items-center gap-2.5"
+          aria-label="Perfil y preferencias"
+        >
+          {inner}
+        </div>
+      );
+    }
     return (
       <div
-        className="flex w-full flex-col items-center gap-3"
+        className={`flex w-full flex-col items-center ${compact ? "gap-2" : "gap-3"}`}
         aria-label="Perfil y preferencias"
       >
         {inner}

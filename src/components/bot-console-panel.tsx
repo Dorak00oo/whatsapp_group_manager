@@ -380,7 +380,7 @@ export function BotConsolePanel() {
               </code>
               .
             </p>
-            <pre className="mt-4 overflow-x-auto rounded-xl bg-zinc-950 p-4 text-xs text-zinc-100">
+            <pre className="mt-4 max-w-full overflow-x-auto rounded-xl bg-zinc-950 p-3 text-[11px] leading-relaxed text-zinc-100 sm:p-4 sm:text-xs">
               {ENV_SNIPPET}
             </pre>
             <button
@@ -442,7 +442,7 @@ export function BotConsolePanel() {
                 con código de país (ej. Colombia 57…, México 521…, Argentina
                 549…).
               </p>
-              <div className="mt-3 flex flex-wrap items-stretch gap-2 sm:items-center">
+              <div className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-stretch">
                 <input
                   type="tel"
                   inputMode="tel"
@@ -451,14 +451,14 @@ export function BotConsolePanel() {
                   value={pairingPhone}
                   onChange={(e) => setPairingPhone(e.target.value)}
                   disabled={pairingCodeLoading}
-                  className="min-w-[200px] flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
+                  className="min-w-0 w-full flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-base text-zinc-900 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 disabled:opacity-60 sm:text-sm dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
                   aria-label="Número de WhatsApp para código de emparejamiento"
                 />
                 <button
                   type="button"
                   onClick={() => void requestPairingCode()}
                   disabled={pairingCodeLoading || !botRemoteConfigured}
-                  className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  className="w-full shrink-0 rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
                 >
                   {pairingCodeLoading ? "Generando…" : "Obtener código"}
                 </button>
@@ -486,7 +486,7 @@ export function BotConsolePanel() {
             <p className="text-center text-xs font-medium uppercase tracking-wide text-violet-800 dark:text-violet-200">
               Código de emparejamiento
             </p>
-            <p className="mt-2 text-center font-mono text-3xl font-semibold tracking-widest text-violet-950 dark:text-violet-50 sm:text-4xl">
+            <p className="mt-2 break-all text-center font-mono text-2xl font-semibold tracking-widest text-violet-950 dark:text-violet-50 sm:text-3xl md:text-4xl">
               {remote.pairingCode}
             </p>
             <div className="mt-4 flex justify-center">

@@ -28,19 +28,30 @@ type Props = {
   compact?: boolean;
   /** Solo icono puerta/salida; hover rojo (barra lateral / móvil). */
   iconOnly?: boolean;
+  /** Tamaño del botón circular cuando `iconOnly`. */
+  iconOnlySize?: "md" | "sm";
 };
 
-export function SignOutButton({ className, compact, iconOnly }: Props) {
+export function SignOutButton({
+  className,
+  compact,
+  iconOnly,
+  iconOnlySize = "md",
+}: Props) {
   if (iconOnly) {
+    const circle =
+      iconOnlySize === "sm" ? "size-9" : "size-12";
     return (
       <button
         type="button"
         onClick={() => signOut({ callbackUrl: "/" })}
         title="Cerrar sesión"
         aria-label="Cerrar sesión"
-        className={`inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-white text-zinc-600 ring-1 ring-zinc-900/10 transition-colors hover:bg-red-500/10 hover:text-red-600 hover:ring-red-400/45 dark:bg-zinc-900/40 dark:text-zinc-400 dark:ring-zinc-700/60 dark:hover:bg-red-950/40 dark:hover:text-red-400 dark:hover:ring-red-500/45 ${className ?? ""}`}
+        className={`inline-flex ${circle} shrink-0 items-center justify-center rounded-full bg-white text-zinc-600 ring-1 ring-zinc-900/10 transition-colors hover:bg-red-500/10 hover:text-red-600 hover:ring-red-400/45 dark:bg-zinc-900/40 dark:text-zinc-400 dark:ring-zinc-700/60 dark:hover:bg-red-950/40 dark:hover:text-red-400 dark:hover:ring-red-500/45 ${className ?? ""}`}
       >
-        <LogOutDoorIcon />
+        <LogOutDoorIcon
+          className={iconOnlySize === "sm" ? "size-[18px]" : undefined}
+        />
       </button>
     );
   }
