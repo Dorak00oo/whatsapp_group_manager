@@ -101,13 +101,37 @@ function IconBot({ className }: { className?: string }) {
   );
 }
 
+function IconMinecraft({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className ?? iconSm}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+      <path d="M15 3v18" />
+      <path d="M3 9h18" />
+      <path d="M3 15h18" />
+    </svg>
+  );
+}
+
 function useNavActive() {
   const pathname = usePathname();
   const list = pathname === "/dashboard";
   const add = pathname.startsWith("/dashboard/agregar");
   const bulk = pathname.startsWith("/dashboard/importar");
   const bot = pathname.startsWith("/dashboard/bot");
-  return { list, add, bulk, bot };
+  const minecraft = pathname.startsWith("/dashboard/minecraft");
+  return { list, add, bulk, bot, minecraft };
 }
 
 function activeCls(on: boolean) {
@@ -124,7 +148,7 @@ function activeTabCls(on: boolean) {
 
 /** Barra lateral: iconos pequeños (md+). */
 export function DashboardSidebarNav() {
-  const { list, add, bulk, bot } = useNavActive();
+  const { list, add, bulk, bot, minecraft } = useNavActive();
 
   return (
     <nav
@@ -163,6 +187,14 @@ export function DashboardSidebarNav() {
       >
         <IconBot className={iconSidebar} />
       </Link>
+      <Link
+        href="/dashboard/minecraft"
+        className={`${linkBaseSidebar} ${activeCls(minecraft)}`}
+        title="Minecraft"
+        aria-current={minecraft ? "page" : undefined}
+      >
+        <IconMinecraft className={iconSidebar} />
+      </Link>
     </nav>
   );
 }
@@ -172,7 +204,7 @@ const tabBase =
 
 /** Navegación fija inferior (solo móvil): icono + etiqueta; el menú «Más» va aparte en el layout. */
 export function DashboardMobileTabNav() {
-  const { list, add, bulk, bot } = useNavActive();
+  const { list, add, bulk, minecraft } = useNavActive();
 
   return (
     <nav className="flex w-full min-w-0 items-stretch justify-between gap-0.5">
@@ -201,12 +233,12 @@ export function DashboardMobileTabNav() {
         <span className="text-[10px] font-medium leading-none">Importar</span>
       </Link>
       <Link
-        href="/dashboard/bot"
-        className={`${tabBase} ${activeTabCls(bot)}`}
-        aria-current={bot ? "page" : undefined}
+        href="/dashboard/minecraft"
+        className={`${tabBase} ${activeTabCls(minecraft)}`}
+        aria-current={minecraft ? "page" : undefined}
       >
-        <IconBot className="size-[1.125rem] shrink-0" />
-        <span className="text-[10px] font-medium leading-none">Bot</span>
+        <IconMinecraft className="size-[1.125rem] shrink-0" />
+        <span className="text-[10px] font-medium leading-none">Minecraft</span>
       </Link>
     </nav>
   );

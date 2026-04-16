@@ -74,6 +74,11 @@ Aplicación web para gestionar un **directorio de personas** (gamertag, teléfon
   - Se procesan **todas las hojas** del libro que tengan cabeceras reconocibles (jugador + teléfono).
   - Plantillas: `GET /dashboard/agregar/plantilla` (Excel) y `?format=csv` (CSV).
   - Sin `+` en el número hace falta columna de **país** (ISO2, ej. `MX`) o número en formato internacional.
+- **Minecraft** (`/dashboard/minecraft`): monitoreo en tiempo real de jugadores del servidor de Minecraft Bedrock.
+  - Dashboard con estadísticas (activos, inactivos, blacklist, whitelist).
+  - Recepción automática de datos cada hora desde el addon del servidor.
+  - Historial de snapshots.
+  - Ver [MINECRAFT.md](./MINECRAFT.md) para configuración completa.
 
 ## Despliegue en Vercel
 

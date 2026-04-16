@@ -7,7 +7,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:minecraft": "node scripts/test-minecraft-api.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.7.0",

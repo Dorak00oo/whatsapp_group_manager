@@ -62,3 +62,32 @@ model BotPanelSettings {
 
   @@map("bot_panel_settings")
 }
+
+/** Registro de actividad de jugadores de Minecraft desde el servidor */
+model MinecraftPlayer {
+  id              String   @id @default(cuid())
+  gamertag        String   @unique
+  lastSeen        DateTime @map("last_seen")
+  active          Boolean  @default(true)
+  daysInactive    Int      @default(0) @map("days_inactive")
+  isBlacklisted   Boolean  @default(false) @map("is_blacklisted")
+  isWhitelisted   Boolean  @default(false) @map("is_whitelisted")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("minecraft_players")
+}
+
+/** Snapshot de datos del servidor de Minecraft (histórico) */
+model MinecraftSnapshot {
+  id              String   @id @default(cuid())
+  timestamp       DateTime @default(now())
+  totalPlayers    Int      @map("total_players")
+  activePlayers   Int      @map("active_players")
+  inactivePlayers Int      @map("inactive_players")
+  data            Json     @default("{}")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([timestamp])
+  @@map("minecraft_snapshots")
+}
