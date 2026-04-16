@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+
+/** Refresco del panel para ver cambios del servidor / blacklist sin recargar a mano. */
+const DASHBOARD_REFRESH_MS = 12_000;
 
 type MinecraftPlayer = {
   id: string;
@@ -40,6 +43,13 @@ export function MinecraftPlayersSection({
   config,
 }: Props) {
   const router = useRouter();
+  useEffect(() => {
+    const id = setInterval(() => {
+      router.refresh();
+    }, DASHBOARD_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [router]);
+
   const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState<string | null>(null);

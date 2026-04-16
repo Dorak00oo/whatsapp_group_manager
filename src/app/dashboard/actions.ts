@@ -14,6 +14,7 @@ import {
   MISSING_DISPLAY_NAME_COLUMN_MESSAGE,
 } from "@/lib/prisma-migration-hints";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import { syncDirectoryMembersFromMinecraftTable } from "@/lib/minecraft-directory-sync";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import { parseMemberSpreadsheet } from "@/lib/spreadsheet-members";
 
@@ -235,6 +236,38 @@ export async function setDirectoryMemberActive(id: string, active: boolean) {
 
   revalidatePath("/dashboard");
   return { ok: true as const };
+}
+
+export type SyncFromMinecraftResult =
+  | {
+      ok: true;
+      updatedRows: number;
+      minecraftCount: number;
+      matchedGamertags: number;
+    }
+  | { error: string };
+
+/** Iguala activo/inactivo del directorio con la lista de Minecraft (gamertag coincidente; no toca “se salieron”). */
+export async function syncDirectoryFromMinecraftPanel(): Promise<SyncFromMinecraftResult> {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado" };
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return { error: STALE_SESSION_ERROR };
+
+  try {
+    const summary = await syncDirectoryMembersFromMinecraftTable(userId);
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/minecraft");
+    return { ok: true, ...summary };
+  } catch (e) {
+    if (isDatabaseUnreachableError(e)) {
+      return {
+        error:
+          "No hay conexión con la base de datos. Revisa Neon o la red e inténtalo de nuevo.",
+      };
+    }
+    throw e;
+  }
 }
 
 export async function addDirectoryStrike(formData: FormData) {

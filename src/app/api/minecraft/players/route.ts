@@ -1,8 +1,18 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
+
+/**
+ * La blacklist / whitelist en el panel solo actualiza la base en Vercel.
+ * El addon del servidor de Bedrock debe consultar con frecuencia
+ * `GET /api/minecraft/status` (mismo Bearer que el POST) y aplicar listas
+ * al unirse o en bucle; si solo confía en el POST de actividad, no verá
+ * cambios del panel hasta el siguiente envío del servidor.
+ */
 
 // POST: Actualizar estado de un jugador
 export async function POST(request: Request) {
@@ -30,8 +40,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const player = await prisma.minecraftPlayer.findUnique({
-      where: { gamertag: body.gamertag },
+    const tag = body.gamertag.trim();
+    const player = await prisma.minecraftPlayer.findFirst({
+      where: { gamertag: { equals: tag, mode: "insensitive" } },
     });
 
     if (!player) {
@@ -67,9 +78,21 @@ export async function POST(request: Request) {
     }
 
     const updated = await prisma.minecraftPlayer.update({
-      where: { gamertag: body.gamertag },
+      where: { id: player.id },
       data: updateData,
     });
+
+    if (body.action === "blacklist") {
+      await syncDirectoryActiveWithMinecraft(updated.gamertag, false);
+    } else if (body.action === "remove_blacklist") {
+      await syncDirectoryActiveWithMinecraft(
+        updated.gamertag,
+        updated.active,
+      );
+    }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/minecraft");
 
     return NextResponse.json({
       ok: true,

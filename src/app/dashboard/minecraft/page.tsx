@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftPlayersSection } from "@/components/minecraft-players-section";
+import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { prisma } from "@/lib/prisma";
 
@@ -40,6 +41,10 @@ export default async function MinecraftPage() {
   const blacklisted = players.filter((p) => p.isBlacklisted);
   const whitelisted = players.filter((p) => p.isWhitelisted);
 
+  const lastUpdateZones = lastSnapshot
+    ? formatInstantMexicoColombia(lastSnapshot.timestamp)
+    : null;
+
   return (
     <section className="flex flex-col gap-4">
       <div>
@@ -57,10 +62,27 @@ export default async function MinecraftPage() {
             <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
               Resumen del servidor
             </h3>
-            <span className="text-xs text-zinc-500">
-              Última actualización:{" "}
-              {new Date(lastSnapshot.timestamp).toLocaleString("es-ES")}
-            </span>
+            <div className="max-w-[min(100%,20rem)] text-right text-xs leading-relaxed text-zinc-500">
+              <p className="font-medium text-zinc-600 dark:text-zinc-400">
+                Última actualización
+              </p>
+              {lastUpdateZones && (
+                <>
+                  <p>
+                    <span className="text-zinc-400 dark:text-zinc-500">
+                      México:{" "}
+                    </span>
+                    {lastUpdateZones.mexico}
+                  </p>
+                  <p>
+                    <span className="text-zinc-400 dark:text-zinc-500">
+                      Colombia:{" "}
+                    </span>
+                    {lastUpdateZones.colombia}
+                  </p>
+                </>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="rounded-md bg-zinc-50 p-3 dark:bg-zinc-800">

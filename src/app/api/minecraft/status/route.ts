@@ -1,5 +1,7 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
 
 export const runtime = "nodejs";
 
@@ -74,41 +76,55 @@ export async function POST(request: Request) {
       },
     });
 
-    // Actualizar o crear jugadores
-    // IMPORTANTE: Respeta los cambios manuales desde la web
+    // Actualizar o crear jugadores (gamertag sin distinguir mayúsculas en la búsqueda)
+    // IMPORTANTE: Listas desde la web se conservan con OR contra el payload del servidor.
     for (const player of body.players) {
-      const existing = await prisma.minecraftPlayer.findUnique({
-        where: { gamertag: player.name },
+      const name = player.name.trim();
+      if (!name) continue;
+
+      const existing = await prisma.minecraftPlayer.findFirst({
+        where: { gamertag: { equals: name, mode: "insensitive" } },
       });
 
+      const mergedBlacklist = existing
+        ? existing.isBlacklisted || player.isBlacklisted
+        : player.isBlacklisted;
+      const mergedWhitelist = existing
+        ? existing.isWhitelisted || player.isWhitelisted
+        : player.isWhitelisted;
+
+      /** Directorio WhatsApp: inactivo si el servidor dice inactivo o está en blacklist */
+      const directoryActive = player.active && !mergedBlacklist;
+
       if (existing) {
-        // Si ya existe, actualizar pero respetar cambios manuales en listas
         await prisma.minecraftPlayer.update({
-          where: { gamertag: player.name },
+          where: { id: existing.id },
           data: {
             lastSeen: new Date(player.lastSeen),
             active: player.active,
             daysInactive: player.daysInactive,
-            // Solo actualizar listas si no han sido modificadas manualmente
-            // (si la web las cambió, el addon no las sobrescribe)
-            isBlacklisted: existing.isBlacklisted || player.isBlacklisted,
-            isWhitelisted: existing.isWhitelisted || player.isWhitelisted,
+            isBlacklisted: mergedBlacklist,
+            isWhitelisted: mergedWhitelist,
           },
         });
+        await syncDirectoryActiveWithMinecraft(name, directoryActive);
       } else {
-        // Si no existe, crear nuevo
         await prisma.minecraftPlayer.create({
           data: {
-            gamertag: player.name,
+            gamertag: name,
             lastSeen: new Date(player.lastSeen),
             active: player.active,
             daysInactive: player.daysInactive,
-            isBlacklisted: player.isBlacklisted,
-            isWhitelisted: player.isWhitelisted,
+            isBlacklisted: mergedBlacklist,
+            isWhitelisted: mergedWhitelist,
           },
         });
+        await syncDirectoryActiveWithMinecraft(name, directoryActive);
       }
     }
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/minecraft");
 
     return NextResponse.json({
       ok: true,
@@ -151,6 +167,13 @@ export async function GET(request: Request) {
       }),
     ]);
 
+    const blacklist = players
+      .filter((p) => p.isBlacklisted)
+      .map((p) => p.gamertag);
+    const whitelist = players
+      .filter((p) => p.isWhitelisted)
+      .map((p) => p.gamertag);
+
     return NextResponse.json({
       ok: true,
       players: players.map((p) => ({
@@ -161,6 +184,9 @@ export async function GET(request: Request) {
         isBlacklisted: p.isBlacklisted,
         isWhitelisted: p.isWhitelisted,
       })),
+      /** Listas planas para el addon del servidor (mismo contrato que el POST) */
+      blacklist,
+      whitelist,
       lastUpdate: lastSnapshot?.timestamp.toISOString() ?? null,
       serverInfo: lastSnapshot
         ? {

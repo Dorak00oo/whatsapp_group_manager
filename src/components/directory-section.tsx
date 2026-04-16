@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import type { DirectoryUrlFilters } from "@/lib/directory-query";
 import type { DirectoryMemberDTO } from "@/types/directory";
+import { DirectoryMinecraftSyncButton } from "@/components/directory-minecraft-sync-button";
 import { DirectoryFilters } from "@/components/directory-filters";
 import { DirectoryMemberCard } from "@/components/directory-member-card";
 
@@ -110,6 +111,8 @@ export function DirectorySection({
       >
         <DirectoryFilters filters={filters} countryCodes={countryCodes} />
       </Suspense>
+
+      <DirectoryMinecraftSyncButton />
 
       {!showSplit ? <RosterCountsStrip counts={rosterCounts} /> : null}
 
