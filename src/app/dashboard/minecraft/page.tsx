@@ -12,14 +12,20 @@ export default async function MinecraftPage() {
   let lastSnapshot: Awaited<
     ReturnType<typeof prisma.minecraftSnapshot.findFirst>
   > | null;
+  let config: Awaited<
+    ReturnType<typeof prisma.minecraftConfig.findUnique>
+  > | null;
 
   try {
-    [players, lastSnapshot] = await Promise.all([
+    [players, lastSnapshot, config] = await Promise.all([
       prisma.minecraftPlayer.findMany({
         orderBy: { lastSeen: "desc" },
       }),
       prisma.minecraftSnapshot.findFirst({
         orderBy: { timestamp: "desc" },
+      }),
+      prisma.minecraftConfig.findUnique({
+        where: { id: "default" },
       }),
     ]);
   } catch (e) {
@@ -106,6 +112,15 @@ export default async function MinecraftPage() {
         inactivePlayers={inactivePlayers.length}
         blacklisted={blacklisted.length}
         whitelisted={whitelisted.length}
+        config={
+          config
+            ? {
+                daysInactive: config.daysInactive,
+                daysBlacklist: config.daysBlacklist,
+                daysPurge: config.daysPurge,
+              }
+            : { daysInactive: 7, daysBlacklist: 14, daysPurge: 21 }
+        }
       />
     </section>
   );

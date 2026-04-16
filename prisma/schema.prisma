@@ -91,3 +91,14 @@ model MinecraftSnapshot {
   @@index([timestamp])
   @@map("minecraft_snapshots")
 }
+
+/** Configuración del sistema de Minecraft (editable desde web) */
+model MinecraftConfig {
+  id                String   @id @default("default")
+  daysInactive      Int      @default(7) @map("days_inactive")
+  daysBlacklist     Int      @default(14) @map("days_blacklist")
+  daysPurge         Int      @default(21) @map("days_purge")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("minecraft_config")
+}

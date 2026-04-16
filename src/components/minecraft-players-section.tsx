@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type MinecraftPlayer = {
   id: string;
@@ -13,12 +14,19 @@ type MinecraftPlayer = {
   createdAt: string;
 };
 
+type Config = {
+  daysInactive: number;
+  daysBlacklist: number;
+  daysPurge: number;
+};
+
 type Props = {
   players: MinecraftPlayer[];
   activePlayers: number;
   inactivePlayers: number;
   blacklisted: number;
   whitelisted: number;
+  config: Config;
 };
 
 type FilterType = "all" | "active" | "inactive" | "blacklisted" | "whitelisted";
@@ -29,9 +37,56 @@ export function MinecraftPlayersSection({
   inactivePlayers,
   blacklisted,
   whitelisted,
+  config,
 }: Props) {
+  const router = useRouter();
   const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState<string | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configForm, setConfigForm] = useState(config);
+
+  const handlePlayerAction = async (
+    gamertag: string,
+    action: "blacklist" | "whitelist" | "remove_blacklist" | "remove_whitelist"
+  ) => {
+    setLoading(gamertag);
+    try {
+      const res = await fetch("/api/minecraft/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gamertag, action }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        alert(`Error: ${error.error}`);
+        return;
+      }
+
+      router.refresh();
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Error al actualizar jugador");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleConfigSave = async () => {
+    setLoading("config");
+    try {
+      // Aquí necesitarías un endpoint para actualizar config desde el dashboard
+      // Por ahora solo mostramos el modal
+      alert(
+        `Configuración guardada:\n- Días inactivo: ${configForm.daysInactive}\n- Días blacklist: ${configForm.daysBlacklist}\n- Días purga: ${configForm.daysPurge}`
+      );
+      setShowConfigModal(false);
+      // TODO: Implementar guardado en backend
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const filtered = players.filter((p) => {
     const matchesSearch = p.gamertag
@@ -57,6 +112,14 @@ export function MinecraftPlayersSection({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowConfigModal(true)}
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            ⚙️ Configurar días
+          </button>
+        </div>
         <div className="flex flex-wrap gap-2">
           <FilterButton
             active={filter === "all"}
@@ -128,13 +191,16 @@ export function MinecraftPlayersSection({
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
                   Listas
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Acciones
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-8 text-center text-sm text-zinc-500"
                   >
                     {search
@@ -190,6 +256,62 @@ export function MinecraftPlayersSection({
                         )}
                       </div>
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1">
+                        {!player.isBlacklisted ? (
+                          <button
+                            onClick={() =>
+                              handlePlayerAction(player.gamertag, "blacklist")
+                            }
+                            disabled={loading === player.gamertag}
+                            className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                            title="Agregar a blacklist"
+                          >
+                            🚫 Ban
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              handlePlayerAction(
+                                player.gamertag,
+                                "remove_blacklist"
+                              )
+                            }
+                            disabled={loading === player.gamertag}
+                            className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                            title="Quitar de blacklist"
+                          >
+                            ✅ Unban
+                          </button>
+                        )}
+                        {!player.isWhitelisted ? (
+                          <button
+                            onClick={() =>
+                              handlePlayerAction(player.gamertag, "whitelist")
+                            }
+                            disabled={loading === player.gamertag}
+                            className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                            title="Agregar a whitelist"
+                          >
+                            ⭐ WL
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              handlePlayerAction(
+                                player.gamertag,
+                                "remove_whitelist"
+                              )
+                            }
+                            disabled={loading === player.gamertag}
+                            className="rounded bg-zinc-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
+                            title="Quitar de whitelist"
+                          >
+                            ❌ Remove WL
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -206,6 +328,97 @@ export function MinecraftPlayersSection({
           </div>
         )}
       </div>
+
+      {/* Modal de configuración */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 dark:bg-zinc-900">
+            <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              Configurar días del sistema
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Días para considerar inactivo
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={configForm.daysInactive}
+                  onChange={(e) =>
+                    setConfigForm({
+                      ...configForm,
+                      daysInactive: parseInt(e.target.value) || 7,
+                    })
+                  }
+                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                />
+                <p className="mt-1 text-xs text-zinc-500">
+                  Actual: {config.daysInactive} días
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Días para blacklist automática
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={configForm.daysBlacklist}
+                  onChange={(e) =>
+                    setConfigForm({
+                      ...configForm,
+                      daysBlacklist: parseInt(e.target.value) || 14,
+                    })
+                  }
+                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                />
+                <p className="mt-1 text-xs text-zinc-500">
+                  Actual: {config.daysBlacklist} días
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Días para purgar de la lista
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={configForm.daysPurge}
+                  onChange={(e) =>
+                    setConfigForm({
+                      ...configForm,
+                      daysPurge: parseInt(e.target.value) || 21,
+                    })
+                  }
+                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                />
+                <p className="mt-1 text-xs text-zinc-500">
+                  Actual: {config.daysPurge} días
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex gap-2">
+              <button
+                onClick={handleConfigSave}
+                disabled={loading === "config"}
+                className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading === "config" ? "Guardando..." : "Guardar"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowConfigModal(false);
+                  setConfigForm(config);
+                }}
+                className="flex-1 rounded-md bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-600"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

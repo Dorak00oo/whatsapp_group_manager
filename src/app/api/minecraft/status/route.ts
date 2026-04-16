@@ -75,25 +75,39 @@ export async function POST(request: Request) {
     });
 
     // Actualizar o crear jugadores
+    // IMPORTANTE: Respeta los cambios manuales desde la web
     for (const player of body.players) {
-      await prisma.minecraftPlayer.upsert({
+      const existing = await prisma.minecraftPlayer.findUnique({
         where: { gamertag: player.name },
-        update: {
-          lastSeen: new Date(player.lastSeen),
-          active: player.active,
-          daysInactive: player.daysInactive,
-          isBlacklisted: player.isBlacklisted,
-          isWhitelisted: player.isWhitelisted,
-        },
-        create: {
-          gamertag: player.name,
-          lastSeen: new Date(player.lastSeen),
-          active: player.active,
-          daysInactive: player.daysInactive,
-          isBlacklisted: player.isBlacklisted,
-          isWhitelisted: player.isWhitelisted,
-        },
       });
+
+      if (existing) {
+        // Si ya existe, actualizar pero respetar cambios manuales en listas
+        await prisma.minecraftPlayer.update({
+          where: { gamertag: player.name },
+          data: {
+            lastSeen: new Date(player.lastSeen),
+            active: player.active,
+            daysInactive: player.daysInactive,
+            // Solo actualizar listas si no han sido modificadas manualmente
+            // (si la web las cambió, el addon no las sobrescribe)
+            isBlacklisted: existing.isBlacklisted || player.isBlacklisted,
+            isWhitelisted: existing.isWhitelisted || player.isWhitelisted,
+          },
+        });
+      } else {
+        // Si no existe, crear nuevo
+        await prisma.minecraftPlayer.create({
+          data: {
+            gamertag: player.name,
+            lastSeen: new Date(player.lastSeen),
+            active: player.active,
+            daysInactive: player.daysInactive,
+            isBlacklisted: player.isBlacklisted,
+            isWhitelisted: player.isWhitelisted,
+          },
+        });
+      }
     }
 
     return NextResponse.json({
@@ -125,12 +139,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [players, lastSnapshot] = await Promise.all([
+    const [players, lastSnapshot, config] = await Promise.all([
       prisma.minecraftPlayer.findMany({
         orderBy: { lastSeen: "desc" },
       }),
       prisma.minecraftSnapshot.findFirst({
         orderBy: { timestamp: "desc" },
+      }),
+      prisma.minecraftConfig.findUnique({
+        where: { id: "default" },
       }),
     ]);
 
@@ -152,6 +169,13 @@ export async function GET(request: Request) {
             inactivePlayers: lastSnapshot.inactivePlayers,
           }
         : null,
+      config: config
+        ? {
+            daysInactive: config.daysInactive,
+            daysBlacklist: config.daysBlacklist,
+            daysPurge: config.daysPurge,
+          }
+        : { daysInactive: 7, daysBlacklist: 14, daysPurge: 21 },
     });
   } catch (error) {
     console.error("[Minecraft API] Error:", error);
