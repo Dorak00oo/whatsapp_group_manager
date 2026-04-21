@@ -13,6 +13,7 @@ import {
 } from "@/app/dashboard/actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
+import { softBtnMint } from "@/lib/soft-ui";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
 function regionLabel(code: string | null): string | null {
@@ -205,6 +206,20 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
           >
             <input type="hidden" name="memberId" value={m.id} />
             <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Gamertag{" "}
+              <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                (principal)
+              </span>
+              <input
+                name="gamertag"
+                required
+                autoComplete="nickname"
+                defaultValue={m.gamertag}
+                placeholder="Ej. CabraTNT, minero_feliz"
+                className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
               Nombre (opcional, distinto del gamertag)
               <input
                 name="displayName"
@@ -227,9 +242,9 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
             <button
               type="submit"
               disabled={pending}
-              className="self-start rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className={`${softBtnMint} self-start`}
             >
-              Guardar nombre y nota
+              Guardar
             </button>
           </form>
 

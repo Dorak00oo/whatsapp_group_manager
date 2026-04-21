@@ -208,11 +208,14 @@ export async function updateDirectoryMemberNotes(formData: FormData) {
   const id = String(formData.get("memberId") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "").trim();
+  const gamertag = String(formData.get("gamertag") ?? "").trim();
   if (!id) return;
+  if (!gamertag) return;
 
   await prisma.directoryMember.updateMany({
     where: { id, userId },
     data: {
+      gamertag,
       notes: notes || null,
       displayName: displayName || null,
     },
