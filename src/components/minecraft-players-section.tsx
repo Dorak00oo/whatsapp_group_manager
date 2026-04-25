@@ -56,6 +56,10 @@ export function MinecraftPlayersSection({
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configForm, setConfigForm] = useState(config);
 
+  useEffect(() => {
+    setConfigForm(config);
+  }, [config]);
+
   const handlePlayerAction = async (
     gamertag: string,
     action: "blacklist" | "whitelist" | "remove_blacklist" | "remove_whitelist"
@@ -86,13 +90,48 @@ export function MinecraftPlayersSection({
   const handleConfigSave = async () => {
     setLoading("config");
     try {
-      // Aquí necesitarías un endpoint para actualizar config desde el dashboard
-      // Por ahora solo mostramos el modal
-      alert(
-        `Configuración guardada:\n- Días inactivo: ${configForm.daysInactive}\n- Días blacklist: ${configForm.daysBlacklist}\n- Días purga: ${configForm.daysPurge}`
-      );
+      const res = await fetch("/api/minecraft/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(configForm),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        alert(`Error: ${error.error}`);
+        return;
+      }
+
       setShowConfigModal(false);
-      // TODO: Implementar guardado en backend
+      router.refresh();
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Error al guardar configuración");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    setLoading("syncall");
+    try {
+      const res = await fetch("/api/minecraft/sync-request", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        alert(`Error: ${error.error}`);
+        return;
+      }
+
+      alert(
+        "Sync all solicitado. El addon lo aplicará en la próxima revisión.",
+      );
+      router.refresh();
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Error al solicitar sync all");
     } finally {
       setLoading(null);
     }
@@ -128,6 +167,13 @@ export function MinecraftPlayersSection({
             className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           >
             ⚙️ Configurar días
+          </button>
+          <button
+            onClick={handleSyncAll}
+            disabled={loading === "syncall"}
+            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          >
+            {loading === "syncall" ? "Solicitando..." : "🔄 Sync all"}
           </button>
         </div>
         <div className="flex flex-wrap gap-2">

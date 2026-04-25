@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -65,15 +66,26 @@ export async function GET(request: Request) {
 // POST: Actualizar configuración
 export async function POST(request: Request) {
   const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
+  const token = getBearerToken(request);
+
+  if (token) {
+    if (!secret) {
+      return NextResponse.json(
+        { error: "MINECRAFT_API_KEY no configurado" },
+        { status: 503 },
+      );
+    }
+    if (token !== secret) {
+      return unauthorized();
+    }
+  } else {
+    const session = await auth();
+    if (!session?.user) {
+      return unauthorized();
+    }
   }
 
-  const token = getBearerToken(request);
-  if (token !== secret) {
+  if (!secret && token) {
     return unauthorized();
   }
 
