@@ -6,6 +6,13 @@ export const runtime = "nodejs";
 
 const SETTINGS_ID = "minecraft_sync_request";
 
+const ALLOWED_PANEL_COMMANDS = new Set([
+  "syncall",
+  "list_todos",
+  "list_activos",
+  "list_inactivos",
+]);
+
 type SyncRequestData = {
   command?: string;
   requestedAt?: string;
@@ -27,9 +34,22 @@ function asSyncRequestData(value: unknown): SyncRequestData {
   return value as SyncRequestData;
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) return unauthorized();
+
+  let command = "syncall";
+  try {
+    const body = (await request.json()) as { command?: unknown };
+    if (
+      typeof body.command === "string" &&
+      ALLOWED_PANEL_COMMANDS.has(body.command.trim())
+    ) {
+      command = body.command.trim();
+    }
+  } catch {
+    /* sin cuerpo / no JSON → syncall */
+  }
 
   const requestedAt = new Date().toISOString();
 
@@ -37,7 +57,7 @@ export async function POST() {
     where: { id: SETTINGS_ID },
     update: {
       data: {
-        command: "syncall",
+        command,
         requestedAt,
         handledAt: null,
       },
@@ -45,14 +65,14 @@ export async function POST() {
     create: {
       id: SETTINGS_ID,
       data: {
-        command: "syncall",
+        command,
         requestedAt,
         handledAt: null,
       },
     },
   });
 
-  return NextResponse.json({ ok: true, command: "syncall", requestedAt });
+  return NextResponse.json({ ok: true, command, requestedAt });
 }
 
 export async function GET(request: Request) {
@@ -110,20 +130,21 @@ export async function PUT(request: Request) {
     );
   }
 
-  await prisma.botPanelSettings.upsert({
+  const row = await prisma.botPanelSettings.findUnique({
     where: { id: SETTINGS_ID },
-    update: {
+  });
+  if (!row) {
+    return NextResponse.json({ error: "Sin cola de panel" }, { status: 404 });
+  }
+
+  const prev = asSyncRequestData(row.data);
+
+  await prisma.botPanelSettings.update({
+    where: { id: SETTINGS_ID },
+    data: {
       data: {
-        command: "syncall",
-        requestedAt,
-        handledAt: requestedAt,
-      },
-    },
-    create: {
-      id: SETTINGS_ID,
-      data: {
-        command: "syncall",
-        requestedAt,
+        command: prev.command ?? "syncall",
+        requestedAt: prev.requestedAt ?? requestedAt,
         handledAt: requestedAt,
       },
     },

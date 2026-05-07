@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
 
@@ -31,6 +32,25 @@ function unauthorized() {
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
+}
+
+/**
+ * Evita que un POST de estado con blacklist/WL “viejas” (o en cola antes del
+ * próximo poll del addon) borre un Unban/Un-WL recién hecho en el panel.
+ * Margen amplio por posible desfase de reloj entre BD y el mundo Bedrock.
+ */
+const PANEL_LIST_PRIORITY_MS = 60_000;
+
+function snapshotDateFromPayload(timestamp: unknown): Date {
+  const n =
+    typeof timestamp === "number"
+      ? timestamp
+      : typeof timestamp === "string"
+        ? Number(timestamp)
+        : NaN;
+  if (!Number.isFinite(n)) return new Date();
+  // Segundos UNIX (~1e9) vs milisegundos (~1e12+)
+  return new Date(n < 1_000_000_000_000 ? n * 1000 : n);
 }
 
 function getBearerToken(request: Request): string | null {
@@ -65,19 +85,24 @@ export async function POST(request: Request) {
   }
 
   try {
+    const serverSnapshotTime = snapshotDateFromPayload(body.timestamp);
+
     // Guardar snapshot histórico
     await prisma.minecraftSnapshot.create({
       data: {
-        timestamp: new Date(body.timestamp),
+        timestamp: serverSnapshotTime,
         totalPlayers: body.serverInfo.totalPlayers,
         activePlayers: body.serverInfo.activePlayers,
         inactivePlayers: body.serverInfo.inactivePlayers,
-        data: body as any,
+        data: body as Prisma.InputJsonValue,
       },
     });
 
     // Actualizar o crear jugadores (gamertag sin distinguir mayúsculas en la búsqueda)
-    // IMPORTANTE: Listas desde la web se conservan con OR contra el payload del servidor.
+    // Blacklist/WL: si el panel editó la fila recientemente, no pisar con un snapshot
+    // del servidor que aún refleja el estado anterior (antes de Sync all / GET).
+    // Si el snapshot es más nuevo que esa ventana, el servidor manda y además se usa OR
+    // para no perder un ban desde panel hasta que el mundo confirme.
     for (const player of body.players) {
       const name = player.name.trim();
       if (!name) continue;
@@ -86,12 +111,25 @@ export async function POST(request: Request) {
         where: { gamertag: { equals: name, mode: "insensitive" } },
       });
 
-      const mergedBlacklist = existing
-        ? existing.isBlacklisted || player.isBlacklisted
-        : player.isBlacklisted;
-      const mergedWhitelist = existing
-        ? existing.isWhitelisted || player.isWhitelisted
-        : player.isWhitelisted;
+      const panelListsNewerThanSnapshot =
+        !!existing &&
+        existing.updatedAt.getTime() >
+          serverSnapshotTime.getTime() - PANEL_LIST_PRIORITY_MS;
+
+      let mergedBlacklist: boolean;
+      let mergedWhitelist: boolean;
+      if (panelListsNewerThanSnapshot) {
+        mergedBlacklist = existing!.isBlacklisted;
+        mergedWhitelist = existing!.isWhitelisted;
+      } else if (existing) {
+        mergedBlacklist =
+          existing.isBlacklisted || player.isBlacklisted;
+        mergedWhitelist =
+          existing.isWhitelisted || player.isWhitelisted;
+      } else {
+        mergedBlacklist = player.isBlacklisted;
+        mergedWhitelist = player.isWhitelisted;
+      }
 
       /** Directorio WhatsApp: inactivo si el servidor dice inactivo o está en blacklist */
       const directoryActive = player.active && !mergedBlacklist;
