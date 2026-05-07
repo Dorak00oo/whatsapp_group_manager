@@ -6,12 +6,7 @@ export const runtime = "nodejs";
 
 const SETTINGS_ID = "minecraft_sync_request";
 
-const ALLOWED_PANEL_COMMANDS = new Set([
-  "syncall",
-  "list_todos",
-  "list_activos",
-  "list_inactivos",
-]);
+const ALLOWED_PANEL_COMMANDS = new Set(["syncall"]);
 
 type SyncRequestData = {
   command?: string;

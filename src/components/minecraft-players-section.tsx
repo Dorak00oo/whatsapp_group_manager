@@ -148,25 +148,6 @@ export function MinecraftPlayersSection({
       "Sync all solicitado. El addon lo aplicará en la próxima revisión (~30 s).",
     );
 
-  const handleListEnServidor = (which: "todos" | "activos" | "inactivos") => {
-    const cmd =
-      which === "todos"
-        ? "list_todos"
-        : which === "activos"
-          ? "list_activos"
-          : "list_inactivos";
-    const labels = {
-      todos: "todos los jugadores",
-      activos: "jugadores activos",
-      inactivos: "jugadores inactivos",
-    };
-    return requestPanelCommand(
-      cmd,
-      cmd,
-      `Lista (${labels[which]}) solicitada. En ~30 s el addon la enviará al chat del mundo (si la consola del host no muestra scriptevent, usa estos botones).`,
-    );
-  };
-
   const filtered = players.filter((p) => {
     const matchesSearch = p.gamertag
       .toLowerCase()
@@ -205,31 +186,6 @@ export function MinecraftPlayersSection({
             className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
             {loading === "syncall" ? "Solicitando..." : "🔄 Sync all"}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleListEnServidor("todos")}
-            disabled={loading === "list_todos"}
-            className="rounded-md border border-zinc-400 bg-transparent px-3 py-1.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            title="Envía la lista al chat del mundo vía HTTP (útil si scriptevent desde el panel no llega al addon)"
-          >
-            {loading === "list_todos" ? "…" : "📋 Lista en mundo (todos)"}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleListEnServidor("activos")}
-            disabled={loading === "list_activos"}
-            className="rounded-md border border-zinc-400 bg-transparent px-3 py-1.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          >
-            {loading === "list_activos" ? "…" : "📋 Activos en mundo"}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleListEnServidor("inactivos")}
-            disabled={loading === "list_inactivos"}
-            className="rounded-md border border-zinc-400 bg-transparent px-3 py-1.5 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          >
-            {loading === "list_inactivos" ? "…" : "📋 Inactivos en mundo"}
           </button>
         </div>
         <div className="flex flex-wrap gap-2">
