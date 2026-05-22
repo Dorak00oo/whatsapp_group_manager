@@ -67,6 +67,31 @@ export function normalizePhoneForDirectory(
   };
 }
 
+/** Valores por defecto para el formulario de edición (país + número nacional). */
+export function splitPhoneForDirectoryForm(
+  phone: string,
+  phoneCountry: string | null,
+): { iso: string; national: string } {
+  const parsed = parsePhoneNumberFromString(phone.trim());
+  if (parsed?.country) {
+    return {
+      iso: parsed.country,
+      national: parsed.formatNational(),
+    };
+  }
+  const iso = (phoneCountry ?? "MX").trim().toUpperCase() || "MX";
+  const digits = phone.replace(/\D/g, "");
+  try {
+    const cc = getCountryCallingCode(iso as CountryCode);
+    const national = digits.startsWith(cc)
+      ? digits.slice(cc.length)
+      : digits;
+    return { iso, national: national || phone };
+  } catch {
+    return { iso, national: phone };
+  }
+}
+
 /**
  * Celda de Excel: si empieza por + se interpreta como internacional; si no,
  * hace falta `pais` (ISO2) como en el formulario manual.

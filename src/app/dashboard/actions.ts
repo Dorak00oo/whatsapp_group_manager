@@ -199,29 +199,52 @@ export async function deleteDirectoryMember(id: string) {
   return { ok: true as const };
 }
 
-export async function updateDirectoryMemberNotes(formData: FormData) {
+export async function updateDirectoryMemberNotes(
+  _prev: { error?: string } | null,
+  formData: FormData,
+): Promise<{ error?: string } | null> {
   const session = await auth();
-  if (!session?.user) return;
+  if (!session?.user) return { error: "No autorizado" };
   const userId = await resolveDirectoryUserId(session);
-  if (!userId) return;
+  if (!userId) return { error: STALE_SESSION_ERROR };
 
   const id = String(formData.get("memberId") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "").trim();
   const gamertag = String(formData.get("gamertag") ?? "").trim();
-  if (!id) return;
-  if (!gamertag) return;
+  const phoneIso = String(formData.get("phoneCountry") ?? "")
+    .trim()
+    .toUpperCase();
+  const phoneNational = String(formData.get("phoneNational") ?? "");
+  if (!id) return { error: "Falta el identificador" };
+  if (!gamertag) return { error: "El gamertag es obligatorio" };
 
-  await prisma.directoryMember.updateMany({
-    where: { id, userId },
-    data: {
-      gamertag,
-      notes: notes || null,
-      displayName: displayName || null,
-    },
-  });
+  const normalized = normalizePhoneForDirectory(phoneIso, phoneNational);
+  if (!normalized.ok) {
+    return { error: normalized.error };
+  }
+  const { phone, phoneCountry } = normalized;
+
+  try {
+    await prisma.directoryMember.updateMany({
+      where: { id, userId },
+      data: {
+        gamertag,
+        phone,
+        phoneCountry,
+        notes: notes || null,
+        displayName: displayName || null,
+      },
+    });
+  } catch (e) {
+    if (isMissingDisplayNameColumnError(e)) {
+      return { error: MISSING_DISPLAY_NAME_COLUMN_MESSAGE };
+    }
+    throw e;
+  }
 
   revalidatePath("/dashboard");
+  return null;
 }
 
 export async function setDirectoryMemberActive(id: string, active: boolean) {

@@ -2,6 +2,10 @@ import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftPlayersSection } from "@/components/minecraft-players-section";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import {
+  buildRosterFromSnapshot,
+  snapshotStatusByGamertag,
+} from "@/lib/minecraft-active";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { prisma } from "@/lib/prisma";
 
@@ -36,10 +40,27 @@ export default async function MinecraftPage() {
     throw e;
   }
 
-  const activePlayers = players.filter((p) => p.active);
-  const inactivePlayers = players.filter((p) => !p.active);
-  const blacklisted = players.filter((p) => p.isBlacklisted);
-  const whitelisted = players.filter((p) => p.isWhitelisted);
+  const daysInactiveThreshold =
+    config?.daysInactive ?? 7;
+  const snapshotByTag = snapshotStatusByGamertag(lastSnapshot?.data);
+
+  const displayPlayers = buildRosterFromSnapshot(
+    players,
+    snapshotByTag,
+    daysInactiveThreshold,
+  );
+
+  const activeCount = displayPlayers.filter((p) => p.active).length;
+  const inactiveCount = displayPlayers.filter((p) => !p.active).length;
+  const blacklistedCount = displayPlayers.filter((p) => p.isBlacklisted).length;
+  const whitelistedCount = displayPlayers.filter((p) => p.isWhitelisted).length;
+
+  const summaryTotal =
+    lastSnapshot?.totalPlayers ?? displayPlayers.length;
+  const summaryActive =
+    lastSnapshot?.activePlayers ?? activeCount;
+  const summaryInactive =
+    lastSnapshot?.inactivePlayers ?? inactiveCount;
 
   const lastUpdateZones = lastSnapshot
     ? formatInstantMexicoColombia(lastSnapshot.timestamp)
@@ -84,11 +105,15 @@ export default async function MinecraftPage() {
               )}
             </div>
           </div>
+          <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+            Mismos totales que el addon en su último envío. La tabla lista solo
+            ese roster (no el histórico antiguo del panel).
+          </p>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="rounded-md bg-zinc-50 p-3 dark:bg-zinc-800">
-              <p className="text-xs text-zinc-500">Total</p>
+              <p className="text-xs text-zinc-500">Total (último reporte)</p>
               <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                {lastSnapshot.totalPlayers}
+                {summaryTotal}
               </p>
             </div>
             <div className="rounded-md bg-green-50 p-3 dark:bg-green-950">
@@ -96,7 +121,7 @@ export default async function MinecraftPage() {
                 Activos
               </p>
               <p className="text-2xl font-bold text-green-900 dark:text-green-50">
-                {lastSnapshot.activePlayers}
+                {summaryActive}
               </p>
             </div>
             <div className="rounded-md bg-amber-50 p-3 dark:bg-amber-950">
@@ -104,7 +129,7 @@ export default async function MinecraftPage() {
                 Inactivos
               </p>
               <p className="text-2xl font-bold text-amber-900 dark:text-amber-50">
-                {lastSnapshot.inactivePlayers}
+                {summaryInactive}
               </p>
             </div>
             <div className="rounded-md bg-red-50 p-3 dark:bg-red-950">
@@ -112,7 +137,7 @@ export default async function MinecraftPage() {
                 Blacklist
               </p>
               <p className="text-2xl font-bold text-red-900 dark:text-red-50">
-                {blacklisted.length}
+                {blacklistedCount}
               </p>
             </div>
           </div>
@@ -120,7 +145,7 @@ export default async function MinecraftPage() {
       )}
 
       <MinecraftPlayersSection
-        players={players.map((p) => ({
+        players={displayPlayers.map((p) => ({
           id: p.id,
           gamertag: p.gamertag,
           lastSeen: p.lastSeen.toISOString(),
@@ -130,10 +155,10 @@ export default async function MinecraftPage() {
           isWhitelisted: p.isWhitelisted,
           createdAt: p.createdAt.toISOString(),
         }))}
-        activePlayers={activePlayers.length}
-        inactivePlayers={inactivePlayers.length}
-        blacklisted={blacklisted.length}
-        whitelisted={whitelisted.length}
+        activePlayers={activeCount}
+        inactivePlayers={inactiveCount}
+        blacklisted={blacklistedCount}
+        whitelisted={whitelistedCount}
         config={
           config
             ? {

@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
+import { isActiveByDaysInactive } from "@/lib/minecraft-active";
 import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
 
 export const runtime = "nodejs";
@@ -86,6 +87,10 @@ export async function POST(request: Request) {
 
   try {
     const serverSnapshotTime = snapshotDateFromPayload(body.timestamp);
+    const config = await prisma.minecraftConfig.findUnique({
+      where: { id: "default" },
+    });
+    const daysInactiveThreshold = config?.daysInactive ?? 7;
 
     // Guardar snapshot histórico
     await prisma.minecraftSnapshot.create({
@@ -131,15 +136,20 @@ export async function POST(request: Request) {
         mergedWhitelist = player.isWhitelisted;
       }
 
-      /** Directorio WhatsApp: inactivo si el servidor dice inactivo o está en blacklist */
-      const directoryActive = player.active && !mergedBlacklist;
+      const active = isActiveByDaysInactive(
+        player.daysInactive,
+        daysInactiveThreshold,
+      );
+
+      /** Directorio WhatsApp: inactivo si no cumple días activos o está en blacklist */
+      const directoryActive = active && !mergedBlacklist;
 
       if (existing) {
         await prisma.minecraftPlayer.update({
           where: { id: existing.id },
           data: {
             lastSeen: new Date(player.lastSeen),
-            active: player.active,
+            active,
             daysInactive: player.daysInactive,
             isBlacklisted: mergedBlacklist,
             isWhitelisted: mergedWhitelist,
@@ -151,13 +161,36 @@ export async function POST(request: Request) {
           data: {
             gamertag: name,
             lastSeen: new Date(player.lastSeen),
-            active: player.active,
+            active,
             daysInactive: player.daysInactive,
             isBlacklisted: mergedBlacklist,
             isWhitelisted: mergedWhitelist,
           },
         });
         await syncDirectoryActiveWithMinecraft(name, directoryActive);
+      }
+    }
+
+    const totalReported = body.serverInfo?.totalPlayers ?? 0;
+    const isFullRoster =
+      totalReported > 0 && body.players.length >= totalReported;
+    if (isFullRoster) {
+      const seen = new Set(
+        body.players
+          .map((p) => p.name.trim().toLowerCase())
+          .filter(Boolean),
+      );
+      const stale = await prisma.minecraftPlayer.findMany({
+        select: { id: true, gamertag: true },
+      });
+      const staleIds = stale
+        .filter((r) => !seen.has(r.gamertag.toLowerCase()))
+        .map((r) => r.id);
+      if (staleIds.length > 0) {
+        await prisma.minecraftPlayer.updateMany({
+          where: { id: { in: staleIds } },
+          data: { active: false },
+        });
       }
     }
 

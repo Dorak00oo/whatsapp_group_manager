@@ -34,6 +34,20 @@ type Props = {
 
 type FilterType = "all" | "active" | "inactive" | "blacklisted" | "whitelisted";
 
+function compareMinecraftPlayers(
+  a: MinecraftPlayer,
+  b: MinecraftPlayer,
+  filter: FilterType,
+): number {
+  const lastSeenMs = (p: MinecraftPlayer) =>
+    new Date(p.lastSeen).getTime();
+
+  if (filter === "all") {
+    if (a.active !== b.active) return a.active ? -1 : 1;
+  }
+  return lastSeenMs(b) - lastSeenMs(a);
+}
+
 export function MinecraftPlayersSection({
   players,
   activePlayers,
@@ -148,26 +162,28 @@ export function MinecraftPlayersSection({
       "Sync all solicitado. El addon lo aplicará en la próxima revisión (~30 s).",
     );
 
-  const filtered = players.filter((p) => {
-    const matchesSearch = p.gamertag
-      .toLowerCase()
-      .includes(search.toLowerCase());
+  const filtered = players
+    .filter((p) => {
+      const matchesSearch = p.gamertag
+        .toLowerCase()
+        .includes(search.toLowerCase());
 
-    if (!matchesSearch) return false;
+      if (!matchesSearch) return false;
 
-    switch (filter) {
-      case "active":
-        return p.active;
-      case "inactive":
-        return !p.active;
-      case "blacklisted":
-        return p.isBlacklisted;
-      case "whitelisted":
-        return p.isWhitelisted;
-      default:
-        return true;
-    }
-  });
+      switch (filter) {
+        case "active":
+          return p.active;
+        case "inactive":
+          return !p.active;
+        case "blacklisted":
+          return p.isBlacklisted;
+        case "whitelisted":
+          return p.isWhitelisted;
+        default:
+          return true;
+      }
+    })
+    .sort((a, b) => compareMinecraftPlayers(a, b, filter));
 
   return (
     <div className="space-y-4">
@@ -193,6 +209,7 @@ export function MinecraftPlayersSection({
             active={filter === "all"}
             onClick={() => setFilter("all")}
             count={players.length}
+            title="Jugadores del último reporte del servidor"
           >
             Todos
           </FilterButton>
@@ -496,12 +513,14 @@ function FilterButton({
   onClick,
   count,
   variant = "default",
+  title,
   children,
 }: {
   active: boolean;
   onClick: () => void;
   count: number;
   variant?: "default" | "success" | "warning" | "danger" | "info";
+  title?: string;
   children: React.ReactNode;
 }) {
   const variants = {
@@ -524,7 +543,9 @@ function FilterButton({
 
   return (
     <button
+      type="button"
       onClick={onClick}
+      title={title}
       className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${variants[variant]}`}
     >
       {children} <span className="ml-1 opacity-75">({count})</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   addDirectoryStrike,
   deleteDirectoryMember,
@@ -13,7 +13,9 @@ import {
 } from "@/app/dashboard/actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
-import { softBtnMint } from "@/lib/soft-ui";
+import { getCallingCodeOptions } from "@/lib/phone-calling-codes";
+import { splitPhoneForDirectoryForm } from "@/lib/phone-normalize";
+import { softBtnMint, softInputNeutral, softSelectNeutral } from "@/lib/soft-ui";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
 function regionLabel(code: string | null): string | null {
@@ -33,9 +35,18 @@ type Props = {
 
 export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
   const [pending, startTransition] = useTransition();
+  const [profileState, profileAction, profilePending] = useActionState(
+    updateDirectoryMemberNotes,
+    null,
+  );
   const [confirm, setConfirm] = useState<"delete" | "left" | null>(null);
   const confirmRef = useRef(confirm);
   const country = regionLabel(m.phoneCountry);
+  const phoneCountryOptions = useMemo(() => getCallingCodeOptions("es"), []);
+  const phoneDefaults = useMemo(
+    () => splitPhoneForDirectoryForm(m.phone, m.phoneCountry),
+    [m.phone, m.phoneCountry],
+  );
 
   useEffect(() => {
     confirmRef.current = confirm;
@@ -201,7 +212,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
           </form>
 
           <form
-            action={updateDirectoryMemberNotes}
+            action={profileAction}
             className="mt-5 flex flex-col gap-3"
           >
             <input type="hidden" name="memberId" value={m.id} />
@@ -219,6 +230,37 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                 className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
               />
             </label>
+            <div className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              <span>Celular</span>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                <label className="sr-only" htmlFor={`edit-phone-country-${m.id}`}>
+                  País y prefijo
+                </label>
+                <select
+                  id={`edit-phone-country-${m.id}`}
+                  name="phoneCountry"
+                  required
+                  defaultValue={phoneDefaults.iso}
+                  className={`${softSelectNeutral} shrink-0 sm:max-w-[min(100%,14rem)]`}
+                >
+                  {phoneCountryOptions.map(({ iso, label }) => (
+                    <option key={iso} value={iso}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  name="phoneNational"
+                  type="tel"
+                  inputMode="tel"
+                  required
+                  autoComplete="tel-national"
+                  defaultValue={phoneDefaults.national}
+                  placeholder="Ej. 55 1234 5678"
+                  className={`${softInputNeutral} min-w-0 flex-1`}
+                />
+              </div>
+            </div>
             <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
               Nombre (opcional, distinto del gamertag)
               <input
@@ -239,12 +281,17 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
               placeholder="Sin nota…"
               className="resize-y rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
             />
+            {profileState?.error ? (
+              <p className="text-xs text-red-600 dark:text-red-400">
+                {profileState.error}
+              </p>
+            ) : null}
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || profilePending}
               className={`${softBtnMint} self-start`}
             >
-              Guardar
+              {profilePending ? "Guardando…" : "Guardar"}
             </button>
           </form>
 
