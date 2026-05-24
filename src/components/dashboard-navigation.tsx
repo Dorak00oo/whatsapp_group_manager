@@ -77,30 +77,6 @@ function IconUpload({ className }: { className?: string }) {
 const linkBaseSidebar =
   "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
 
-function IconBot({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className ?? iconSm}
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M12 8V4H8" />
-      <rect width="16" height="12" x="4" y="8" rx="2" />
-      <path d="M2 14h2" />
-      <path d="M20 14h2" />
-      <path d="M15 13v2" />
-      <path d="M9 13v2" />
-    </svg>
-  );
-}
-
 function IconMinecraft({ className }: { className?: string }) {
   return (
     <svg
@@ -129,9 +105,8 @@ function useNavActive() {
   const list = pathname === "/dashboard";
   const add = pathname.startsWith("/dashboard/agregar");
   const bulk = pathname.startsWith("/dashboard/importar");
-  const bot = pathname.startsWith("/dashboard/bot");
   const minecraft = pathname.startsWith("/dashboard/minecraft");
-  return { list, add, bulk, bot, minecraft };
+  return { list, add, bulk, minecraft };
 }
 
 function activeCls(on: boolean) {
@@ -148,7 +123,7 @@ function activeTabCls(on: boolean) {
 
 /** Barra lateral: iconos pequeños (md+). */
 export function DashboardSidebarNav() {
-  const { list, add, bulk, bot, minecraft } = useNavActive();
+  const { list, add, bulk, minecraft } = useNavActive();
 
   return (
     <nav
@@ -178,14 +153,6 @@ export function DashboardSidebarNav() {
         aria-current={bulk ? "page" : undefined}
       >
         <IconUpload className={iconSidebar} />
-      </Link>
-      <Link
-        href="/dashboard/bot"
-        className={`${linkBaseSidebar} ${activeCls(bot)}`}
-        title="Bot WhatsApp"
-        aria-current={bot ? "page" : undefined}
-      >
-        <IconBot className={iconSidebar} />
       </Link>
       <Link
         href="/dashboard/minecraft"

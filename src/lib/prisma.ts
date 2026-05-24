@@ -37,14 +37,14 @@ function createPrismaClient(): PrismaClient {
 function isCurrentPrismaClient(c: PrismaClient | undefined): boolean {
   const x = c as {
     directoryMember?: { findMany?: unknown };
-    botPanelSettings?: { findUnique?: unknown };
+    minecraftSyncQueue?: { findUnique?: unknown };
     minecraftPlayer?: { findMany?: unknown };
     minecraftConfig?: { findUnique?: unknown };
   };
   return (
     c != null &&
     typeof x.directoryMember?.findMany === "function" &&
-    typeof x.botPanelSettings?.findUnique === "function" &&
+    typeof x.minecraftSyncQueue?.findUnique === "function" &&
     typeof x.minecraftPlayer?.findMany === "function" &&
     typeof x.minecraftConfig?.findUnique === "function"
   );

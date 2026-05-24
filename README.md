@@ -80,6 +80,10 @@ Aplicación web para gestionar un **directorio de personas** (gamertag, teléfon
   - Historial de snapshots.
   - Ver [MINECRAFT.md](./MINECRAFT.md) para configuración completa.
 
+## Migrar la base Neon → Supabase
+
+Guía ordenada (**primero datos y migraciones contra Supabase, después cambio de `DATABASE_URL`** en cada entorno): [docs/MIGRACION-NEON-SUPABASE.md](./docs/MIGRACION-NEON-SUPABASE.md).
+
 ## Despliegue en Vercel
 
 1. Crea el proyecto en Vercel enlazado al mismo repositorio y rama que uses en desarrollo.

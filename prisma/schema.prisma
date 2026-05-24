@@ -54,13 +54,13 @@ model DirectoryStrike {
   @@map("directory_strikes")
 }
 
-/** Parámetros JSON editables desde el panel; el bot puede leerlos vía GET /api/bot/panel-config */
-model BotPanelSettings {
+/** Cola panel ↔ addon: peticiones de sync (id fijo `minecraft_sync_request`). */
+model MinecraftSyncQueue {
   id        String   @id
   data      Json     @default("{}")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("bot_panel_settings")
+  @@map("minecraft_sync_queue")
 }
 
 /** Registro de actividad de jugadores de Minecraft desde el servidor */

@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
   const requestedAt = new Date().toISOString();
 
-  await prisma.botPanelSettings.upsert({
+  await prisma.minecraftSyncQueue.upsert({
     where: { id: SETTINGS_ID },
     update: {
       data: {
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
   const token = getBearerToken(request);
   if (token !== secret) return unauthorized();
 
-  const row = await prisma.botPanelSettings.findUnique({
+  const row = await prisma.minecraftSyncQueue.findUnique({
     where: { id: SETTINGS_ID },
   });
   const data = asSyncRequestData(row?.data);
@@ -125,7 +125,7 @@ export async function PUT(request: Request) {
     );
   }
 
-  const row = await prisma.botPanelSettings.findUnique({
+  const row = await prisma.minecraftSyncQueue.findUnique({
     where: { id: SETTINGS_ID },
   });
   if (!row) {
@@ -134,7 +134,7 @@ export async function PUT(request: Request) {
 
   const prev = asSyncRequestData(row.data);
 
-  await prisma.botPanelSettings.update({
+  await prisma.minecraftSyncQueue.update({
     where: { id: SETTINGS_ID },
     data: {
       data: {

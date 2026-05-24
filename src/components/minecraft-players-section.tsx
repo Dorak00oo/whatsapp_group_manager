@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-/** Refresco del panel para ver cambios del servidor / blacklist sin recargar a mano. */
-const DASHBOARD_REFRESH_MS = 12_000;
+/** Refresco del panel: intervalo alto para reducir consultas Neon (CU-h) cuando la pestaña está abierta mucho tiempo. */
+const DASHBOARD_REFRESH_MS = 60_000;
 
 type MinecraftPlayer = {
   id: string;
@@ -58,10 +58,35 @@ export function MinecraftPlayersSection({
 }: Props) {
   const router = useRouter();
   useEffect(() => {
-    const id = setInterval(() => {
+    let id: ReturnType<typeof setInterval> | undefined;
+    const refresh = () => {
       router.refresh();
-    }, DASHBOARD_REFRESH_MS);
-    return () => clearInterval(id);
+    };
+    const startIfVisible = () => {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState !== "visible") return;
+      if (id !== undefined) return;
+      id = setInterval(refresh, DASHBOARD_REFRESH_MS);
+    };
+    const stop = () => {
+      if (id !== undefined) {
+        clearInterval(id);
+        id = undefined;
+      }
+    };
+    const onVis = () => {
+      stop();
+      if (document.visibilityState === "visible") {
+        refresh();
+        startIfVisible();
+      }
+    };
+    startIfVisible();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [router]);
 
   const [filter, setFilter] = useState<FilterType>("all");
