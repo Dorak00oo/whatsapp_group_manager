@@ -7,6 +7,10 @@ import {
   snapshotStatusByGamertag,
 } from "@/lib/minecraft-active";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import {
+  MINECRAFT_CONFIG_DEFAULTS,
+  minecraftConfigToPayload,
+} from "@/lib/minecraft-config-defaults";
 import { prisma } from "@/lib/prisma";
 
 export default async function MinecraftPage() {
@@ -161,12 +165,8 @@ export default async function MinecraftPage() {
         whitelisted={whitelistedCount}
         config={
           config
-            ? {
-                daysInactive: config.daysInactive,
-                daysBlacklist: config.daysBlacklist,
-                daysPurge: config.daysPurge,
-              }
-            : { daysInactive: 7, daysBlacklist: 14, daysPurge: 21 }
+            ? minecraftConfigToPayload(config)
+            : { ...MINECRAFT_CONFIG_DEFAULTS }
         }
       />
     </section>

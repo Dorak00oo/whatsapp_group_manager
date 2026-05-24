@@ -21,6 +21,8 @@ type Config = {
   daysInactive: number;
   daysBlacklist: number;
   daysPurge: number;
+  snapshotRetentionDays: number;
+  snapshotKeepMinimum: number;
 };
 
 type Props = {
@@ -504,7 +506,56 @@ export function MinecraftPlayersSection({
                   className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
                 />
                 <p className="mt-1 text-xs text-zinc-500">
-                  Actual: {config.daysPurge} días
+                  Actual: {config.daysPurge} días (solo en el servidor Bedrock)
+                </p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Historial en la base (Neon)
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Días de historial de snapshots
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={configForm.snapshotRetentionDays}
+                  onChange={(e) =>
+                    setConfigForm({
+                      ...configForm,
+                      snapshotRetentionDays:
+                        parseInt(e.target.value, 10) || 45,
+                    })
+                  }
+                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                />
+                <p className="mt-1 text-xs text-zinc-500">
+                  Actual: {config.snapshotRetentionDays} días (~mes y medio por
+                  defecto). No borra jugadores actuales.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Mínimo de snapshots a conservar
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={configForm.snapshotKeepMinimum}
+                  onChange={(e) =>
+                    setConfigForm({
+                      ...configForm,
+                      snapshotKeepMinimum:
+                        parseInt(e.target.value, 10) || 10,
+                    })
+                  }
+                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+                />
+                <p className="mt-1 text-xs text-zinc-500">
+                  Actual: {config.snapshotKeepMinimum} (los más recientes no se
+                  purgan por antigüedad).
                 </p>
               </div>
             </div>

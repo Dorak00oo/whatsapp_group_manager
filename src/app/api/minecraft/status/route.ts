@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { isActiveByDaysInactive } from "@/lib/minecraft-active";
 import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
+import { purgeOldMinecraftSnapshots } from "@/lib/minecraft-snapshot-purge";
 
 export const runtime = "nodejs";
 
@@ -102,6 +103,13 @@ export async function POST(request: Request) {
         data: body as Prisma.InputJsonValue,
       },
     });
+
+    const purgeResult = await purgeOldMinecraftSnapshots(prisma, config);
+    if (purgeResult.deleted > 0) {
+      console.info(
+        `[Minecraft API] Purga snapshots: ${purgeResult.deleted} filas (> ${config?.snapshotRetentionDays ?? 45} días, mín. ${config?.snapshotKeepMinimum ?? 10} recientes)`,
+      );
+    }
 
     // Actualizar o crear jugadores (gamertag sin distinguir mayúsculas en la búsqueda)
     // Blacklist/WL: si el panel editó la fila recientemente, no pisar con un snapshot
@@ -271,8 +279,16 @@ export async function GET(request: Request) {
             daysInactive: config.daysInactive,
             daysBlacklist: config.daysBlacklist,
             daysPurge: config.daysPurge,
+            snapshotRetentionDays: config.snapshotRetentionDays,
+            snapshotKeepMinimum: config.snapshotKeepMinimum,
           }
-        : { daysInactive: 7, daysBlacklist: 14, daysPurge: 21 },
+        : {
+            daysInactive: 7,
+            daysBlacklist: 14,
+            daysPurge: 21,
+            snapshotRetentionDays: 45,
+            snapshotKeepMinimum: 10,
+          },
     });
   } catch (error) {
     console.error("[Minecraft API] Error:", error);

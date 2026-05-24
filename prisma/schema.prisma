@@ -94,11 +94,15 @@ model MinecraftSnapshot {
 
 /** Configuración del sistema de Minecraft (editable desde web) */
 model MinecraftConfig {
-  id                String   @id @default("default")
-  daysInactive      Int      @default(7) @map("days_inactive")
-  daysBlacklist     Int      @default(14) @map("days_blacklist")
-  daysPurge         Int      @default(21) @map("days_purge")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default("default")
+  daysInactive          Int      @default(7) @map("days_inactive")
+  daysBlacklist         Int      @default(14) @map("days_blacklist")
+  daysPurge             Int      @default(21) @map("days_purge")
+  /** Días de historial de snapshots en Neon antes de borrar (no afecta jugadores actuales). */
+  snapshotRetentionDays Int      @default(45) @map("snapshot_retention_days")
+  /** Mínimo de snapshots recientes que nunca se purgan por antigüedad. */
+  snapshotKeepMinimum   Int      @default(10) @map("snapshot_keep_minimum")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("minecraft_config")
 }

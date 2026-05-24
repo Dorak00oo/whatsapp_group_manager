@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import {
+  MINECRAFT_CONFIG_DEFAULTS,
+  minecraftConfigToPayload,
+} from "@/lib/minecraft-config-defaults";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -12,6 +16,20 @@ function getBearerToken(request: Request): string | null {
   const h = request.headers.get("authorization");
   if (!h?.toLowerCase().startsWith("bearer ")) return null;
   return h.slice(7).trim() || null;
+}
+
+type ConfigBody = {
+  daysInactive?: number;
+  daysBlacklist?: number;
+  daysPurge?: number;
+  snapshotRetentionDays?: number;
+  snapshotKeepMinimum?: number;
+};
+
+function pickPositiveInt(value: unknown): number | undefined {
+  return typeof value === "number" && value > 0 && Number.isFinite(value)
+    ? Math.floor(value)
+    : undefined;
 }
 
 // GET: Obtener configuración actual
@@ -34,25 +52,15 @@ export async function GET(request: Request) {
       where: { id: "default" },
     });
 
-    // Si no existe, crear con valores por defecto
     if (!config) {
       config = await prisma.minecraftConfig.create({
-        data: {
-          id: "default",
-          daysInactive: 7,
-          daysBlacklist: 14,
-          daysPurge: 21,
-        },
+        data: { id: "default", ...MINECRAFT_CONFIG_DEFAULTS },
       });
     }
 
     return NextResponse.json({
       ok: true,
-      config: {
-        daysInactive: config.daysInactive,
-        daysBlacklist: config.daysBlacklist,
-        daysPurge: config.daysPurge,
-      },
+      config: minecraftConfigToPayload(config),
     });
   } catch (error) {
     console.error("[Minecraft Config API] Error:", error);
@@ -85,16 +93,7 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!secret && token) {
-    return unauthorized();
-  }
-
-  let body: {
-    daysInactive?: number;
-    daysBlacklist?: number;
-    daysPurge?: number;
-  };
-
+  let body: ConfigBody;
   try {
     body = await request.json();
   } catch {
@@ -102,20 +101,21 @@ export async function POST(request: Request) {
   }
 
   try {
-    const updateData: {
-      daysInactive?: number;
-      daysBlacklist?: number;
-      daysPurge?: number;
-    } = {};
+    const updateData: Partial<typeof MINECRAFT_CONFIG_DEFAULTS> = {};
+    const daysInactive = pickPositiveInt(body.daysInactive);
+    const daysBlacklist = pickPositiveInt(body.daysBlacklist);
+    const daysPurge = pickPositiveInt(body.daysPurge);
+    const snapshotRetentionDays = pickPositiveInt(body.snapshotRetentionDays);
+    const snapshotKeepMinimum = pickPositiveInt(body.snapshotKeepMinimum);
 
-    if (typeof body.daysInactive === "number" && body.daysInactive > 0) {
-      updateData.daysInactive = body.daysInactive;
+    if (daysInactive !== undefined) updateData.daysInactive = daysInactive;
+    if (daysBlacklist !== undefined) updateData.daysBlacklist = daysBlacklist;
+    if (daysPurge !== undefined) updateData.daysPurge = daysPurge;
+    if (snapshotRetentionDays !== undefined) {
+      updateData.snapshotRetentionDays = snapshotRetentionDays;
     }
-    if (typeof body.daysBlacklist === "number" && body.daysBlacklist > 0) {
-      updateData.daysBlacklist = body.daysBlacklist;
-    }
-    if (typeof body.daysPurge === "number" && body.daysPurge > 0) {
-      updateData.daysPurge = body.daysPurge;
+    if (snapshotKeepMinimum !== undefined) {
+      updateData.snapshotKeepMinimum = snapshotKeepMinimum;
     }
 
     const config = await prisma.minecraftConfig.upsert({
@@ -123,19 +123,22 @@ export async function POST(request: Request) {
       update: updateData,
       create: {
         id: "default",
-        daysInactive: body.daysInactive ?? 7,
-        daysBlacklist: body.daysBlacklist ?? 14,
-        daysPurge: body.daysPurge ?? 21,
+        daysInactive: daysInactive ?? MINECRAFT_CONFIG_DEFAULTS.daysInactive,
+        daysBlacklist:
+          daysBlacklist ?? MINECRAFT_CONFIG_DEFAULTS.daysBlacklist,
+        daysPurge: daysPurge ?? MINECRAFT_CONFIG_DEFAULTS.daysPurge,
+        snapshotRetentionDays:
+          snapshotRetentionDays ??
+          MINECRAFT_CONFIG_DEFAULTS.snapshotRetentionDays,
+        snapshotKeepMinimum:
+          snapshotKeepMinimum ??
+          MINECRAFT_CONFIG_DEFAULTS.snapshotKeepMinimum,
       },
     });
 
     return NextResponse.json({
       ok: true,
-      config: {
-        daysInactive: config.daysInactive,
-        daysBlacklist: config.daysBlacklist,
-        daysPurge: config.daysPurge,
-      },
+      config: minecraftConfigToPayload(config),
     });
   } catch (error) {
     console.error("[Minecraft Config API] Error:", error);
