@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import {
   MINECRAFT_CONFIG_DEFAULTS,
+  type MinecraftConfigUpdateInput,
   minecraftConfigToPayload,
 } from "@/lib/minecraft-config-defaults";
 import { prisma } from "@/lib/prisma";
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const updateData: Partial<typeof MINECRAFT_CONFIG_DEFAULTS> = {};
+    const updateData: MinecraftConfigUpdateInput = {};
     const daysInactive = pickPositiveInt(body.daysInactive);
     const daysBlacklist = pickPositiveInt(body.daysBlacklist);
     const daysPurge = pickPositiveInt(body.daysPurge);
