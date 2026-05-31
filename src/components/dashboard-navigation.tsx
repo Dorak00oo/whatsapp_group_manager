@@ -77,6 +77,26 @@ function IconUpload({ className }: { className?: string }) {
 const linkBaseSidebar =
   "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
 
+function IconCommands({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className ?? iconSm}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" x2="20" y1="19" y2="19" />
+    </svg>
+  );
+}
+
 function IconMinecraft({ className }: { className?: string }) {
   return (
     <svg
@@ -106,7 +126,8 @@ function useNavActive() {
   const add = pathname.startsWith("/dashboard/agregar");
   const bulk = pathname.startsWith("/dashboard/importar");
   const minecraft = pathname.startsWith("/dashboard/minecraft");
-  return { list, add, bulk, minecraft };
+  const comandos = pathname.startsWith("/dashboard/comandos");
+  return { list, add, bulk, minecraft, comandos };
 }
 
 function activeCls(on: boolean) {
@@ -123,7 +144,7 @@ function activeTabCls(on: boolean) {
 
 /** Barra lateral: iconos pequeños (md+). */
 export function DashboardSidebarNav() {
-  const { list, add, bulk, minecraft } = useNavActive();
+  const { list, add, bulk, minecraft, comandos } = useNavActive();
 
   return (
     <nav
@@ -162,6 +183,14 @@ export function DashboardSidebarNav() {
       >
         <IconMinecraft className={iconSidebar} />
       </Link>
+      <Link
+        href="/dashboard/comandos"
+        className={`${linkBaseSidebar} ${activeCls(comandos)}`}
+        title="Comandos rápidos"
+        aria-current={comandos ? "page" : undefined}
+      >
+        <IconCommands className={iconSidebar} />
+      </Link>
     </nav>
   );
 }
@@ -171,7 +200,7 @@ const tabBase =
 
 /** Navegación fija inferior (solo móvil): icono + etiqueta; el menú «Más» va aparte en el layout. */
 export function DashboardMobileTabNav() {
-  const { list, add, bulk, minecraft } = useNavActive();
+  const { list, add, bulk, minecraft, comandos } = useNavActive();
 
   return (
     <nav className="flex w-full min-w-0 items-stretch justify-between gap-0.5">
@@ -205,7 +234,15 @@ export function DashboardMobileTabNav() {
         aria-current={minecraft ? "page" : undefined}
       >
         <IconMinecraft className="size-[1.125rem] shrink-0" />
-        <span className="text-[10px] font-medium leading-none">Minecraft</span>
+        <span className="text-[10px] font-medium leading-none">MC</span>
+      </Link>
+      <Link
+        href="/dashboard/comandos"
+        className={`${tabBase} ${activeTabCls(comandos)}`}
+        aria-current={comandos ? "page" : undefined}
+      >
+        <IconCommands className="size-[1.125rem] shrink-0" />
+        <span className="text-[10px] font-medium leading-none">Cmd</span>
       </Link>
     </nav>
   );
