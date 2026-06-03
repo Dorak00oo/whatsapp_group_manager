@@ -12,7 +12,7 @@ type Props = {
   admins: AdminOption[];
 };
 
-type CmdAction = "spectator" | "survival" | "kill_endermites" | "kill_withers";
+type CmdAction = "spectator" | "survival" | "kill_silverfish" | "kill_withers";
 
 export function MinecraftRemoteCommandsPanel({ admins }: Props) {
   const [targetGamertag, setTargetGamertag] = useState(
@@ -116,12 +116,12 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
         <button
           type="button"
           disabled={loading !== null}
-          onClick={() => void send("kill_endermites")}
+          onClick={() => void send("kill_silverfish")}
           className="rounded-lg bg-zinc-800 px-4 py-3 text-sm font-medium text-white transition hover:bg-zinc-900 disabled:opacity-50 dark:bg-zinc-700 dark:hover:bg-zinc-600"
         >
-          {loading === "kill_endermites"
+          {loading === "kill_silverfish"
             ? "Enviando…"
-            : "Eliminar todos los endermitas"}
+            : "Eliminar todos los silverfish"}
         </button>
         <button
           type="button"

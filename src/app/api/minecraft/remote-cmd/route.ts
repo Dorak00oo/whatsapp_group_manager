@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     typeof body.action === "string" ? body.action.trim() : "";
   if (!isRemoteCmdAction(actionRaw)) {
     return badRequest(
-      `action debe ser uno de: spectator, survival, kill_endermites, kill_withers`,
+      `action debe ser uno de: spectator, survival, kill_silverfish, kill_withers`,
     );
   }
   const action: RemoteCmdAction = actionRaw;

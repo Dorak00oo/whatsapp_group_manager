@@ -4,7 +4,7 @@ export const REMOTE_CMD_QUEUE_ID = "panel_remote_cmd";
 export const REMOTE_CMD_ACTIONS = [
   "spectator",
   "survival",
-  "kill_endermites",
+  "kill_silverfish",
   "kill_withers",
 ] as const;
 
