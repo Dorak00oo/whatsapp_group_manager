@@ -8,17 +8,15 @@ export type CallingCodeOption = {
 };
 
 /**
- * Solo países que sueles usar (Latinoamérica, España, Norteamérica y algunos
- * europeos frecuentes). Amplía o reduce esta lista aquí.
+ * Países hispanohablantes, Norteamérica y Europa occidental/central relevante.
+ * Amplía o reduce esta lista aquí.
  */
 const KNOWN_COUNTRY_CODES = [
+  // Hispanohablantes (Latinoamérica, España, Caribe)
   "MX",
   "ES",
-  "US",
-  "CA",
   "AR",
   "BO",
-  "BR",
   "CL",
   "CO",
   "CR",
@@ -26,6 +24,7 @@ const KNOWN_COUNTRY_CODES = [
   "DO",
   "EC",
   "SV",
+  "GQ",
   "GT",
   "HN",
   "NI",
@@ -35,12 +34,35 @@ const KNOWN_COUNTRY_CODES = [
   "PR",
   "UY",
   "VE",
-  "FR",
+  // Norteamérica
+  "US",
+  "CA",
+  // Europa — principales
+  "AT",
+  "BE",
+  "BG",
+  "CH",
+  "CZ",
   "DE",
-  "IT",
-  "PT",
+  "DK",
+  "FI",
+  "FR",
   "GB",
+  "GR",
+  "HR",
+  "HU",
+  "IE",
+  "IT",
+  "LU",
   "NL",
+  "NO",
+  "PL",
+  "PT",
+  "RO",
+  "SE",
+  "SK",
+  // Brasil (vecino frecuente en la comunidad)
+  "BR",
 ] as const satisfies readonly CountryCode[];
 
 /** Orden fijo al inicio del desplegable; el resto va alfabético por nombre. */
