@@ -25,7 +25,7 @@ export const PARCEL_CONFIG_DEFAULTS: ParcelConfigPayload = {
   maxZ: 15,
 };
 
-export type ParcelEventType = "enter" | "exit";
+export type ParcelEventType = "enter" | "exit" | "chest_open";
 
 export function isParcelDimension(value: string): value is ParcelDimension {
   return (PARCEL_DIMENSIONS as readonly string[]).includes(value);

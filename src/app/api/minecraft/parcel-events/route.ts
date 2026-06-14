@@ -22,7 +22,7 @@ function getBearerToken(request: Request): string | null {
 }
 
 function isEventType(value: string): value is ParcelEventType {
-  return value === "enter" || value === "exit";
+  return value === "enter" || value === "exit" || value === "chest_open";
 }
 
 /** Addon: registra entradas/salidas (batch, 1 write por lote). */
@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     posY: number | null;
     posZ: number | null;
     dimension: string | null;
+    blockType: string | null;
   }[] = [];
 
   for (const raw of body.events.slice(0, MAX_EVENTS_PER_POST)) {
@@ -79,6 +80,8 @@ export async function POST(request: Request) {
       typeof e.z === "number" && Number.isFinite(e.z) ? Math.floor(e.z) : null;
     const dimension =
       typeof e.dimension === "string" ? e.dimension.trim().slice(0, 40) : null;
+    const blockType =
+      typeof e.blockType === "string" ? e.blockType.trim().slice(0, 64) : null;
 
     rows.push({
       gamertag,
@@ -88,6 +91,7 @@ export async function POST(request: Request) {
       posY,
       posZ,
       dimension,
+      blockType,
     });
   }
 

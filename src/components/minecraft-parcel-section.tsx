@@ -12,7 +12,7 @@ import { softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
 export type ParcelEventRow = {
   id: string;
   gamertag: string;
-  event: "enter" | "exit";
+  event: "enter" | "exit" | "chest_open";
   occurredAt: string;
   timeMexico: string;
   timeColombia: string;
@@ -20,6 +20,7 @@ export type ParcelEventRow = {
   y: number | null;
   z: number | null;
   dimension: string | null;
+  blockType: string | null;
 };
 
 type DirectoryLookup = {
@@ -229,8 +230,7 @@ export function MinecraftParcelSection({
           <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
             Últimos {events.length} eventos. Quien no esté en el grupo WA aparece
             resaltado.
-          </p>
-        </div>
+          </p>        </div>
 
         {events.length === 0 ? (
           <p className="text-sm text-zinc-500">
@@ -273,10 +273,16 @@ export function MinecraftParcelSection({
                           className={
                             ev.event === "enter"
                               ? "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100"
+                              : ev.event === "chest_open"
+                              ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-100"
                               : "rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100"
                           }
                         >
-                          {ev.event === "enter" ? "Entrada" : "Salida"}
+                          {ev.event === "enter"
+                            ? "Entrada"
+                            : ev.event === "chest_open"
+                            ? `Cofre${ev.blockType ? ` (${ev.blockType})` : ""}`
+                            : "Salida"}
                         </span>
                       </td>
                       <td className="px-3 py-2 font-medium">{ev.gamertag}</td>

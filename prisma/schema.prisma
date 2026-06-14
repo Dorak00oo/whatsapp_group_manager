@@ -126,6 +126,7 @@ model MinecraftParcelEvent {
   posY       Int?     @map("pos_y")
   posZ       Int?     @map("pos_z")
   dimension  String?
+  blockType  String?  @map("block_type")
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([occurredAt(sort: Desc)])

@@ -82,7 +82,7 @@ export default async function DashboardParcelaPage() {
             return {
               id: e.id,
               gamertag: e.gamertag,
-              event: e.eventType as "enter" | "exit",
+              event: e.eventType as "enter" | "exit" | "chest_open",
               occurredAt: e.occurredAt.toISOString(),
               timeMexico: zones.mexico,
               timeColombia: zones.colombia,
@@ -90,6 +90,7 @@ export default async function DashboardParcelaPage() {
               y: e.posY,
               z: e.posZ,
               dimension: e.dimension,
+              blockType: e.blockType ?? null,
             };
           })}
           directoryByTag={directoryByTag}
