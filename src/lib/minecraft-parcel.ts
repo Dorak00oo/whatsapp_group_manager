@@ -8,9 +8,9 @@ export type ParcelConfigPayload = {
   minX: number;
   minY: number;
   minZ: number;
-  sizeX: number;
-  sizeY: number;
-  sizeZ: number;
+  maxX: number;
+  maxY: number;
+  maxZ: number;
 };
 
 export const PARCEL_CONFIG_DEFAULTS: ParcelConfigPayload = {
@@ -20,15 +20,28 @@ export const PARCEL_CONFIG_DEFAULTS: ParcelConfigPayload = {
   minX: 0,
   minY: 64,
   minZ: 0,
-  sizeX: 16,
-  sizeY: 16,
-  sizeZ: 16,
+  maxX: 15,
+  maxY: 79,
+  maxZ: 15,
 };
 
 export type ParcelEventType = "enter" | "exit";
 
 export function isParcelDimension(value: string): value is ParcelDimension {
   return (PARCEL_DIMENSIONS as readonly string[]).includes(value);
+}
+
+/** Ordena esquinas para que min ≤ max en cada eje. */
+export function normalizeParcelCorners(parcel: ParcelConfigPayload): ParcelConfigPayload {
+  return {
+    ...parcel,
+    minX: Math.min(parcel.minX, parcel.maxX),
+    minY: Math.min(parcel.minY, parcel.maxY),
+    minZ: Math.min(parcel.minZ, parcel.maxZ),
+    maxX: Math.max(parcel.minX, parcel.maxX),
+    maxY: Math.max(parcel.minY, parcel.maxY),
+    maxZ: Math.max(parcel.minZ, parcel.maxZ),
+  };
 }
 
 export function parcelConfigFromRow(row: {
@@ -38,11 +51,11 @@ export function parcelConfigFromRow(row: {
   parcelMinX: number;
   parcelMinY: number;
   parcelMinZ: number;
-  parcelSizeX: number;
-  parcelSizeY: number;
-  parcelSizeZ: number;
+  parcelMaxX: number;
+  parcelMaxY: number;
+  parcelMaxZ: number;
 }): ParcelConfigPayload {
-  return {
+  return normalizeParcelCorners({
     enabled: row.parcelEnabled,
     name: row.parcelName.trim() || PARCEL_CONFIG_DEFAULTS.name,
     dimension: isParcelDimension(row.parcelDimension)
@@ -51,15 +64,50 @@ export function parcelConfigFromRow(row: {
     minX: row.parcelMinX,
     minY: row.parcelMinY,
     minZ: row.parcelMinZ,
-    sizeX: row.parcelSizeX,
-    sizeY: row.parcelSizeY,
-    sizeZ: row.parcelSizeZ,
-  };
+    maxX: row.parcelMaxX,
+    maxY: row.parcelMaxY,
+    maxZ: row.parcelMaxZ,
+  });
 }
 
 export function parcelPrismaUpdateFromPayload(
   parcel: Partial<ParcelConfigPayload>,
 ): Record<string, unknown> {
+  const merged: ParcelConfigPayload = normalizeParcelCorners({
+    ...PARCEL_CONFIG_DEFAULTS,
+    ...parcel,
+    enabled: parcel.enabled ?? PARCEL_CONFIG_DEFAULTS.enabled,
+    name: parcel.name?.trim() || PARCEL_CONFIG_DEFAULTS.name,
+    dimension:
+      parcel.dimension && isParcelDimension(parcel.dimension)
+        ? parcel.dimension
+        : PARCEL_CONFIG_DEFAULTS.dimension,
+    minX:
+      typeof parcel.minX === "number" && Number.isFinite(parcel.minX)
+        ? Math.floor(parcel.minX)
+        : PARCEL_CONFIG_DEFAULTS.minX,
+    minY:
+      typeof parcel.minY === "number" && Number.isFinite(parcel.minY)
+        ? Math.floor(parcel.minY)
+        : PARCEL_CONFIG_DEFAULTS.minY,
+    minZ:
+      typeof parcel.minZ === "number" && Number.isFinite(parcel.minZ)
+        ? Math.floor(parcel.minZ)
+        : PARCEL_CONFIG_DEFAULTS.minZ,
+    maxX:
+      typeof parcel.maxX === "number" && Number.isFinite(parcel.maxX)
+        ? Math.floor(parcel.maxX)
+        : PARCEL_CONFIG_DEFAULTS.maxX,
+    maxY:
+      typeof parcel.maxY === "number" && Number.isFinite(parcel.maxY)
+        ? Math.floor(parcel.maxY)
+        : PARCEL_CONFIG_DEFAULTS.maxY,
+    maxZ:
+      typeof parcel.maxZ === "number" && Number.isFinite(parcel.maxZ)
+        ? Math.floor(parcel.maxZ)
+        : PARCEL_CONFIG_DEFAULTS.maxZ,
+  });
+
   const out: Record<string, unknown> = {};
   if (typeof parcel.enabled === "boolean") out.parcelEnabled = parcel.enabled;
   if (typeof parcel.name === "string") {
@@ -69,23 +117,20 @@ export function parcelPrismaUpdateFromPayload(
   if (parcel.dimension && isParcelDimension(parcel.dimension)) {
     out.parcelDimension = parcel.dimension;
   }
-  if (typeof parcel.minX === "number" && Number.isFinite(parcel.minX)) {
-    out.parcelMinX = Math.floor(parcel.minX);
-  }
-  if (typeof parcel.minY === "number" && Number.isFinite(parcel.minY)) {
-    out.parcelMinY = Math.floor(parcel.minY);
-  }
-  if (typeof parcel.minZ === "number" && Number.isFinite(parcel.minZ)) {
-    out.parcelMinZ = Math.floor(parcel.minZ);
-  }
-  if (typeof parcel.sizeX === "number" && Number.isFinite(parcel.sizeX)) {
-    out.parcelSizeX = Math.max(1, Math.min(512, Math.floor(parcel.sizeX)));
-  }
-  if (typeof parcel.sizeY === "number" && Number.isFinite(parcel.sizeY)) {
-    out.parcelSizeY = Math.max(1, Math.min(512, Math.floor(parcel.sizeY)));
-  }
-  if (typeof parcel.sizeZ === "number" && Number.isFinite(parcel.sizeZ)) {
-    out.parcelSizeZ = Math.max(1, Math.min(512, Math.floor(parcel.sizeZ)));
+  if (
+    parcel.minX !== undefined ||
+    parcel.minY !== undefined ||
+    parcel.minZ !== undefined ||
+    parcel.maxX !== undefined ||
+    parcel.maxY !== undefined ||
+    parcel.maxZ !== undefined
+  ) {
+    out.parcelMinX = merged.minX;
+    out.parcelMinY = merged.minY;
+    out.parcelMinZ = merged.minZ;
+    out.parcelMaxX = merged.maxX;
+    out.parcelMaxY = merged.maxY;
+    out.parcelMaxZ = merged.maxZ;
   }
   return out;
 }
@@ -96,22 +141,34 @@ export function isInsideParcelBox(
   z: number,
   parcel: ParcelConfigPayload,
 ): boolean {
+  const p = normalizeParcelCorners(parcel);
   const fx = Math.floor(x);
   const fy = Math.floor(y);
   const fz = Math.floor(z);
   return (
-    fx >= parcel.minX &&
-    fx < parcel.minX + parcel.sizeX &&
-    fy >= parcel.minY &&
-    fy < parcel.minY + parcel.sizeY &&
-    fz >= parcel.minZ &&
-    fz < parcel.minZ + parcel.sizeZ
+    fx >= p.minX &&
+    fx <= p.maxX &&
+    fy >= p.minY &&
+    fy <= p.maxY &&
+    fz >= p.minZ &&
+    fz <= p.maxZ
   );
 }
 
 export function formatParcelBounds(parcel: ParcelConfigPayload): string {
-  const maxX = parcel.minX + parcel.sizeX - 1;
-  const maxY = parcel.minY + parcel.sizeY - 1;
-  const maxZ = parcel.minZ + parcel.sizeZ - 1;
-  return `(${parcel.minX}, ${parcel.minY}, ${parcel.minZ}) → (${maxX}, ${maxY}, ${maxZ})`;
+  const p = normalizeParcelCorners(parcel);
+  return `(${p.minX}, ${p.minY}, ${p.minZ}) → (${p.maxX}, ${p.maxY}, ${p.maxZ})`;
+}
+
+export function parcelBlockSpan(parcel: ParcelConfigPayload): {
+  spanX: number;
+  spanY: number;
+  spanZ: number;
+} {
+  const p = normalizeParcelCorners(parcel);
+  return {
+    spanX: p.maxX - p.minX + 1,
+    spanY: p.maxY - p.minY + 1,
+    spanZ: p.maxZ - p.minZ + 1,
+  };
 }

@@ -33,9 +33,9 @@ type ConfigBody = {
     minX?: number;
     minY?: number;
     minZ?: number;
-    sizeX?: number;
-    sizeY?: number;
-    sizeZ?: number;
+    maxX?: number;
+    maxY?: number;
+    maxZ?: number;
   };
 };
 
@@ -157,9 +157,9 @@ export async function POST(request: Request) {
         parcelMinX: MINECRAFT_CONFIG_DEFAULTS.parcel.minX,
         parcelMinY: MINECRAFT_CONFIG_DEFAULTS.parcel.minY,
         parcelMinZ: MINECRAFT_CONFIG_DEFAULTS.parcel.minZ,
-        parcelSizeX: MINECRAFT_CONFIG_DEFAULTS.parcel.sizeX,
-        parcelSizeY: MINECRAFT_CONFIG_DEFAULTS.parcel.sizeY,
-        parcelSizeZ: MINECRAFT_CONFIG_DEFAULTS.parcel.sizeZ,
+        parcelMaxX: MINECRAFT_CONFIG_DEFAULTS.parcel.maxX,
+        parcelMaxY: MINECRAFT_CONFIG_DEFAULTS.parcel.maxY,
+        parcelMaxZ: MINECRAFT_CONFIG_DEFAULTS.parcel.maxZ,
         ...parcelFields,
       },
     });

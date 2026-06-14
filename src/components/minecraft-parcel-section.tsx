@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   formatParcelBounds,
+  parcelBlockSpan,
   PARCEL_DIMENSIONS,
   type ParcelConfigPayload,
 } from "@/lib/minecraft-parcel";
@@ -95,7 +96,7 @@ export function MinecraftParcelSection({
             Configurar terreno
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Define un cubo en el mundo (esquina mínima + tamaño en bloques). El
+            Define un cubo con dos esquinas (mínima y máxima) en bloques. El
             addon revisa cada segundo a los jugadores online y registra entrada
             y salida con fecha. En el juego podés ver coordenadas con{" "}
             <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
@@ -172,16 +173,14 @@ export function MinecraftParcelSection({
         </div>
 
         <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-          Tamaño (bloques)
+          Esquina máxima (bloque opuesto)
         </p>
         <div className="grid grid-cols-3 gap-2">
-          {(["sizeX", "sizeY", "sizeZ"] as const).map((key) => (
+          {(["maxX", "maxY", "maxZ"] as const).map((key) => (
             <label key={key} className="block text-sm">
-              <span className="text-zinc-500">{key.slice(4)}</span>
+              <span className="text-zinc-500">{key.slice(3)}</span>
               <input
                 type="number"
-                min={1}
-                max={512}
                 className={`${softInputNeutral} mt-1 w-full`}
                 value={parcelForm[key]}
                 onChange={(e) =>
@@ -197,6 +196,11 @@ export function MinecraftParcelSection({
 
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
           Área: {boundsLabel}
+          {" · "}
+          {(() => {
+            const s = parcelBlockSpan(parcelForm);
+            return `${s.spanX}×${s.spanY}×${s.spanZ} bloques`;
+          })()}
         </p>
 
         <button

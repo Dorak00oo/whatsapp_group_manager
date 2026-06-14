@@ -108,9 +108,9 @@ model MinecraftConfig {
   parcelMinX            Int      @default(0) @map("parcel_min_x")
   parcelMinY            Int      @default(64) @map("parcel_min_y")
   parcelMinZ            Int      @default(0) @map("parcel_min_z")
-  parcelSizeX           Int      @default(16) @map("parcel_size_x")
-  parcelSizeY           Int      @default(16) @map("parcel_size_y")
-  parcelSizeZ           Int      @default(16) @map("parcel_size_z")
+  parcelMaxX            Int      @default(15) @map("parcel_max_x")
+  parcelMaxY            Int      @default(79) @map("parcel_max_y")
+  parcelMaxZ            Int      @default(15) @map("parcel_max_z")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("minecraft_config")

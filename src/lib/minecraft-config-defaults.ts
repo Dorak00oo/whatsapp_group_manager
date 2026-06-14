@@ -40,9 +40,9 @@ export function minecraftConfigToPayload(config: {
   parcelMinX: number;
   parcelMinY: number;
   parcelMinZ: number;
-  parcelSizeX: number;
-  parcelSizeY: number;
-  parcelSizeZ: number;
+  parcelMaxX: number;
+  parcelMaxY: number;
+  parcelMaxZ: number;
 }): MinecraftConfigPayload {
   return {
     daysInactive: config.daysInactive,
