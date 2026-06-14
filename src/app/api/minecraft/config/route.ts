@@ -5,6 +5,7 @@ import {
   type MinecraftConfigUpdateInput,
   minecraftConfigToPayload,
 } from "@/lib/minecraft-config-defaults";
+import { parcelPrismaUpdateFromPayload, type ParcelConfigPayload } from "@/lib/minecraft-parcel";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -25,6 +26,17 @@ type ConfigBody = {
   daysPurge?: number;
   snapshotRetentionDays?: number;
   snapshotKeepMinimum?: number;
+  parcel?: {
+    enabled?: boolean;
+    name?: string;
+    dimension?: string;
+    minX?: number;
+    minY?: number;
+    minZ?: number;
+    sizeX?: number;
+    sizeY?: number;
+    sizeZ?: number;
+  };
 };
 
 function pickPositiveInt(value: unknown): number | undefined {
@@ -119,9 +131,14 @@ export async function POST(request: Request) {
       updateData.snapshotKeepMinimum = snapshotKeepMinimum;
     }
 
+    const parcelFields =
+      body.parcel && typeof body.parcel === "object"
+        ? parcelPrismaUpdateFromPayload(body.parcel as Partial<ParcelConfigPayload>)
+        : {};
+
     const config = await prisma.minecraftConfig.upsert({
       where: { id: "default" },
-      update: updateData,
+      update: { ...updateData, ...parcelFields },
       create: {
         id: "default",
         daysInactive: daysInactive ?? MINECRAFT_CONFIG_DEFAULTS.daysInactive,
@@ -134,6 +151,16 @@ export async function POST(request: Request) {
         snapshotKeepMinimum:
           snapshotKeepMinimum ??
           MINECRAFT_CONFIG_DEFAULTS.snapshotKeepMinimum,
+        parcelEnabled: MINECRAFT_CONFIG_DEFAULTS.parcel.enabled,
+        parcelName: MINECRAFT_CONFIG_DEFAULTS.parcel.name,
+        parcelDimension: MINECRAFT_CONFIG_DEFAULTS.parcel.dimension,
+        parcelMinX: MINECRAFT_CONFIG_DEFAULTS.parcel.minX,
+        parcelMinY: MINECRAFT_CONFIG_DEFAULTS.parcel.minY,
+        parcelMinZ: MINECRAFT_CONFIG_DEFAULTS.parcel.minZ,
+        parcelSizeX: MINECRAFT_CONFIG_DEFAULTS.parcel.sizeX,
+        parcelSizeY: MINECRAFT_CONFIG_DEFAULTS.parcel.sizeY,
+        parcelSizeZ: MINECRAFT_CONFIG_DEFAULTS.parcel.sizeZ,
+        ...parcelFields,
       },
     });
 

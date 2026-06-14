@@ -102,7 +102,33 @@ model MinecraftConfig {
   snapshotRetentionDays Int      @default(45) @map("snapshot_retention_days")
   /** Mínimo de snapshots recientes que nunca se purgan por antigüedad. */
   snapshotKeepMinimum   Int      @default(10) @map("snapshot_keep_minimum")
+  parcelEnabled         Boolean  @default(false) @map("parcel_enabled")
+  parcelName            String   @default("Parcela") @map("parcel_name")
+  parcelDimension       String   @default("overworld") @map("parcel_dimension")
+  parcelMinX            Int      @default(0) @map("parcel_min_x")
+  parcelMinY            Int      @default(64) @map("parcel_min_y")
+  parcelMinZ            Int      @default(0) @map("parcel_min_z")
+  parcelSizeX           Int      @default(16) @map("parcel_size_x")
+  parcelSizeY           Int      @default(16) @map("parcel_size_y")
+  parcelSizeZ           Int      @default(16) @map("parcel_size_z")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("minecraft_config")
+}
+
+/** Entrada o salida de un jugador en la parcela monitoreada */
+model MinecraftParcelEvent {
+  id         String   @id @default(cuid())
+  gamertag   String
+  eventType  String   @map("event_type")
+  occurredAt DateTime @map("occurred_at")
+  posX       Int?     @map("pos_x")
+  posY       Int?     @map("pos_y")
+  posZ       Int?     @map("pos_z")
+  dimension  String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([occurredAt(sort: Desc)])
+  @@index([gamertag])
+  @@map("minecraft_parcel_events")
 }

@@ -77,6 +77,27 @@ function IconUpload({ className }: { className?: string }) {
 const linkBaseSidebar =
   "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
 
+function IconParcel({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className ?? iconSm}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 9h18v10H3z" />
+      <path d="M9 9V5h6v4" />
+      <path d="M3 14h18" />
+    </svg>
+  );
+}
+
 function IconCommands({ className }: { className?: string }) {
   return (
     <svg
@@ -127,7 +148,8 @@ function useNavActive() {
   const bulk = pathname.startsWith("/dashboard/importar");
   const minecraft = pathname.startsWith("/dashboard/minecraft");
   const comandos = pathname.startsWith("/dashboard/comandos");
-  return { list, add, bulk, minecraft, comandos };
+  const parcela = pathname.startsWith("/dashboard/parcela");
+  return { list, add, bulk, minecraft, comandos, parcela };
 }
 
 function activeCls(on: boolean) {
@@ -144,7 +166,7 @@ function activeTabCls(on: boolean) {
 
 /** Barra lateral: iconos pequeños (md+). */
 export function DashboardSidebarNav() {
-  const { list, add, bulk, minecraft, comandos } = useNavActive();
+  const { list, add, bulk, minecraft, comandos, parcela } = useNavActive();
 
   return (
     <nav
@@ -184,6 +206,14 @@ export function DashboardSidebarNav() {
         <IconMinecraft className={iconSidebar} />
       </Link>
       <Link
+        href="/dashboard/parcela"
+        className={`${linkBaseSidebar} ${activeCls(parcela)}`}
+        title="Parcela"
+        aria-current={parcela ? "page" : undefined}
+      >
+        <IconParcel className={iconSidebar} />
+      </Link>
+      <Link
         href="/dashboard/comandos"
         className={`${linkBaseSidebar} ${activeCls(comandos)}`}
         title="Comandos rápidos"
@@ -200,7 +230,7 @@ const tabBase =
 
 /** Navegación fija inferior (solo móvil): icono + etiqueta; el menú «Más» va aparte en el layout. */
 export function DashboardMobileTabNav() {
-  const { list, add, bulk, minecraft, comandos } = useNavActive();
+  const { list, add, bulk, minecraft, comandos, parcela } = useNavActive();
 
   return (
     <nav className="flex w-full min-w-0 items-stretch justify-between gap-0.5">

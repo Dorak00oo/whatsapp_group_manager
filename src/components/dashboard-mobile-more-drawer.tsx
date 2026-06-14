@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MOBILE_TOP_NAV_TOP_CSS } from "@/lib/dashboard-mobile-top-nav";
@@ -40,6 +42,7 @@ const panelClass =
  * `touch-manipulation` en el botón elimina el retraso de 300 ms del click en Android.
  */
 export function DashboardMobileMoreDrawer({ defaultThemeDark }: Props) {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const portalRoot = useRef<HTMLDivElement | null>(null);
   const [portalReady, setPortalReady] = useState(false);
@@ -101,6 +104,22 @@ export function DashboardMobileMoreDrawer({ defaultThemeDark }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          Más secciones
+        </p>
+        <nav className="mt-2 flex flex-col gap-1">
+          <Link
+            href="/dashboard/parcela"
+            onClick={closeMenu}
+            className={`rounded-xl px-3 py-2.5 text-sm font-medium ${
+              pathname.startsWith("/dashboard/parcela")
+                ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            }`}
+          >
+            Parcela
+          </Link>
+        </nav>
+        <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           Claro u oscuro
         </p>
         <div className="mt-2">

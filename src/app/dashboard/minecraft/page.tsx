@@ -165,8 +165,22 @@ export default async function MinecraftPage() {
         whitelisted={whitelistedCount}
         config={
           config
-            ? minecraftConfigToPayload(config)
-            : { ...MINECRAFT_CONFIG_DEFAULTS }
+            ? {
+                daysInactive: config.daysInactive,
+                daysBlacklist: config.daysBlacklist,
+                daysPurge: config.daysPurge,
+                snapshotRetentionDays: config.snapshotRetentionDays,
+                snapshotKeepMinimum: config.snapshotKeepMinimum,
+              }
+            : {
+                daysInactive: MINECRAFT_CONFIG_DEFAULTS.daysInactive,
+                daysBlacklist: MINECRAFT_CONFIG_DEFAULTS.daysBlacklist,
+                daysPurge: MINECRAFT_CONFIG_DEFAULTS.daysPurge,
+                snapshotRetentionDays:
+                  MINECRAFT_CONFIG_DEFAULTS.snapshotRetentionDays,
+                snapshotKeepMinimum:
+                  MINECRAFT_CONFIG_DEFAULTS.snapshotKeepMinimum,
+              }
         }
       />
     </section>

@@ -9,17 +9,22 @@ export function DashboardMainHeader() {
   const pathname = usePathname();
   const isComandos = pathname.startsWith("/dashboard/comandos");
   const isMinecraft = pathname.startsWith("/dashboard/minecraft");
+  const isParcela = pathname.startsWith("/dashboard/parcela");
 
   const title = isComandos
     ? "Comandos rápidos"
-    : isMinecraft
-      ? "Minecraft"
-      : "Panel";
+    : isParcela
+      ? "Parcela"
+      : isMinecraft
+        ? "Minecraft"
+        : "Panel";
   const subtitle = isComandos
     ? "Órdenes al mundo Bedrock vía el addon (espectador, survival, limpieza de mobs)."
-    : isMinecraft
-      ? "Estado de jugadores y configuración del servidor."
-      : "Directorio de personas, filtros, importación y monitoreo Minecraft.";
+    : isParcela
+      ? "Quién entra y sale del terreno monitoreado, con historial y fechas."
+      : isMinecraft
+        ? "Estado de jugadores y configuración del servidor."
+        : "Directorio de personas, filtros, importación y monitoreo Minecraft.";
 
   return (
     <header className="mb-5 border-b border-zinc-200/80 pb-5 dark:border-zinc-800/80 max-md:hidden sm:mb-6 sm:pb-6 md:mb-8 xl:mb-8 xl:border-0 xl:pb-0">
