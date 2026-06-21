@@ -26,12 +26,13 @@ export default async function DashboardParcelaPage() {
   if (!userId) return null;
 
   try {
-    const [config, events, members] = await Promise.all([
+    const [config, events, eventTotal, members] = await Promise.all([
       prisma.minecraftConfig.findUnique({ where: { id: "default" } }),
       prisma.minecraftParcelEvent.findMany({
         orderBy: { occurredAt: "desc" },
         take: 250,
       }),
+      prisma.minecraftParcelEvent.count(),
       prisma.directoryMember.findMany({
         where: { userId },
         select: {
@@ -72,11 +73,13 @@ export default async function DashboardParcelaPage() {
             Parcela
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
-            Registro de quién entra y sale de un terreno pequeño en Minecraft.
+            El addon acumula eventos en el mundo y guarda un solo lote en la base
+            de datos cada 24 h (o cuando lo pedís). El historial es permanente.
           </p>
         </div>
         <MinecraftParcelSection
           parcel={payload.parcel}
+          totalEvents={eventTotal}
           events={events.map((e) => {
             const zones = formatInstantMexicoColombia(e.occurredAt);
             return {

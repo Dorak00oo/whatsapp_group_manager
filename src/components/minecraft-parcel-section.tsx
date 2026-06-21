@@ -7,7 +7,8 @@ import {
   PARCEL_DIMENSIONS,
   type ParcelConfigPayload,
 } from "@/lib/minecraft-parcel";
-import { softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
+import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { softBtnLavender, softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
 
 export type ParcelEventRow = {
   id: string;
@@ -33,23 +34,81 @@ type DirectoryLookup = {
 type Props = {
   parcel: ParcelConfigPayload;
   events: ParcelEventRow[];
+  totalEvents: number;
   directoryByTag: Record<string, DirectoryLookup>;
 };
+
+const POLL_MS = 4000;
+const POLL_MAX_ATTEMPTS = 30;
+
+function mapApiEvents(
+  raw: Array<{
+    id: string;
+    gamertag: string;
+    event: "enter" | "exit" | "chest_open";
+    occurredAt: string;
+    x: number | null;
+    y: number | null;
+    z: number | null;
+    dimension: string | null;
+    blockType: string | null;
+  }>,
+): ParcelEventRow[] {
+  return raw.map((e) => {
+    const zones = formatInstantMexicoColombia(new Date(e.occurredAt));
+    return {
+      ...e,
+      timeMexico: zones.mexico,
+      timeColombia: zones.colombia,
+    };
+  });
+}
 
 export function MinecraftParcelSection({
   parcel: initialParcel,
   events: initialEvents,
+  totalEvents: initialTotal,
   directoryByTag,
 }: Props) {
   const [parcelForm, setParcelForm] = useState(initialParcel);
-  const [events] = useState(initialEvents);
+  const [events, setEvents] = useState(initialEvents);
+  const [totalEvents, setTotalEvents] = useState(initialTotal);
+  const [lastBatchAt, setLastBatchAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const boundsLabel = useMemo(
     () => formatParcelBounds(parcelForm),
     [parcelForm],
   );
+
+  async function loadFromApi() {
+    const res = await fetch("/api/minecraft/parcel-events");
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      ok?: boolean;
+      lastBatchAt?: string | null;
+      total?: number;
+      events?: Array<{
+        id: string;
+        gamertag: string;
+        event: "enter" | "exit" | "chest_open";
+        occurredAt: string;
+        x: number | null;
+        y: number | null;
+        z: number | null;
+        dimension: string | null;
+        blockType: string | null;
+      }>;
+    };
+    if (!data.ok || !Array.isArray(data.events)) return null;
+    return {
+      lastBatchAt: data.lastBatchAt ?? null,
+      total: data.total ?? data.events.length,
+      events: mapApiEvents(data.events),
+    };
+  }
 
   async function saveParcel() {
     setSaving(true);
@@ -67,13 +126,84 @@ export function MinecraftParcelSection({
       }
       setMessage(
         parcelForm.enabled
-          ? "Parcela guardada y activa. El addon la detecta en ~1 minuto."
+          ? "Parcela guardada y activa. El addon la detecta en el próximo sync (24 h)."
           : "Configuración guardada (monitoreo desactivado).",
       );
     } catch {
       setMessage("Error de red al guardar.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function requestParcelBatch() {
+    setSyncing(true);
+    setMessage(null);
+    const beforeBatchAt = lastBatchAt;
+    const beforeTotal = totalEvents;
+
+    try {
+      const req = await fetch("/api/minecraft/parcel-sync-request", {
+        method: "POST",
+      });
+      if (!req.ok) {
+        const data = (await req.json()) as { error?: string };
+        setMessage(data.error ?? "No se pudo solicitar el lote");
+        return;
+      }
+
+      setMessage(
+        "Solicitud enviada. Esperando al addon (hasta ~2 min)…",
+      );
+
+      for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+        await new Promise((r) => setTimeout(r, POLL_MS));
+        const batch = await loadFromApi();
+        if (!batch) continue;
+        const batchArrived =
+          (batch.lastBatchAt && batch.lastBatchAt !== beforeBatchAt) ||
+          batch.total > beforeTotal;
+        if (batchArrived) {
+          setEvents(batch.events);
+          setTotalEvents(batch.total);
+          setLastBatchAt(batch.lastBatchAt);
+          const added = batch.total - beforeTotal;
+          setMessage(
+            added > 0
+              ? `Historial actualizado: ${added} evento(s) nuevo(s) guardados.`
+              : "Sync recibido; no hubo eventos nuevos en la parcela.",
+          );
+          return;
+        }
+      }
+
+      setMessage(
+        "Sin respuesta del addon aún. Probá de nuevo en unos minutos.",
+      );
+    } catch {
+      setMessage("Error de red al solicitar el lote.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function loadLastBatch() {
+    setSyncing(true);
+    setMessage(null);
+    try {
+      const batch = await loadFromApi();
+      if (!batch) {
+        setMessage("No se pudo leer el historial.");
+        return;
+      }
+      setEvents(batch.events);
+      setTotalEvents(batch.total);
+      setLastBatchAt(batch.lastBatchAt);
+      setMessage(null);
+    } catch {
+      setMessage("Error de red al cargar el historial.");
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -97,9 +227,9 @@ export function MinecraftParcelSection({
             Configurar terreno
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Define un cubo con dos esquinas (mínima y máxima) en bloques. El
-            addon revisa cada segundo a los jugadores online y registra entrada
-            y salida con fecha. En el juego podés ver coordenadas con{" "}
+            El addon registra entradas, salidas y cofres en el mundo de
+            Minecraft. No envía nada a la web hasta que pedís el lote o pasan
+            24 h. En el juego podés ver coordenadas con{" "}
             <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
               /gamerule showcoordinates true
             </code>
@@ -225,17 +355,37 @@ export function MinecraftParcelSection({
             Historial
           </p>
           <h3 className="mt-1 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-            Entradas y salidas
+            Entradas, salidas y cofres
           </h3>
           <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-            Últimos {events.length} eventos. Quien no esté en el grupo WA aparece
-            resaltado.
-          </p>        </div>
+            Últimos {events.length} de {totalEvents} eventos guardados en la base
+            de datos. Quien no esté en el grupo WA aparece resaltado.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={syncing}
+            onClick={() => void requestParcelBatch()}
+            className={softBtnPrimary}
+          >
+            {syncing ? "Esperando addon…" : "Solicitar lote desde el servidor"}
+          </button>
+          <button
+            type="button"
+            disabled={syncing}
+            onClick={() => void loadLastBatch()}
+            className={softBtnLavender}
+          >
+            Actualizar historial
+          </button>
+        </div>
 
         {events.length === 0 ? (
           <p className="text-sm text-zinc-500">
-            Aún no hay registros. Activá el monitoreo, guardá las coordenadas y
-            subí el addon actualizado.
+            Sin eventos cargados. Activá el monitoreo, subí el addon y pedí el
+            lote con el botón de arriba.
           </p>
         ) : (
           <div className="overflow-x-auto rounded-2xl ring-1 ring-zinc-200/80 dark:ring-zinc-800/80">
@@ -274,15 +424,15 @@ export function MinecraftParcelSection({
                             ev.event === "enter"
                               ? "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100"
                               : ev.event === "chest_open"
-                              ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-100"
-                              : "rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100"
+                                ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-100"
+                                : "rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100"
                           }
                         >
                           {ev.event === "enter"
                             ? "Entrada"
                             : ev.event === "chest_open"
-                            ? `Cofre${ev.blockType ? ` (${ev.blockType})` : ""}`
-                            : "Salida"}
+                              ? `Cofre${ev.blockType ? ` (${ev.blockType})` : ""}`
+                              : "Salida"}
                         </span>
                       </td>
                       <td className="px-3 py-2 font-medium">{ev.gamertag}</td>
