@@ -22,23 +22,24 @@ model User {
 }
 
 model DirectoryMember {
-  id           String            @id @default(cuid())
-  gamertag     String
-  displayName  String?           @map("display_name")
-  phone        String
-  phoneCountry String?           @map("phone_country")
-  active       Boolean           @default(true) @map("is_active")
-  isAdmin      Boolean           @default(false) @map("is_admin")
-  banExempt    Boolean           @default(false) @map("ban_exempt")
-  leftAt       DateTime?         @map("left_at")
-  banned       Boolean           @default(false) @map("banned")
-  bannedReason String?           @map("banned_reason")
-  notes        String?
-  userId       String            @map("user_id")
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  strikes      DirectoryStrike[]
-  createdAt    DateTime          @default(now()) @map("created_at")
-  updatedAt    DateTime          @updatedAt @map("updated_at")
+  id               String                    @id @default(cuid())
+  gamertag         String
+  displayName      String?                   @map("display_name")
+  phone            String
+  phoneCountry     String?                   @map("phone_country")
+  active           Boolean                   @default(true) @map("is_active")
+  isAdmin          Boolean                   @default(false) @map("is_admin")
+  banExempt        Boolean                   @default(false) @map("ban_exempt")
+  leftAt           DateTime?                 @map("left_at")
+  banned           Boolean                   @default(false) @map("banned")
+  bannedReason     String?                   @map("banned_reason")
+  notes            String?
+  userId           String                    @map("user_id")
+  user             User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strikes          DirectoryStrike[]
+  auditSuggestions GamertagAuditSuggestion[]
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
 
   @@map("directory_members")
 }
@@ -54,7 +55,9 @@ model DirectoryStrike {
   @@map("directory_strikes")
 }
 
-/** Cola panel ↔ addon: peticiones de sync (id fijo `minecraft_sync_request`). */
+/**
+ * Cola panel ↔ addon: peticiones de sync (id fijo `minecraft_sync_request`).
+ */
 model MinecraftSyncQueue {
   id        String   @id
   data      Json     @default("{}")
@@ -63,22 +66,27 @@ model MinecraftSyncQueue {
   @@map("minecraft_sync_queue")
 }
 
-/** Registro de actividad de jugadores de Minecraft desde el servidor */
+/**
+ * Registro de actividad de jugadores de Minecraft desde el servidor
+ */
 model MinecraftPlayer {
-  id              String   @id @default(cuid())
-  gamertag        String   @unique
-  lastSeen        DateTime @map("last_seen")
-  active          Boolean  @default(true)
-  daysInactive    Int      @default(0) @map("days_inactive")
-  isBlacklisted   Boolean  @default(false) @map("is_blacklisted")
-  isWhitelisted   Boolean  @default(false) @map("is_whitelisted")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id               String                    @id @default(cuid())
+  gamertag         String                    @unique
+  lastSeen         DateTime                  @map("last_seen")
+  active           Boolean                   @default(true)
+  daysInactive     Int                       @default(0) @map("days_inactive")
+  isBlacklisted    Boolean                   @default(false) @map("is_blacklisted")
+  isWhitelisted    Boolean                   @default(false) @map("is_whitelisted")
+  auditSuggestions GamertagAuditSuggestion[]
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
 
   @@map("minecraft_players")
 }
 
-/** Snapshot de datos del servidor de Minecraft (histórico) */
+/**
+ * Snapshot de datos del servidor de Minecraft (histórico)
+ */
 model MinecraftSnapshot {
   id              String   @id @default(cuid())
   timestamp       DateTime @default(now())
@@ -92,15 +100,21 @@ model MinecraftSnapshot {
   @@map("minecraft_snapshots")
 }
 
-/** Configuración del sistema de Minecraft (editable desde web) */
+/**
+ * Configuración del sistema de Minecraft (editable desde web)
+ */
 model MinecraftConfig {
   id                    String   @id @default("default")
   daysInactive          Int      @default(7) @map("days_inactive")
   daysBlacklist         Int      @default(14) @map("days_blacklist")
   daysPurge             Int      @default(21) @map("days_purge")
-  /** Días de historial de snapshots en Neon antes de borrar (no afecta jugadores actuales). */
+  /**
+   * Días de historial de snapshots en Neon antes de borrar (no afecta jugadores actuales).
+   */
   snapshotRetentionDays Int      @default(45) @map("snapshot_retention_days")
-  /** Mínimo de snapshots recientes que nunca se purgan por antigüedad. */
+  /**
+   * Mínimo de snapshots recientes que nunca se purgan por antigüedad.
+   */
   snapshotKeepMinimum   Int      @default(10) @map("snapshot_keep_minimum")
   parcelEnabled         Boolean  @default(false) @map("parcel_enabled")
   parcelName            String   @default("Parcela") @map("parcel_name")
@@ -116,7 +130,9 @@ model MinecraftConfig {
   @@map("minecraft_config")
 }
 
-/** Entrada o salida de un jugador en la parcela monitoreada */
+/**
+ * Entrada o salida de un jugador en la parcela monitoreada
+ */
 model MinecraftParcelEvent {
   id         String   @id @default(cuid())
   gamertag   String
@@ -132,4 +148,40 @@ model MinecraftParcelEvent {
   @@index([occurredAt(sort: Desc)])
   @@index([gamertag])
   @@map("minecraft_parcel_events")
+}
+
+/**
+ * Mini auditoría: gamertag visto en Minecraft muy parecido (no exacto) al de un
+ * miembro del directorio (WhatsApp). Requiere aprobación manual antes de
+ * sobreescribir el gamertag del directorio (probablemente mal escrito).
+ */
+model GamertagAuditSuggestion {
+  id                String          @id @default(cuid())
+  directoryMemberId String          @map("directory_member_id")
+  directoryMember   DirectoryMember @relation(fields: [directoryMemberId], references: [id], onDelete: Cascade)
+  minecraftPlayerId String          @map("minecraft_player_id")
+  minecraftPlayer   MinecraftPlayer @relation(fields: [minecraftPlayerId], references: [id], onDelete: Cascade)
+  /**
+   * Gamertag del directorio en el momento de detectar la sugerencia.
+   */
+  currentGamertag   String          @map("current_gamertag")
+  /**
+   * Gamertag visto en Minecraft que se propone usar en su lugar.
+   */
+  suggestedGamertag String          @map("suggested_gamertag")
+  /**
+   * Similitud 0-1 (Levenshtein normalizado, considerando sufijos numéricos).
+   */
+  similarity        Float
+  /**
+   * pending | approved | rejected
+   */
+  status            String          @default("pending")
+  decidedAt         DateTime?       @map("decided_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@unique([directoryMemberId, minecraftPlayerId], map: "gamertag_audit_suggestions_member_player_key")
+  @@index([status])
+  @@map("gamertag_audit_suggestions")
 }

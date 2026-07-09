@@ -14,7 +14,7 @@ function CompareColumn({
 }: {
   title: string;
   subtitle: string;
-  rows: { gamertag: string; label: string; detail?: string | null }[];
+  rows: { id: string; gamertag: string; label: string; detail?: string | null }[];
   emptyText: string;
 }) {
   return (
@@ -36,7 +36,7 @@ function CompareColumn({
         ) : (
           rows.map((row) => (
             <li
-              key={row.gamertag}
+              key={row.id}
               className="border-b border-zinc-200/60 py-1.5 last:border-0 dark:border-zinc-800/60"
             >
               <span className="font-medium text-zinc-900 dark:text-zinc-100">
@@ -105,7 +105,7 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
           <ul className="mt-2 flex flex-wrap gap-2">
             {suspects.map((row) => (
               <li
-                key={row.gamertag}
+                key={row.id}
                 className="rounded-lg bg-white/80 px-2 py-1 text-xs text-amber-950 ring-1 ring-amber-200/80 dark:bg-zinc-900/80 dark:text-amber-50 dark:ring-amber-800/60"
                 title={row.detail ?? undefined}
               >

@@ -1,4 +1,6 @@
 export type ActiveCompareEntry = {
+  /** Id de la fila de origen (miembro o jugador); único aunque el gamertag se repita. */
+  id: string;
   gamertag: string;
   label: string;
   detail?: string | null;
@@ -30,6 +32,7 @@ function sortByGamertag<T extends { gamertag: string }>(rows: T[]): T[] {
 }
 
 type WhatsappMember = {
+  id: string;
   gamertag: string;
   displayName: string | null;
   active: boolean;
@@ -37,6 +40,7 @@ type WhatsappMember = {
 };
 
 type MinecraftPlayer = {
+  id: string;
   gamertag: string;
   active: boolean;
   isBlacklisted: boolean;
@@ -57,6 +61,7 @@ export function buildActiveCompareData(
     waMembers
       .filter((m) => m.leftAt == null && m.active)
       .map((m) => ({
+        id: m.id,
         gamertag: m.gamertag,
         label: m.displayName?.trim()
           ? `${m.displayName.trim()} · ${m.gamertag}`
@@ -68,6 +73,7 @@ export function buildActiveCompareData(
     mcPlayers
       .filter((p) => p.active && !p.isBlacklisted)
       .map((p) => ({
+        id: p.id,
         gamertag: p.gamertag,
         label: p.gamertag,
         detail:

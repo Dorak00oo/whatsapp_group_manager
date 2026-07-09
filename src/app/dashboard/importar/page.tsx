@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
-import { DirectoryBulkUpload } from "@/components/directory-bulk-upload";
+import { DirectoryAllowlistExport } from "@/components/directory-allowlist-export";
 import { DirectoryMinecraftActiveCompare } from "@/components/directory-minecraft-active-compare";
-import { DirectoryMinecraftInactivePaste } from "@/components/directory-minecraft-inactive-paste";
+import { GamertagAuditPanel } from "@/components/gamertag-audit-panel";
 import { buildActiveCompareData } from "@/lib/directory-minecraft-compare";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
 import {
@@ -31,12 +31,14 @@ export default async function DashboardImportarPage() {
 
   let compareData;
   let snapshotAt: string | null = null;
+  let activeCount = 0;
 
   try {
     const [waMembers, mcPlayers, lastSnapshot, config] = await Promise.all([
       prisma.directoryMember.findMany({
         where: { userId },
         select: {
+          id: true,
           gamertag: true,
           displayName: true,
           active: true,
@@ -66,6 +68,9 @@ export default async function DashboardImportarPage() {
     snapshotAt = lastSnapshot
       ? formatInstantMexicoColombia(lastSnapshot.timestamp).mexico
       : null;
+    activeCount = waMembers.filter(
+      (m) => m.active && m.leftAt == null,
+    ).length;
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
       return <DatabaseUnavailable />;
@@ -83,9 +88,9 @@ export default async function DashboardImportarPage() {
           Importar y log
         </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Compara listas, carga masiva desde hoja de cálculo o marca inactivos
-          pegando el log del servidor de Minecraft. El alta manual de una sola
-          persona sigue en{" "}
+          Compara la lista de WhatsApp con Minecraft, revisa la auditoría de
+          gamertags y exporta la whitelist del servidor. El alta manual de una
+          sola persona sigue en{" "}
           <Link
             href="/dashboard/agregar"
             className="font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
@@ -101,12 +106,10 @@ export default async function DashboardImportarPage() {
         snapshotAt={snapshotAt}
       />
 
-      <div className="border-t border-zinc-200/80 pt-10 dark:border-zinc-700/60">
-        <DirectoryBulkUpload />
-      </div>
+      <GamertagAuditPanel />
 
       <div className="border-t border-zinc-200/80 pt-10 dark:border-zinc-700/60">
-        <DirectoryMinecraftInactivePaste />
+        <DirectoryAllowlistExport activeCount={activeCount} />
       </div>
     </section>
   );
