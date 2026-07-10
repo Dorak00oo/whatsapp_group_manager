@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { DIRECTORY_NEW_MEMBER_DAYS } from "@/lib/directory-cohort";
 import {
   REMOTE_CMD_QUEUE_ID,
   asRemoteCmdQueueData,
   isRemoteCmdAction,
   remoteCmdNeedsTarget,
+  remoteCmdNeedsTargetList,
   type RemoteCmdAction,
 } from "@/lib/minecraft-remote-commands";
 import { prisma } from "@/lib/prisma";
+import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 
 export const runtime = "nodejs";
 
@@ -38,6 +41,43 @@ async function isAdminGamertag(gamertag: string): Promise<boolean> {
   return row != null;
 }
 
+function dedupedTrimmedGamertags(members: { gamertag: string }[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of members) {
+    const tag = m.gamertag.trim();
+    if (!tag || seen.has(tag)) continue;
+    seen.add(tag);
+    out.push(tag);
+  }
+  return out;
+}
+
+/** Gamertags de miembros «nuevos» (alta reciente, sin salida) para el alta rápida en el allowlist del servidor. */
+async function newMemberGamertags(userId: string): Promise<string[]> {
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - DIRECTORY_NEW_MEMBER_DAYS);
+
+  const members = await prisma.directoryMember.findMany({
+    where: { userId, leftAt: null, createdAt: { gte: cutoff } },
+    select: { gamertag: true },
+  });
+  return dedupedTrimmedGamertags(members);
+}
+
+/**
+ * Gamertags que ya no cuentan como roster activo (mismo criterio que el
+ * export de `allowlist.json`: activo y sin salida) para darles baja del
+ * allowlist del servidor con `allowlist remove`.
+ */
+async function inactiveOrLeftMemberGamertags(userId: string): Promise<string[]> {
+  const members = await prisma.directoryMember.findMany({
+    where: { userId, NOT: { active: true, leftAt: null } },
+    select: { gamertag: true },
+  });
+  return dedupedTrimmedGamertags(members);
+}
+
 /** Panel web: encola un comando para el addon (1 upsert en cola existente). */
 export async function POST(request: Request) {
   const session = await auth();
@@ -54,7 +94,7 @@ export async function POST(request: Request) {
     typeof body.action === "string" ? body.action.trim() : "";
   if (!isRemoteCmdAction(actionRaw)) {
     return badRequest(
-      `action debe ser uno de: spectator, survival, kill_silverfish, kill_withers`,
+      `action debe ser uno de: spectator, survival, kill_silverfish, kill_withers, allowlist_sync`,
     );
   }
   const action: RemoteCmdAction = actionRaw;
@@ -74,6 +114,24 @@ export async function POST(request: Request) {
     targetGamertag = t;
   }
 
+  let targetGamertagsAdd: string[] | null = null;
+  let targetGamertagsRemove: string[] | null = null;
+  if (remoteCmdNeedsTargetList(action)) {
+    const userId = await resolveDirectoryUserId(session);
+    if (!userId) return unauthorized();
+    const [toAdd, toRemove] = await Promise.all([
+      newMemberGamertags(userId),
+      inactiveOrLeftMemberGamertags(userId),
+    ]);
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      return badRequest(
+        `No hay miembros «nuevos» (alta en los últimos ${DIRECTORY_NEW_MEMBER_DAYS} días) ni inactivos/salidos para actualizar en el allowlist.`,
+      );
+    }
+    targetGamertagsAdd = toAdd.length > 0 ? toAdd : null;
+    targetGamertagsRemove = toRemove.length > 0 ? toRemove : null;
+  }
+
   const requestedAt = new Date().toISOString();
 
   await prisma.minecraftSyncQueue.upsert({
@@ -82,6 +140,8 @@ export async function POST(request: Request) {
       data: {
         action,
         targetGamertag,
+        targetGamertagsAdd,
+        targetGamertagsRemove,
         requestedAt,
         handledAt: null,
       },
@@ -91,6 +151,8 @@ export async function POST(request: Request) {
       data: {
         action,
         targetGamertag,
+        targetGamertagsAdd,
+        targetGamertagsRemove,
         requestedAt,
         handledAt: null,
       },
@@ -101,6 +163,8 @@ export async function POST(request: Request) {
     ok: true,
     action,
     targetGamertag,
+    targetGamertagsAdd,
+    targetGamertagsRemove,
     requestedAt,
   });
 }
@@ -130,6 +194,8 @@ export async function GET(request: Request) {
     pending,
     action: pending && isRemoteCmdAction(data.action ?? "") ? data.action : null,
     targetGamertag: pending ? (data.targetGamertag ?? null) : null,
+    targetGamertagsAdd: pending ? (data.targetGamertagsAdd ?? null) : null,
+    targetGamertagsRemove: pending ? (data.targetGamertagsRemove ?? null) : null,
     requestedAt: data.requestedAt ?? null,
   });
 }
@@ -175,6 +241,8 @@ export async function PUT(request: Request) {
       data: {
         action: prev.action,
         targetGamertag: prev.targetGamertag ?? null,
+        targetGamertagsAdd: prev.targetGamertagsAdd ?? null,
+        targetGamertagsRemove: prev.targetGamertagsRemove ?? null,
         requestedAt: prev.requestedAt ?? requestedAt,
         handledAt: requestedAt,
       },

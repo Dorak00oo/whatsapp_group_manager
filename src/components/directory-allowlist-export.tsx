@@ -1,3 +1,4 @@
+import { AllowlistAddNewButton } from "@/components/allowlist-add-new-button";
 import { softBtnLavender, softPanel } from "@/lib/soft-ui";
 
 type Props = {
@@ -24,13 +25,16 @@ export function DirectoryAllowlistExport({ activeCount }: Props) {
           del servidor.
         </p>
       </div>
-      <a
-        href="/dashboard/allowlist"
-        download="allowlist.json"
-        className={`${softBtnLavender} self-start`}
-      >
-        Descargar allowlist.json
-      </a>
+      <div className="flex flex-wrap gap-2">
+        <a
+          href="/dashboard/allowlist"
+          download="allowlist.json"
+          className={`${softBtnLavender} self-start`}
+        >
+          Descargar allowlist.json
+        </a>
+        <AllowlistAddNewButton />
+      </div>
     </div>
   );
 }

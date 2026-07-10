@@ -16,14 +16,18 @@ export type GamertagAuditCandidate = {
 };
 
 /**
- * Detecta pares (miembro del directorio, jugador de Minecraft) donde el único
- * caso de gamertags "parecidos pero no idénticos" que aplica es: mismas
- * letras y espacios (sin distinguir mayúsculas), y solo cambia el sufijo
- * numérico final (falta, sobra o es distinto). No se corrigen errores de
- * tipeo en las letras, para no fusionar por error a dos jugadores distintos
- * con nombres parecidos. Solo considera jugadores de Minecraft que no tengan
- * ya una coincidencia exacta (sin distinguir mayúsculas) en el directorio, y
- * asigna cada miembro/jugador a lo sumo una vez (asignación voraz uno-a-uno).
+ * Detecta pares (miembro del directorio, jugador de Minecraft) donde el
+ * gamertag "es la misma persona" (mismas letras y espacios, ignorando
+ * mayúsculas, y a lo sumo cambia el sufijo numérico final) pero el gamertag
+ * del directorio no es un calco exacto carácter por carácter del real de
+ * Minecraft — ya sea por mayúsculas distintas, por el sufijo numérico, o por
+ * ambos. Minecraft distingue mayúsculas, así que una diferencia de caso
+ * también hace falta corregirla para que el allowlist del servidor funcione.
+ * No se corrigen errores de tipeo en las letras, para no fusionar por error a
+ * dos jugadores distintos con nombres parecidos. Solo considera jugadores de
+ * Minecraft que no tengan ya una coincidencia EXACTA (carácter por carácter,
+ * mayúsculas incluidas) en el directorio, y asigna cada miembro/jugador a lo
+ * sumo una vez (asignación voraz uno-a-uno).
  */
 export function findGamertagAuditCandidates(
   members: AuditDirectoryMember[],
@@ -31,9 +35,7 @@ export function findGamertagAuditCandidates(
   threshold: number = GAMERTAG_SIMILARITY_THRESHOLD,
 ): GamertagAuditCandidate[] {
   const exactMemberTags = new Set(
-    members
-      .map((m) => m.gamertag.trim().toLowerCase())
-      .filter((t) => t.length > 0),
+    members.map((m) => m.gamertag.trim()).filter((t) => t.length > 0),
   );
 
   type Pair = {
@@ -46,7 +48,7 @@ export function findGamertagAuditCandidates(
   for (const player of players) {
     const playerTag = player.gamertag.trim();
     if (!playerTag) continue;
-    if (exactMemberTags.has(playerTag.toLowerCase())) continue;
+    if (exactMemberTags.has(playerTag)) continue;
 
     for (const member of members) {
       const memberTag = member.gamertag.trim();
@@ -233,24 +235,24 @@ export async function runGamertagAuditWithLog(
   });
 
   const exactMemberTags = new Set(
-    members.map((m) => m.gamertag.trim().toLowerCase()).filter((t) => t.length > 0),
+    members.map((m) => m.gamertag.trim()).filter((t) => t.length > 0),
   );
   const withoutExactMatch = players.filter((p) => {
     const tag = p.gamertag.trim();
-    return tag.length > 0 && !exactMemberTags.has(tag.toLowerCase());
+    return tag.length > 0 && !exactMemberTags.has(tag);
   });
   const exactMatchCount = players.length - withoutExactMatch.length;
   log(
-    `Descartando jugadores con coincidencia exacta en WhatsApp... ${exactMatchCount} descartado(s)`,
+    `Descartando jugadores con coincidencia exacta en WhatsApp (mayúsculas incluidas)... ${exactMatchCount} descartado(s)`,
   );
   log(
-    `Comparando ${withoutExactMatch.length} jugador(es) restante(s) (solo sufijo numérico, sin distinguir mayúsculas)...`,
+    `Comparando ${withoutExactMatch.length} jugador(es) restante(s) (mismo nombre ignorando mayúsculas, con sufijo numérico o mayúsculas distintas)...`,
   );
 
   const candidates = findGamertagAuditCandidates(members, players);
 
   if (candidates.length === 0) {
-    log("  -> ninguna coincidencia por sufijo numérico");
+    log("  -> ninguna coincidencia (ni por mayúsculas ni por sufijo numérico)");
   } else {
     for (const c of candidates) {
       log(

@@ -15,6 +15,29 @@ type Phase = "idle" | "running" | "done";
 /** Milisegundos entre cada línea revelada en la terminal; da la sensación de ejecución en vivo. */
 const LINE_REVEAL_MS = 90;
 
+function splitSuffix(raw: string): { base: string; suffix: string } {
+  const match = /^(.*?)(\d*)$/.exec(raw);
+  const suffix = match?.[2] ?? "";
+  const base = suffix ? raw.slice(0, raw.length - suffix.length) : raw;
+  return { base, suffix };
+}
+
+/** Describe en qué se diferencian dos gamertags que "son la misma persona" (mayúsculas y/o sufijo numérico). */
+function describeGamertagDiff(current: string, suggested: string): string {
+  const a = splitSuffix(current);
+  const b = splitSuffix(suggested);
+  const caseDiffers = a.base !== b.base;
+  const suffixDiffers = a.suffix !== b.suffix;
+
+  if (caseDiffers && suffixDiffers) {
+    return "Mismas letras que el gamertag del grupo, pero en Minecraft las mayúsculas y los números finales son distintos.";
+  }
+  if (caseDiffers) {
+    return "Mismo gamertag que el grupo, pero en Minecraft las mayúsculas son distintas (Minecraft sí distingue mayúsculas).";
+  }
+  return "Mismas letras que el gamertag del grupo, pero en Minecraft tiene números al final que faltan o son distintos.";
+}
+
 function SuggestionRow({
   suggestion,
   onResolved,
@@ -57,9 +80,10 @@ function SuggestionRow({
           <span className="font-semibold">{suggestion.suggestedGamertag}</span>
         </p>
         <p className="mt-0.5 text-zinc-600 dark:text-zinc-400">
-          Mismas letras que el gamertag del grupo (sin distinguir
-          mayúsculas), pero en Minecraft tiene números al final que faltan o
-          son distintos en WhatsApp.
+          {describeGamertagDiff(
+            suggestion.currentGamertag,
+            suggestion.suggestedGamertag,
+          )}
         </p>
         {error ? (
           <p className="mt-1 text-red-600 dark:text-red-400" role="alert">
@@ -150,11 +174,13 @@ export function GamertagAuditPanel() {
           Posibles errores de escritura
         </h3>
         <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-          Compara cada jugador visto en Minecraft (sin coincidencia exacta)
-          contra los gamertags activos del grupo de WhatsApp. Solo detecta un
-          caso muy concreto: mismas letras y espacios (sin distinguir
-          mayúsculas) pero con números al final que faltan o son distintos —
-          el típico caso de anotarse sin el número del gamertag. No corrige
+          Compara cada jugador visto en Minecraft (sin coincidencia exacta,
+          mayúsculas incluidas) contra los gamertags activos del grupo de
+          WhatsApp. Solo detecta casos muy concretos: mismas letras y espacios
+          (ignorando mayúsculas) pero con mayúsculas distintas, números al
+          final que faltan o son distintos, o ambas cosas a la vez. Minecraft
+          sí distingue mayúsculas, así que esa diferencia también hace falta
+          corregirla para que el allowlist del servidor funcione. No corrige
           errores de tipeo en las letras, para no confundir a dos jugadores
           distintos con nombres parecidos. Nada se corrige solo: hace falta
           aprobar el cambio manualmente.
@@ -202,7 +228,7 @@ export function GamertagAuditPanel() {
         suggestions.length === 0 ? (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
             Por ahora ningún jugador de Minecraft coincide en letras con uno
-            de WhatsApp que solo le falten o le sobren números al final, así
+            de WhatsApp que tenga mayúsculas o números al final distintos, así
             que no hay nada que revisar.
           </p>
         ) : (

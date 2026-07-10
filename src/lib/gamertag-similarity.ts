@@ -1,23 +1,32 @@
 /**
- * Comparación estricta entre gamertags para detectar un único caso concreto de
- * error humano: alguien se anota en el grupo de WhatsApp sin el sufijo
- * numérico final de su gamertag real (p. ej. "Drako274" se anota como
- * "Drako"). El gamertag se descompone UNA sola vez en "base" (letras, espacios
- * y todo lo que no sea el sufijo numérico final) y "sufijo" (los dígitos del
- * final), y con esas dos partes ya descompuestas se toma UNA sola decisión —
- * no se compara primero el nombre completo y, si falla, por separado la
- * versión sin números: es un único paso de comparación sobre el gamertag
- * entero, donde el sufijo numérico es la única parte que se permite variar.
- * La base debe coincidir letra por letra y espacio por espacio (solo se
- * ignoran mayúsculas/minúsculas, porque Bedrock no distingue caso). Esto evita
- * fusionar por error a dos jugadores distintos que solo comparten un nombre
- * parecido.
+ * Comparación estricta entre gamertags para detectar dos únicos casos
+ * concretos de error humano al anotarse en el grupo de WhatsApp:
+ *
+ * 1. Falta (o sobra, o difiere) el sufijo numérico final del gamertag real
+ *    (p. ej. "Drako274" se anota como "Drako").
+ * 2. Las mayúsculas no coinciden (p. ej. "drako274" en WhatsApp vs
+ *    "Drako274" en Minecraft). Minecraft SÍ distingue mayúsculas en el
+ *    gamertag real, así que esta diferencia importa de verdad para el
+ *    allowlist del servidor y no se puede ignorar como si fuera la misma
+ *    cadena.
+ *
+ * El gamertag se descompone UNA sola vez en "base" (letras, espacios y todo
+ * lo que no sea el sufijo numérico final) y "sufijo" (los dígitos del final),
+ * y con esas dos partes ya descompuestas se toma UNA sola decisión — no se
+ * compara primero el nombre completo y, si falla, por separado la versión sin
+ * números: es un único paso de comparación sobre el gamertag entero. La base
+ * debe coincidir letra por letra y espacio por espacio SIN importar
+ * mayúsculas para saber si "son la misma persona"; pero si el resultado no es
+ * un calco exacto carácter por carácter (mayúsculas incluidas), se marca como
+ * candidato a corregir. Esto evita fusionar por error a dos jugadores
+ * distintos que solo comparten un nombre parecido.
  */
 
 /**
- * Puntaje de confianza cuando la base coincide 1 a 1 pero el sufijo numérico
- * no. No hay valores intermedios: o se detecta este caso exacto (0.97) o no
- * hay ninguna sugerencia (0).
+ * Puntaje de confianza cuando la base coincide (ignorando mayúsculas) pero el
+ * gamertag no es un calco exacto carácter por carácter (por mayúsculas, por
+ * el sufijo numérico, o por ambos). No hay valores intermedios: o se detecta
+ * este caso exacto (0.97) o no hay ninguna sugerencia (0).
  */
 export const GAMERTAG_SUFFIX_MATCH_SCORE = 0.97;
 
@@ -42,10 +51,14 @@ function parseGamertag(raw: string): ParsedGamertag {
 
 /**
  * Puntaje 0-1 entre dos gamertags, en un único paso sobre el gamertag entero:
- * - 0 si la base (letras/espacios, sin distinguir mayúsculas) no coincide 1 a 1.
- * - 1 si además el sufijo numérico también coincide exacto (son el mismo gamertag).
- * - 0.97 si la base coincide 1 a 1 pero el sufijo numérico falta, sobra o es
- *   distinto (caso de "olvidó poner los números").
+ * - 0 si la base (letras/espacios, ignorando mayúsculas) no coincide 1 a 1:
+ *   son gamertags de personas distintas.
+ * - 1 si además son un calco exacto carácter por carácter, mayúsculas
+ *   incluidas: no hace falta ninguna corrección.
+ * - 0.97 si la base coincide (ignorando mayúsculas) pero el gamertag real no
+ *   es exactamente igual: mayúsculas distintas, sufijo numérico distinto, o
+ *   ambos. Minecraft distingue mayúsculas, así que esto sí requiere corregir
+ *   el gamertag en WhatsApp para que el allowlist funcione.
  */
 export function gamertagSimilarity(a: string, b: string): number {
   const pa = parseGamertag(a);
@@ -53,5 +66,6 @@ export function gamertagSimilarity(a: string, b: string): number {
   if (!pa.base || !pb.base) return 0;
   if (pa.base.toLowerCase() !== pb.base.toLowerCase()) return 0;
 
-  return pa.suffix === pb.suffix ? 1 : GAMERTAG_SUFFIX_MATCH_SCORE;
+  const exactMatch = pa.base === pb.base && pa.suffix === pb.suffix;
+  return exactMatch ? 1 : GAMERTAG_SUFFIX_MATCH_SCORE;
 }

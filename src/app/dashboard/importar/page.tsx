@@ -101,16 +101,14 @@ export default async function DashboardImportarPage() {
         </p>
       </div>
 
+      <DirectoryAllowlistExport activeCount={activeCount} />
+
+      <GamertagAuditPanel />
+
       <DirectoryMinecraftActiveCompare
         data={compareData}
         snapshotAt={snapshotAt}
       />
-
-      <GamertagAuditPanel />
-
-      <div className="border-t border-zinc-200/80 pt-10 dark:border-zinc-700/60">
-        <DirectoryAllowlistExport activeCount={activeCount} />
-      </div>
     </section>
   );
 }
