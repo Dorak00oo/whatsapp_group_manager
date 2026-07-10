@@ -28,6 +28,22 @@ model DirectoryMember {
   phone            String
   phoneCountry     String?                   @map("phone_country")
   active           Boolean                   @default(true) @map("is_active")
+  /**
+   * Activo permanente en el roster de WhatsApp: aunque Minecraft marque inactividad,
+   * no se baja a «inactivo» mientras esté activado.
+   */
+  permanentlyActive Boolean                  @default(false) @map("permanently_active")
+  /**
+   * Tras marcar activo a mano, el sync de Minecraft no vuelve a poner inactivo
+   * hasta que lo marques inactivo otra vez (salvo activo permanente).
+   */
+  activeHoldFromMc Boolean                    @default(false) @map("active_hold_from_mc")
+  /** Pendiente de `allowlist add` (p. ej. reactivación manual inactivo → activo). */
+  allowlistAddPending Boolean                 @default(false) @map("allowlist_add_pending")
+  /** Última vez que su gamertag se dio de alta en el allowlist vía sync web. */
+  allowlistSyncedAt DateTime?                @map("allowlist_synced_at")
+  /** Última vez que su gamertag se quitó del allowlist vía sync web. */
+  allowlistRemovedAt DateTime?               @map("allowlist_removed_at")
   isAdmin          Boolean                   @default(false) @map("is_admin")
   banExempt        Boolean                   @default(false) @map("ban_exempt")
   leftAt           DateTime?                 @map("left_at")
@@ -210,4 +226,19 @@ model PendingGamertagCorrection {
 
   @@index([syncedAt])
   @@map("pending_gamertag_corrections")
+}
+
+/**
+ * Gamertags que deben quitarse del allowlist del servidor (miembro inactivo/salido,
+ * ficha borrada o nombre viejo tras corrección). `syncedAt` null = pendiente.
+ */
+model PendingAllowlistRemoval {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  gamertag  String
+  syncedAt  DateTime? @map("synced_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId, syncedAt])
+  @@map("pending_allowlist_removals")
 }

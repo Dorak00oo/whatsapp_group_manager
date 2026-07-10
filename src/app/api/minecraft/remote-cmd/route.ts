@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import {
+  markAllowlistAddsCompleted,
   markCorrectedAllowlistSynced,
   pendingCorrectedAllowlistSync,
 } from "@/lib/allowlist-corrected";
+import {
+  markAllowlistRemovesCompleted,
+  pendingAllowlistRemovalGamertags,
+} from "@/lib/allowlist-removal";
 import { DIRECTORY_NEW_MEMBER_DAYS } from "@/lib/directory-cohort";
 import {
   REMOTE_CMD_QUEUE_ID,
@@ -61,33 +66,40 @@ function dedupedTrimmedGamertags(members: { gamertag: string }[]): string[] {
   return out;
 }
 
-/** Gamertags de miembros «nuevos» (alta reciente, sin salida) para el alta rápida en el allowlist del servidor. */
-async function newMemberGamertags(userId: string): Promise<string[]> {
+function resolveAllowlistBatch(
+  toAdd: string[],
+  toRemove: string[],
+): { toAdd: string[]; toRemove: string[] } {
+  const removeSet = new Set(toRemove);
+  const addFiltered = toAdd.filter((tag) => !removeSet.has(tag));
+  const addSet = new Set(addFiltered);
+  const removeFiltered = toRemove.filter((tag) => !addSet.has(tag));
+  return { toAdd: addFiltered, toRemove: removeFiltered };
+}
+
+/** Miembros nuevos activos que aún no se sincronizaron al allowlist del servidor. */
+async function newMemberGamertags(
+  userId: string,
+  blockedFromAdd: Set<string>,
+): Promise<string[]> {
   const cutoff = new Date();
   cutoff.setUTCDate(cutoff.getUTCDate() - DIRECTORY_NEW_MEMBER_DAYS);
 
   const members = await withDbRetry(() =>
     prisma.directoryMember.findMany({
-      where: { userId, leftAt: null, createdAt: { gte: cutoff } },
+      where: {
+        userId,
+        leftAt: null,
+        active: true,
+        allowlistSyncedAt: null,
+        createdAt: { gte: cutoff },
+      },
       select: { gamertag: true },
     }),
   );
-  return dedupedTrimmedGamertags(members);
-}
-
-/**
- * Gamertags que ya no cuentan como roster activo (mismo criterio que el
- * export de `allowlist.json`: activo y sin salida) para darles baja del
- * allowlist del servidor con `allowlist remove`.
- */
-async function inactiveOrLeftMemberGamertags(userId: string): Promise<string[]> {
-  const members = await withDbRetry(() =>
-    prisma.directoryMember.findMany({
-      where: { userId, NOT: { active: true, leftAt: null } },
-      select: { gamertag: true },
-    }),
+  return dedupedTrimmedGamertags(members).filter(
+    (tag) => !blockedFromAdd.has(tag.toLowerCase()),
   );
-  return dedupedTrimmedGamertags(members);
 }
 
 /** Panel web: encola un comando para el addon (1 upsert en cola existente). */
@@ -136,13 +148,19 @@ export async function POST(request: Request) {
     if (!userId) return unauthorized();
 
     if (action === "allowlist_sync") {
-      const [toAdd, toRemove] = await Promise.all([
-        newMemberGamertags(userId),
-        inactiveOrLeftMemberGamertags(userId),
+      const blockedFromAdd = new Set(
+        (await pendingAllowlistRemovalGamertags(userId)).map((t) =>
+          t.toLowerCase(),
+        ),
+      );
+      const [toAddRaw, toRemoveRaw] = await Promise.all([
+        newMemberGamertags(userId, blockedFromAdd),
+        pendingAllowlistRemovalGamertags(userId),
       ]);
+      const { toAdd, toRemove } = resolveAllowlistBatch(toAddRaw, toRemoveRaw);
       if (toAdd.length === 0 && toRemove.length === 0) {
         return badRequest(
-          `No hay miembros «nuevos» (alta en los últimos ${DIRECTORY_NEW_MEMBER_DAYS} días) ni inactivos/salidos para actualizar en el allowlist.`,
+          `No hay miembros «nuevos» (alta en los últimos ${DIRECTORY_NEW_MEMBER_DAYS} días) ni bajas pendientes para actualizar en el allowlist.`,
         );
       }
       targetGamertagsAdd = toAdd.length > 0 ? toAdd : null;
@@ -152,10 +170,19 @@ export async function POST(request: Request) {
         pendingCorrectedAllowlistSync(userId),
       );
       skippedCorrections = corrected.skipped;
-      if (
-        corrected.toAdd.length === 0 &&
-        corrected.toRemove.length === 0
-      ) {
+      const blockedFromAdd = new Set(
+        (await pendingAllowlistRemovalGamertags(userId)).map((t) =>
+          t.toLowerCase(),
+        ),
+      );
+      const toAddRaw = corrected.toAdd.filter(
+        (tag) => !blockedFromAdd.has(tag.toLowerCase()),
+      );
+      const { toAdd, toRemove } = resolveAllowlistBatch(
+        toAddRaw,
+        corrected.toRemove,
+      );
+      if (toAdd.length === 0 && toRemove.length === 0) {
         if (corrected.skipped.length > 0) {
           return badRequest(
             `No hay correcciones válidas para sincronizar: ${corrected.skipped.length} descartada(s) por tener un gamertag con pinta de error de tipeo (revisa la ficha del miembro). Detalle: ${corrected.skipped
@@ -164,13 +191,13 @@ export async function POST(request: Request) {
           );
         }
         return badRequest(
-          "No hay correcciones de gamertag pendientes de sincronizar con el allowlist del servidor (ni por auditoría aprobada ni por edición manual).",
+          "No hay correcciones de gamertag ni reactivaciones manuales pendientes de sincronizar con el allowlist del servidor.",
         );
       }
       targetGamertagsAdd =
-        corrected.toAdd.length > 0 ? corrected.toAdd : null;
+        toAdd.length > 0 ? toAdd : null;
       targetGamertagsRemove =
-        corrected.toRemove.length > 0 ? corrected.toRemove : null;
+        toRemove.length > 0 ? toRemove : null;
       pendingCorrectionIds =
         corrected.correctionIds.length > 0 ? corrected.correctionIds : null;
     }
@@ -305,8 +332,44 @@ export async function PUT(request: Request) {
   );
 
   const pendingCorrectionIds = prev.pendingCorrectionIds;
+  const addedGamertags = prev.targetGamertagsAdd;
+  const removedGamertags = prev.targetGamertagsRemove;
+  const storedAction = prev.action;
+
   if (Array.isArray(pendingCorrectionIds) && pendingCorrectionIds.length > 0) {
     await withDbRetry(() => markCorrectedAllowlistSynced(pendingCorrectionIds));
+  }
+
+  const email = process.env.COMMUNITY_EMAIL?.trim().toLowerCase();
+  const owner =
+    email &&
+    (storedAction === "allowlist_sync" ||
+      storedAction === "allowlist_sync_corrected")
+      ? await withDbRetry(() =>
+          prisma.user.findUnique({ where: { email }, select: { id: true } }),
+        )
+      : null;
+
+  if (
+    owner &&
+    Array.isArray(addedGamertags) &&
+    addedGamertags.length > 0 &&
+    (storedAction === "allowlist_sync" || storedAction === "allowlist_sync_corrected")
+  ) {
+    await withDbRetry(() =>
+      markAllowlistAddsCompleted(owner.id, addedGamertags),
+    );
+  }
+
+  if (
+    owner &&
+    Array.isArray(removedGamertags) &&
+    removedGamertags.length > 0 &&
+    (storedAction === "allowlist_sync" || storedAction === "allowlist_sync_corrected")
+  ) {
+    await withDbRetry(() =>
+      markAllowlistRemovesCompleted(owner.id, removedGamertags),
+    );
   }
 
   return NextResponse.json({ ok: true, handledAt: requestedAt });

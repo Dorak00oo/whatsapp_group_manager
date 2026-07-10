@@ -101,6 +101,11 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
           label="Protegido (no se puede banear)"
           accent="cyan"
         />
+        <FormSwitch
+          name="permanentlyActive"
+          label="Activo permanente (no baja a inactivo por Minecraft)"
+          accent="violet"
+        />
       </div>
       <label className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
         Nota (opcional)

@@ -16,6 +16,14 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
   const chips: { key: string; label: string; short: string; className: string }[] =
     [];
 
+  if (m.permanentlyActive && !m.leftAt) {
+    chips.push({
+      key: "permanent",
+      label: "Activo permanente",
+      short: "Permanente",
+      className: `${base} bg-amber-200 text-amber-950 ring-amber-400/85 dark:bg-amber-950/75 dark:text-amber-100 dark:ring-amber-700/65`,
+    });
+  }
   if (m.isAdmin) {
     chips.push({
       key: "admin",

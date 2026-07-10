@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { recordPendingGamertagCorrection } from "@/lib/allowlist-corrected";
+import {
+  cancelPendingAllowlistRemoval,
+  enqueueAllowlistRemovalForMember,
+} from "@/lib/allowlist-removal";
 import { prisma } from "@/lib/prisma";
 import {
   normalizePhoneForDirectory,
@@ -42,6 +46,7 @@ export async function createDirectoryMember(
   const active = !markedLeft && formData.get("active") === "on";
   const isAdmin = formData.get("isAdmin") === "on";
   const banExempt = formData.get("banExempt") === "on";
+  const permanentlyActive = formData.get("permanentlyActive") === "on";
 
   if (!gamertag) return { error: "El gamertag es obligatorio" };
   const normalized = normalizePhoneForDirectory(phoneIso, phoneNational);
@@ -57,10 +62,12 @@ export async function createDirectoryMember(
         displayName: displayName || null,
         phone,
         phoneCountry,
-        active: markedLeft ? false : active,
+        active: markedLeft ? false : active || permanentlyActive,
         leftAt: markedLeft ? new Date() : null,
         isAdmin,
         banExempt,
+        permanentlyActive,
+        activeHoldFromMc: permanentlyActive || (active && !markedLeft),
         notes: notesRaw || null,
         userId,
       },
@@ -190,6 +197,18 @@ export async function deleteDirectoryMember(id: string) {
   const userId = await resolveDirectoryUserId(session);
   if (!userId) return { error: STALE_SESSION_ERROR };
 
+  const member = await prisma.directoryMember.findFirst({
+    where: { id, userId },
+    select: {
+      gamertag: true,
+      allowlistSyncedAt: true,
+      allowlistRemovedAt: true,
+    },
+  });
+  if (!member) return { error: "No encontrado" };
+
+  await enqueueAllowlistRemovalForMember(userId, member);
+
   const result = await prisma.directoryMember.deleteMany({
     where: { id, userId },
   });
@@ -263,12 +282,64 @@ export async function setDirectoryMemberActive(id: string, active: boolean) {
   const userId = await resolveDirectoryUserId(session);
   if (!userId) return { error: STALE_SESSION_ERROR };
 
-  const result = await prisma.directoryMember.updateMany({
+  const before = await prisma.directoryMember.findFirst({
     where: { id, userId },
-    data: { active },
+    select: {
+      active: true,
+      permanentlyActive: true,
+      gamertag: true,
+      allowlistSyncedAt: true,
+      allowlistRemovedAt: true,
+    },
+  });
+  if (!before) return { error: "No encontrado" };
+
+  const reactivated = active && !before.active;
+  const deactivated = !active && before.active;
+
+  await prisma.directoryMember.updateMany({
+    where: { id, userId },
+    data: {
+      active: active || before.permanentlyActive,
+      activeHoldFromMc: active || before.permanentlyActive,
+      ...(reactivated
+        ? { allowlistAddPending: true, allowlistRemovedAt: null }
+        : !active
+          ? { allowlistAddPending: false }
+          : {}),
+    },
   });
 
-  if (result.count === 0) return { error: "No encontrado" };
+  if (reactivated) {
+    await cancelPendingAllowlistRemoval(userId, before.gamertag);
+  } else if (deactivated) {
+    await enqueueAllowlistRemovalForMember(userId, before);
+  }
+
+  revalidatePath("/dashboard");
+  return { ok: true as const };
+}
+
+export async function toggleDirectoryMemberPermanentlyActive(id: string) {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado" };
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return { error: STALE_SESSION_ERROR };
+
+  const member = await prisma.directoryMember.findFirst({
+    where: { id, userId },
+    select: { permanentlyActive: true },
+  });
+  if (!member) return { error: "No encontrado" };
+
+  const next = !member.permanentlyActive;
+  await prisma.directoryMember.updateMany({
+    where: { id, userId },
+    data: {
+      permanentlyActive: next,
+      ...(next ? { active: true, activeHoldFromMc: true } : {}),
+    },
+  });
 
   revalidatePath("/dashboard");
   return { ok: true as const };
@@ -409,12 +480,28 @@ export async function setDirectoryMemberLeft(id: string, left: boolean) {
   const userId = await resolveDirectoryUserId(session);
   if (!userId) return;
 
+  const member = await prisma.directoryMember.findFirst({
+    where: { id, userId },
+    select: {
+      gamertag: true,
+      allowlistSyncedAt: true,
+      allowlistRemovedAt: true,
+    },
+  });
+  if (!member) return;
+
   await prisma.directoryMember.updateMany({
     where: { id, userId },
     data: left
-      ? { leftAt: new Date(), active: false }
+      ? { leftAt: new Date(), active: false, allowlistAddPending: false }
       : { leftAt: null },
   });
+
+  if (left) {
+    await enqueueAllowlistRemovalForMember(userId, member);
+  } else {
+    await cancelPendingAllowlistRemoval(userId, member.gamertag);
+  }
 
   revalidatePath("/dashboard");
 }

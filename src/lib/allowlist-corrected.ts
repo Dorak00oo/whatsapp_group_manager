@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  alreadyRemovedAllowlistGamertags,
+  enqueueAllowlistRemoval,
+} from "@/lib/allowlist-removal";
 
 export type CorrectedAllowlistSync = {
   toAdd: string[];
@@ -74,31 +78,76 @@ export async function recordPendingGamertagCorrection(
   await prisma.pendingGamertagCorrection.create({
     data: { directoryMemberId, oldGamertag: oldTag, newGamertag: newTag },
   });
+
+  const member = await prisma.directoryMember.findUnique({
+    where: { id: directoryMemberId },
+    select: { userId: true, allowlistSyncedAt: true },
+  });
+  if (member?.allowlistSyncedAt) {
+    await enqueueAllowlistRemoval(member.userId, oldTag);
+  }
 }
 
 /**
- * Correcciones de gamertag (por auditoría aprobada o edición manual) que aún
+ * Correcciones de gamertag y reactivaciones manuales (inactivo → activo) que aún
  * no se reflejaron en el allowlist nativo del servidor.
  */
 export async function pendingCorrectedAllowlistSync(
   userId: string,
 ): Promise<CorrectedAllowlistSync> {
-  const rows = await prisma.pendingGamertagCorrection.findMany({
-    where: { syncedAt: null, directoryMember: { userId } },
-    select: {
-      id: true,
-      directoryMemberId: true,
-      oldGamertag: true,
-      newGamertag: true,
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const [rows, reactivations, activeMembers] = await Promise.all([
+    prisma.pendingGamertagCorrection.findMany({
+      where: { syncedAt: null, directoryMember: { userId } },
+      select: {
+        id: true,
+        directoryMemberId: true,
+        oldGamertag: true,
+        newGamertag: true,
+        directoryMember: {
+          select: { active: true, leftAt: true },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.directoryMember.findMany({
+      where: {
+        userId,
+        leftAt: null,
+        active: true,
+        allowlistAddPending: true,
+      },
+      select: { gamertag: true },
+    }),
+    prisma.directoryMember.findMany({
+      where: { userId, leftAt: null, active: true },
+      select: { gamertag: true },
+    }),
+  ]);
+
+  const activeRoster = new Set(
+    activeMembers
+      .map((m) => m.gamertag.trim().toLowerCase())
+      .filter(Boolean),
+  );
 
   const byMember = new Map<string, PendingCorrectionRow[]>();
   for (const row of rows) {
     const list = byMember.get(row.directoryMemberId) ?? [];
-    list.push(row);
+    list.push({
+      id: row.id,
+      directoryMemberId: row.directoryMemberId,
+      oldGamertag: row.oldGamertag,
+      newGamertag: row.newGamertag,
+    });
     byMember.set(row.directoryMemberId, list);
+  }
+
+  const memberActive = new Map<string, boolean>();
+  for (const row of rows) {
+    memberActive.set(
+      row.directoryMemberId,
+      row.directoryMember.active && row.directoryMember.leftAt == null,
+    );
   }
 
   const toAdd: string[] = [];
@@ -108,26 +157,32 @@ export async function pendingCorrectedAllowlistSync(
   const seenAdd = new Set<string>();
   const seenRemove = new Set<string>();
 
-  for (const memberRows of byMember.values()) {
+  for (const [memberId, memberRows] of byMember.entries()) {
     const collapsed = collapseMemberCorrections(memberRows);
     if (!collapsed) continue;
 
+    const isActive = memberActive.get(memberId) ?? false;
     const firstOld = memberRows[0]!.oldGamertag;
-    if (!isPlausibleGamertag(collapsed.toAdd)) {
-      skipped.push({
-        oldGamertag: firstOld,
-        newGamertag: collapsed.toAdd,
-        reason: `Gamertag con más de ${MAX_GAMERTAG_LENGTH} caracteres, revisa si hay un error de tipeo en la ficha del miembro.`,
-      });
-      continue;
+
+    if (isActive) {
+      if (!isPlausibleGamertag(collapsed.toAdd)) {
+        skipped.push({
+          oldGamertag: firstOld,
+          newGamertag: collapsed.toAdd,
+          reason: `Gamertag con más de ${MAX_GAMERTAG_LENGTH} caracteres, revisa si hay un error de tipeo en la ficha del miembro.`,
+        });
+        continue;
+      }
+
+      const addKey = collapsed.toAdd.toLowerCase();
+      if (activeRoster.has(addKey) && !seenAdd.has(collapsed.toAdd)) {
+        seenAdd.add(collapsed.toAdd);
+        toAdd.push(collapsed.toAdd);
+      }
     }
 
     correctionIds.push(...collapsed.correctionIds);
 
-    if (!seenAdd.has(collapsed.toAdd)) {
-      seenAdd.add(collapsed.toAdd);
-      toAdd.push(collapsed.toAdd);
-    }
     for (const name of collapsed.toRemove) {
       if (name === collapsed.toAdd || seenRemove.has(name)) continue;
       seenRemove.add(name);
@@ -135,7 +190,25 @@ export async function pendingCorrectedAllowlistSync(
     }
   }
 
-  return { toAdd, toRemove, correctionIds, skipped };
+  for (const member of reactivations) {
+    const tag = member.gamertag.trim();
+    if (!tag || !isPlausibleGamertag(tag) || seenAdd.has(tag)) continue;
+    if (!activeRoster.has(tag.toLowerCase())) continue;
+    seenAdd.add(tag);
+    toAdd.push(tag);
+  }
+
+  const removedAlready = await alreadyRemovedAllowlistGamertags(userId, toRemove);
+  const filteredRemove = toRemove.filter(
+    (tag) => !removedAlready.has(tag.toLowerCase()),
+  );
+
+  return {
+    toAdd,
+    toRemove: filteredRemove,
+    correctionIds,
+    skipped,
+  };
 }
 
 export async function markCorrectedAllowlistSynced(
@@ -146,4 +219,28 @@ export async function markCorrectedAllowlistSynced(
     where: { id: { in: correctionIds } },
     data: { syncedAt: new Date() },
   });
+}
+
+/** Tras confirmar el addon: marca altas hechas y limpia pendientes de reactivación. */
+export async function markAllowlistAddsCompleted(
+  userId: string,
+  gamertags: string[],
+): Promise<void> {
+  const now = new Date();
+  for (const raw of gamertags) {
+    const tag = raw.trim();
+    if (!tag) continue;
+    await prisma.directoryMember.updateMany({
+      where: {
+        userId,
+        leftAt: null,
+        gamertag: { equals: tag, mode: "insensitive" },
+      },
+      data: {
+        allowlistSyncedAt: now,
+        allowlistAddPending: false,
+        allowlistRemovedAt: null,
+      },
+    });
+  }
 }

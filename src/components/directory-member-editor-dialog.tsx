@@ -9,6 +9,7 @@ import {
   setDirectoryMemberLeft,
   toggleDirectoryMemberBanExempt,
   toggleDirectoryMemberIsAdmin,
+  toggleDirectoryMemberPermanentlyActive,
   updateDirectoryMemberNotes,
 } from "@/app/dashboard/actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -366,6 +367,20 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                 className="w-full rounded-lg border border-cyan-200 bg-cyan-50/80 px-3 py-2 text-left text-sm font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200 dark:hover:bg-cyan-950/50 sm:w-auto sm:min-w-[12rem]"
               >
                 {m.banExempt ? "Quitar protección" : "Proteger (sin ban)"}
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    await toggleDirectoryMemberPermanentlyActive(m.id);
+                  })
+                }
+                className="w-full rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-left text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/50 sm:w-auto sm:min-w-[12rem]"
+              >
+                {m.permanentlyActive
+                  ? "Quitar activo permanente"
+                  : "Activo permanente"}
               </button>
               {m.leftAt ? (
                 <button

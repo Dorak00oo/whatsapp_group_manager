@@ -12,6 +12,7 @@ export type DirectoryMemberDTO = {
   phone: string;
   phoneCountry: string | null;
   active: boolean;
+  permanentlyActive: boolean;
   isAdmin: boolean;
   banExempt: boolean;
   leftAt: string | null;

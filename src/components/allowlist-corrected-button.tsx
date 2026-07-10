@@ -2,10 +2,8 @@ import { RemoteCmdTerminalButton } from "@/components/remote-cmd-terminal-button
 import { softBtnPeach } from "@/lib/soft-ui";
 
 /**
- * Encola `allowlist_sync_corrected`: añade el gamertag corregido y quita el
- * nombre erróneo que tenía en WhatsApp antes, tanto para correcciones
- * aprobadas en la auditoría como para ediciones manuales del gamertag hechas
- * desde la ficha del miembro.
+ * Encola `allowlist_sync_corrected`: gamertags corregidos, reactivaciones
+ * manuales (inactivo → activo) y bajas de nombres antiguos en el allowlist.
  */
 export function AllowlistCorrectedButton() {
   return (
@@ -15,7 +13,7 @@ export function AllowlistCorrectedButton() {
       loadingLabel="Enviando…"
       doneLabel="Volver a sincronizar"
       buttonClassName={softBtnPeach}
-      title='Ejecuta "allowlist add" con el gamertag corregido y "allowlist remove" con el nombre erróneo'
+      title='Ejecuta "allowlist add" / "allowlist remove" para correcciones de gamertag y para quien pasaste de inactivo a activo a mano'
     />
   );
 }
