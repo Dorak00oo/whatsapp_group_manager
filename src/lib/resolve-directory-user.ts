@@ -1,5 +1,6 @@
 import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
+import { withDbRetry } from "@/lib/prisma-retry";
 
 /**
  * El JWT puede conservar un `user.id` antiguo tras resetear la BD o cambiar
@@ -13,19 +14,17 @@ export async function resolveDirectoryUserId(
 
   const email = session.user.email?.trim().toLowerCase();
   if (email) {
-    const byEmail = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true },
-    });
+    const byEmail = await withDbRetry(() =>
+      prisma.user.findUnique({ where: { email }, select: { id: true } }),
+    );
     if (byEmail) return byEmail.id;
   }
 
   const tokenId = session.user.id;
   if (tokenId) {
-    const byId = await prisma.user.findUnique({
-      where: { id: tokenId },
-      select: { id: true },
-    });
+    const byId = await withDbRetry(() =>
+      prisma.user.findUnique({ where: { id: tokenId }, select: { id: true } }),
+    );
     if (byId) return byId.id;
   }
 

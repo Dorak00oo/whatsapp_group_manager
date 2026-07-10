@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { recordPendingGamertagCorrection } from "@/lib/allowlist-corrected";
 import { prisma } from "@/lib/prisma";
 import {
   normalizePhoneForDirectory,
@@ -226,6 +227,11 @@ export async function updateDirectoryMemberNotes(
   const { phone, phoneCountry } = normalized;
 
   try {
+    const before = await prisma.directoryMember.findFirst({
+      where: { id, userId },
+      select: { gamertag: true },
+    });
+
     await prisma.directoryMember.updateMany({
       where: { id, userId },
       data: {
@@ -236,6 +242,10 @@ export async function updateDirectoryMemberNotes(
         displayName: displayName || null,
       },
     });
+
+    if (before && before.gamertag.trim() !== gamertag) {
+      await recordPendingGamertagCorrection(id, before.gamertag, gamertag);
+    }
   } catch (e) {
     if (isMissingDisplayNameColumnError(e)) {
       return { error: MISSING_DISPLAY_NAME_COLUMN_MESSAGE };

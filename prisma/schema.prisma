@@ -38,6 +38,7 @@ model DirectoryMember {
   user             User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   strikes          DirectoryStrike[]
   auditSuggestions GamertagAuditSuggestion[]
+  gamertagCorrections PendingGamertagCorrection[]
   createdAt        DateTime                  @default(now()) @map("created_at")
   updatedAt        DateTime                  @updatedAt @map("updated_at")
 
@@ -184,4 +185,29 @@ model GamertagAuditSuggestion {
   @@unique([directoryMemberId, minecraftPlayerId], map: "gamertag_audit_suggestions_member_player_key")
   @@index([status])
   @@map("gamertag_audit_suggestions")
+}
+
+/**
+ * Corrección de gamertag pendiente de reflejar en el allowlist real del
+ * servidor (`allowlist remove <viejo>` + `allowlist add <nuevo>`). Se crea
+ * tanto al aprobar una sugerencia de la mini auditoría como al editar el
+ * gamertag a mano desde la ficha del miembro (cualquier cambio de gamertag
+ * de un miembro del roster queda registrado aquí, con el mismo origen que
+ * quien lo hizo).
+ */
+model PendingGamertagCorrection {
+  id                String          @id @default(cuid())
+  directoryMemberId String          @map("directory_member_id")
+  directoryMember   DirectoryMember @relation(fields: [directoryMemberId], references: [id], onDelete: Cascade)
+  oldGamertag       String          @map("old_gamertag")
+  newGamertag       String          @map("new_gamertag")
+  /**
+   * Cuándo el addon aplicó en el servidor allowlist add/remove para esta
+   * corrección. Null = aún pendiente de sincronizar.
+   */
+  syncedAt          DateTime?       @map("synced_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  @@index([syncedAt])
+  @@map("pending_gamertag_corrections")
 }

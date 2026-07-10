@@ -70,6 +70,13 @@ export async function approveGamertagAuditSuggestion(
         where: { id },
         data: { status: "approved", decidedAt: new Date() },
       }),
+      prisma.pendingGamertagCorrection.create({
+        data: {
+          directoryMemberId: suggestion.directoryMemberId,
+          oldGamertag: suggestion.currentGamertag,
+          newGamertag: suggestion.suggestedGamertag,
+        },
+      }),
     ]);
 
     revalidatePath("/dashboard");
