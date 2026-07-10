@@ -100,7 +100,6 @@ export function RemoteCmdTerminalButton({
           data.skippedCorrections ?? [],
         ),
       );
-      // El efecto de arriba revela línea por línea; si no hay líneas pasa a "done" solo.
       if ((data.targetGamertagsAdd?.length ?? 0) === 0 && (data.targetGamertagsRemove?.length ?? 0) === 0) {
         setPhase("done");
       }
