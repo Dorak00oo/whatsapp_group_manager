@@ -12,7 +12,7 @@ const geistSans = Geist({
 
 export const metadata: Metadata = {
   title: "Registros WA / Minecraft",
-  description: "Usuarios, login y registros con Next.js, Neon y Auth.js",
+  description: "Usuarios, login y registros con Next.js, Postgres y Auth.js",
 };
 
 export const viewport: Viewport = {
