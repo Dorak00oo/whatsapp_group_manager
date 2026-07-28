@@ -43,6 +43,9 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# copias de seguridad locales de Neon (contienen datos sensibles)
+/backups
+
 # documentación local (no versionada)
 /docs
 
