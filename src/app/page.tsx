@@ -15,7 +15,7 @@ export default async function Home() {
         </h1>
         <p className="mt-4 text-pretty text-base leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-lg">
           Acceso comunitario con una sola cuenta. Notas por categoría, base de
-          datos Postgres (Neon) y despliegue en Vercel.
+          datos Postgres y panel en wsp.drk000.dev.
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">

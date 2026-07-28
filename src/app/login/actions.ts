@@ -2,6 +2,7 @@
 
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
 import { authLog } from "@/lib/auth-log";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 
@@ -18,14 +19,26 @@ export async function loginAction(
   });
 
   try {
-    await signIn("credentials", {
+    // redirect: false evita que Auth.js redirija a AUTH_URL (puede ser un dominio viejo
+    // en Coolify). Luego Next hace redirect relativo al host desde el que entraste.
+    const result = await signIn("credentials", {
       email,
       password,
-      redirectTo: "/dashboard",
+      redirect: false,
     });
+
+    if (
+      (typeof result === "string" && /[?&]error=/.test(result)) ||
+      (result && typeof result === "object" && "error" in result && result.error)
+    ) {
+      authLog("server action: Auth.js rechazó el login", { result });
+      return { error: "Email o contraseña incorrectos" };
+    }
+
+    authLog("server action: login OK — redirect relativo a /dashboard");
+    redirect("/dashboard");
   } catch (error) {
     if (isRedirectError(error)) {
-      authLog("server action: redirección tras login OK (normal)");
       throw error;
     }
     if (error instanceof AuthError) {
