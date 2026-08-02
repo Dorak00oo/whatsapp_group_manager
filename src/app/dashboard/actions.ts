@@ -5,6 +5,13 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { recordPendingGamertagCorrection } from "@/lib/allowlist-corrected";
 import {
+  MAX_DIRECTORY_STRIKES,
+  memberHasStrikeWithoutReason,
+  parseStrikeKind,
+  STRIKE_KIND_DEFINITIVE,
+  STRIKE_KIND_PENDING,
+} from "@/lib/directory-strikes";
+import {
   cancelPendingAllowlistRemoval,
   enqueueAllowlistRemovalForMember,
 } from "@/lib/allowlist-removal";
@@ -377,26 +384,75 @@ export async function syncDirectoryFromMinecraftPanel(): Promise<SyncFromMinecra
   }
 }
 
-export async function addDirectoryStrike(formData: FormData) {
+export async function addDirectoryStrike(
+  formData: FormData,
+): Promise<{ error: string } | { ok: true }> {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado" };
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return { error: STALE_SESSION_ERROR };
+
+  const memberId = String(formData.get("memberId") ?? "").trim();
+  const kind = parseStrikeKind(String(formData.get("kind") ?? ""));
+  const reasonRaw = String(formData.get("reason") ?? "").trim();
+  if (!memberId) return { error: "Jugador no válido." };
+
+  const member = await prisma.directoryMember.findFirst({
+    where: { id: memberId, userId },
+    include: {
+      strikes: { orderBy: { createdAt: "asc" } },
+    },
+  });
+  if (!member) return { error: "Jugador no encontrado." };
+
+  if (member.strikes.length >= MAX_DIRECTORY_STRIKES) {
+    return {
+      error: `Máximo ${MAX_DIRECTORY_STRIKES} strikes por jugador.`,
+    };
+  }
+
+  if (!reasonRaw && memberHasStrikeWithoutReason(member.strikes)) {
+    return {
+      error:
+        "Solo puede haber un strike sin causa escrita. Añade la descripción o elimina el otro.",
+    };
+  }
+
+  await prisma.directoryStrike.create({
+    data: { memberId, kind, reason: reasonRaw },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/importar");
+  return { ok: true };
+}
+
+/** Para `<form action={…}>` que no consume el resultado JSON. */
+export async function addDirectoryStrikeFromForm(
+  formData: FormData,
+): Promise<void> {
+  await addDirectoryStrike(formData);
+}
+
+export async function removeDirectoryStrike(
+  strikeId: string,
+  memberId: string,
+): Promise<void> {
   const session = await auth();
   if (!session?.user) return;
   const userId = await resolveDirectoryUserId(session);
   if (!userId) return;
 
-  const memberId = String(formData.get("memberId") ?? "").trim();
-  const reason = String(formData.get("reason") ?? "").trim();
-  if (!memberId || !reason) return;
-
-  const member = await prisma.directoryMember.findFirst({
-    where: { id: memberId, userId },
-  });
-  if (!member) return;
-
-  await prisma.directoryStrike.create({
-    data: { memberId, reason },
+  await prisma.directoryStrike.deleteMany({
+    where: {
+      id: strikeId,
+      memberId,
+      member: { userId },
+    },
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/importar");
 }
 
 export async function setDirectoryMemberBan(formData: FormData) {

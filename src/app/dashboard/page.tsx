@@ -116,6 +116,7 @@ export default async function DashboardPage({
     createdAt: m.createdAt.toISOString(),
     strikes: m.strikes.map((s) => ({
       id: s.id,
+      kind: s.kind === "definitive" ? "definitive" : "pending",
       reason: s.reason,
       createdAt: s.createdAt.toISOString(),
     })),

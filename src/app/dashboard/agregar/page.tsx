@@ -16,12 +16,13 @@ export default function DashboardAgregarPage() {
         </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           Gamertag, celular y situación en la comunidad. Luego podrás editar
-          strikes y baneos desde la lista.           Para Excel o log de Minecraft usa{" "}
+          strikes y baneos desde la lista. Para administración del allowlist y
+          strikes usa{" "}
           <Link
             href="/dashboard/importar"
             className="font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
           >
-            Importar y log
+            Administración de jugadores
           </Link>
           .
         </p>

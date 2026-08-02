@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -52,27 +53,6 @@ function IconUserPlus({ className }: { className?: string }) {
   );
 }
 
-function IconUpload({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className ?? iconSm}
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="17 8 12 3 7 8" />
-      <line x1="12" x2="12" y1="3" y2="15" />
-    </svg>
-  );
-}
-
 /** Iconos circulares — lateral escritorio (carril estrecho). */
 const linkBaseSidebar =
   "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
@@ -118,7 +98,7 @@ function IconCommands({ className }: { className?: string }) {
   );
 }
 
-function IconMinecraft({ className }: { className?: string }) {
+function IconAdmin({ className }: { className?: string }) {
   return (
     <svg
       className={className ?? iconSm}
@@ -132,12 +112,27 @@ function IconMinecraft({ className }: { className?: string }) {
       strokeLinejoin="round"
       aria-hidden
     >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M9 3v18" />
-      <path d="M15 3v18" />
-      <path d="M3 9h18" />
-      <path d="M3 15h18" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M9 12h6" />
+      <path d="M9 16h6" />
+      <path d="M9 8h6" />
     </svg>
+  );
+}
+
+/** Bloque de tierra/césped (Minecraft). */
+function IconMinecraft({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/minecraft-grass-16.png"
+      alt=""
+      width={16}
+      height={16}
+      className={`${className ?? iconSm} shrink-0 object-contain [image-rendering:pixelated]`}
+      aria-hidden
+      unoptimized
+    />
   );
 }
 
@@ -192,10 +187,10 @@ export function DashboardSidebarNav() {
       <Link
         href="/dashboard/importar"
         className={`${linkBaseSidebar} ${activeCls(bulk)}`}
-        title="Importar y log"
+        title="Administración de jugadores"
         aria-current={bulk ? "page" : undefined}
       >
-        <IconUpload className={iconSidebar} />
+        <IconAdmin className={iconSidebar} />
       </Link>
       <Link
         href="/dashboard/minecraft"
@@ -255,8 +250,8 @@ export function DashboardMobileTabNav() {
         className={`${tabBase} ${activeTabCls(bulk)}`}
         aria-current={bulk ? "page" : undefined}
       >
-        <IconUpload className="size-[1.125rem] shrink-0" />
-        <span className="text-[10px] font-medium leading-none">Importar</span>
+        <IconAdmin className="size-[1.125rem] shrink-0" />
+        <span className="text-[10px] font-medium leading-none">Admin</span>
       </Link>
       <Link
         href="/dashboard/minecraft"

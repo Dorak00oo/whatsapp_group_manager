@@ -104,7 +104,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               ? "authorize: FALLO — error al hablar con la BD (Neon dormida, red o URL)"
               : "authorize: FALLO — DATABASE_URL vacía: revisa .env en la raíz del proyecto",
           );
-          return null;
+          throw new Error("DATABASE_UNAVAILABLE");
         }
       },
     }),

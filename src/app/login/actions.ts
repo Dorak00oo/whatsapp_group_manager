@@ -49,6 +49,12 @@ export async function loginAction(
       return { error: "Email o contraseña incorrectos" };
     }
     const err = error as Error;
+    if (err?.message === "DATABASE_UNAVAILABLE") {
+      return {
+        error:
+          "No se pudo conectar a la base de datos. En desarrollo local abre el túnel SSH (scripts/homelab-db-tunnel.ps1) y usa DATABASE_URL con 127.0.0.1:5433 en .env.local. Reinicia npm run dev.",
+      };
+    }
     console.error("[login-auth] server action: error inesperado", {
       name: err?.name,
       message: err?.message,

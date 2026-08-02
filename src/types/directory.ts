@@ -1,5 +1,6 @@
 export type StrikeDTO = {
   id: string;
+  kind: "pending" | "definitive";
   reason: string;
   createdAt: string;
 };

@@ -1,10 +1,14 @@
-import Link from "next/link";
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { DirectoryAllowlistExport } from "@/components/directory-allowlist-export";
 import { DirectoryMinecraftActiveCompare } from "@/components/directory-minecraft-active-compare";
 import { GamertagAuditPanel } from "@/components/gamertag-audit-panel";
+import { PlayerAdminStrikePanel } from "@/components/player-admin-strike-panel";
 import { buildActiveCompareData } from "@/lib/directory-minecraft-compare";
+import {
+  STRIKE_KIND_DEFINITIVE,
+  STRIKE_KIND_PENDING,
+} from "@/lib/directory-strikes";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
 import {
   buildRosterFromSnapshot,
@@ -32,6 +36,20 @@ export default async function DashboardImportarPage() {
   let compareData;
   let snapshotAt: string | null = null;
   let activeCount = 0;
+  let rosterMembers: Awaited<
+    ReturnType<
+      typeof prisma.directoryMember.findMany<{
+        select: {
+          id: true;
+          gamertag: true;
+          displayName: true;
+          active: true;
+          leftAt: true;
+          strikes: { select: { id: true; kind: true; reason: true; createdAt: true } };
+        };
+      }>
+    >
+  > = [];
 
   try {
     const [waMembers, mcPlayers, lastSnapshot, config] = await Promise.all([
@@ -43,7 +61,12 @@ export default async function DashboardImportarPage() {
           displayName: true,
           active: true,
           leftAt: true,
+          strikes: {
+            orderBy: { createdAt: "asc" },
+            select: { id: true, kind: true, reason: true, createdAt: true },
+          },
         },
+        orderBy: { gamertag: "asc" },
       }),
       prisma.minecraftPlayer.findMany({
         orderBy: { lastSeen: "desc" },
@@ -55,6 +78,8 @@ export default async function DashboardImportarPage() {
         where: { id: "default" },
       }),
     ]);
+
+    rosterMembers = waMembers;
 
     const daysInactiveThreshold = config?.daysInactive ?? 7;
     const snapshotByTag = snapshotStatusByGamertag(lastSnapshot?.data);
@@ -78,28 +103,36 @@ export default async function DashboardImportarPage() {
     throw e;
   }
 
+  const playerAdminMembers = rosterMembers.map((m) => ({
+    id: m.id,
+    gamertag: m.gamertag,
+    displayName: m.displayName,
+    active: m.active,
+    leftAt: m.leftAt?.toISOString() ?? null,
+    strikes: m.strikes.map((s) => ({
+      id: s.id,
+      kind: s.kind === STRIKE_KIND_DEFINITIVE ? STRIKE_KIND_DEFINITIVE : STRIKE_KIND_PENDING,
+      reason: s.reason,
+      createdAt: s.createdAt.toISOString(),
+    })),
+  }));
+
   return (
-    <section className="flex flex-col gap-10">
+    <section className="flex flex-col gap-8">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Herramientas
+          Panel administración
         </p>
         <h2 className="mt-0.5 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Importar y log
+          Administración de los usuarios
         </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Compara la lista de WhatsApp con Minecraft, revisa la auditoría de
-          gamertags y exporta la whitelist del servidor. El alta manual de una
-          sola persona sigue en{" "}
-          <Link
-            href="/dashboard/agregar"
-            className="font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
-          >
-            Agregar persona
-          </Link>
-          .
+          Administración de jugadores, allowlist, auditoría de gamertags y
+          comparación con Minecraft.
         </p>
       </div>
+
+      <PlayerAdminStrikePanel members={playerAdminMembers} />
 
       <DirectoryAllowlistExport activeCount={activeCount} />
 

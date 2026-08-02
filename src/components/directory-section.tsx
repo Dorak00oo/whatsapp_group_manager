@@ -130,7 +130,7 @@ export function DirectorySection({
             href="/dashboard/importar"
             className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-100"
           >
-            importa / pega log
+            Administración de jugadores
           </Link>
           .
         </p>

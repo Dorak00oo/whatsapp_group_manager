@@ -11,7 +11,7 @@ export function DirectoryAllowlistExport({ activeCount }: Props) {
     <div className={`${softPanel} gap-3`}>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-800 dark:text-zinc-200">
-          Whitelist del servidor
+          Allowlist Bedrock
         </p>
         <h3 className="mt-1 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
           Exportar allowlist.json ({activeCount} activo

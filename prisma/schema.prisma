@@ -63,7 +63,8 @@ model DirectoryMember {
 
 model DirectoryStrike {
   id        String          @id @default(cuid())
-  reason    String
+  kind      String          @default("pending")
+  reason    String          @default("")
   memberId  String          @map("member_id")
   member    DirectoryMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   createdAt DateTime        @default(now()) @map("created_at")

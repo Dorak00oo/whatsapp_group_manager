@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
-  addDirectoryStrike,
+  addDirectoryStrikeFromForm,
   deleteDirectoryMember,
   setDirectoryMemberActive,
   setDirectoryMemberBan,
@@ -16,6 +16,16 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
 import { getCallingCodeOptions } from "@/lib/phone-calling-codes";
 import { splitPhoneForDirectoryForm } from "@/lib/phone-normalize";
+import {
+  formatStrikeDisplay,
+  formatStrikeKindLabel,
+  MAX_DIRECTORY_STRIKES,
+  memberHasStrikeWithoutReason,
+  parseStrikeKind,
+  STRIKE_KIND_DEFINITIVE,
+  STRIKE_KIND_PENDING,
+  type StrikeKind,
+} from "@/lib/directory-strikes";
 import { softBtnMint, softInputNeutral, softSelectNeutral } from "@/lib/soft-ui";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
@@ -41,6 +51,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
     null,
   );
   const [confirm, setConfirm] = useState<"delete" | "left" | null>(null);
+  const [strikeKind, setStrikeKind] = useState<StrikeKind>(STRIKE_KIND_PENDING);
   const confirmRef = useRef(confirm);
   const country = regionLabel(m.phoneCountry);
   const phoneCountryOptions = useMemo(() => getCallingCodeOptions("es"), []);
@@ -188,29 +199,68 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                     <span className="text-zinc-400 dark:text-zinc-500">
                       {new Date(s.createdAt).toLocaleString("es")} —{" "}
                     </span>
-                    {s.reason}
+                    {formatStrikeDisplay(parseStrikeKind(s.kind), s.reason)}
                   </li>
                 ))}
               </ul>
             </div>
           ) : null}
 
-          <form action={addDirectoryStrike} className="mt-4 flex flex-wrap gap-2">
+          <form action={addDirectoryStrikeFromForm} className="mt-4 flex flex-col gap-2">
             <input type="hidden" name="memberId" value={m.id} />
+            <input type="hidden" name="kind" value={strikeKind} />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={m.strikes.length >= MAX_DIRECTORY_STRIKES}
+                onClick={() => setStrikeKind(STRIKE_KIND_PENDING)}
+                className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                  strikeKind === STRIKE_KIND_PENDING
+                    ? "border-amber-400 bg-amber-100 text-amber-950 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-100"
+                    : "border-zinc-300 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
+                }`}
+              >
+                ? Pendiente
+              </button>
+              <button
+                type="button"
+                disabled={m.strikes.length >= MAX_DIRECTORY_STRIKES}
+                onClick={() => setStrikeKind(STRIKE_KIND_DEFINITIVE)}
+                className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                  strikeKind === STRIKE_KIND_DEFINITIVE
+                    ? "border-red-400 bg-red-100 text-red-950 dark:border-red-700 dark:bg-red-950/50 dark:text-red-100"
+                    : "border-zinc-300 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
+                }`}
+              >
+                X Definitivo
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
             <input
               name="reason"
-              required
-              placeholder="Motivo del nuevo strike"
-              className="min-w-[12rem] flex-1 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+              placeholder="Causa (opcional)"
+              disabled={m.strikes.length >= MAX_DIRECTORY_STRIKES}
+              className="min-w-[12rem] flex-1 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
             />
             <button
               type="submit"
-              disabled={pending}
+              disabled={pending || m.strikes.length >= MAX_DIRECTORY_STRIKES}
               className="rounded-lg border border-amber-400/80 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"
             >
-              Añadir strike
+              Añadir strike ({m.strikes.length}/{MAX_DIRECTORY_STRIKES})
             </button>
+            </div>
           </form>
+          {m.strikes.length >= MAX_DIRECTORY_STRIKES ? (
+            <p className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+              Máximo {MAX_DIRECTORY_STRIKES} strikes por jugador.
+            </p>
+          ) : memberHasStrikeWithoutReason(m.strikes) ? (
+            <p className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+              Ya hay un strike sin causa escrita; el siguiente necesita
+              descripción.
+            </p>
+          ) : null}
 
           <form
             action={profileAction}
