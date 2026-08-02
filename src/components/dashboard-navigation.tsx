@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -121,18 +120,26 @@ function IconAdmin({ className }: { className?: string }) {
   );
 }
 
-/** Bloque de tierra/césped (Minecraft). */
+/** Bloque / mundo Minecraft — mismo estilo de trazo que el resto del nav. */
 function IconMinecraft({ className }: { className?: string }) {
   return (
-    <Image
-      src="/minecraft-grass-16.png"
-      alt=""
-      width={16}
-      height={16}
-      className={`${className ?? iconSm} shrink-0 object-contain [image-rendering:pixelated]`}
+    <svg
+      className={className ?? iconSm}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden
-      unoptimized
-    />
+    >
+      <path d="M12 2 2 7v10l10 5 10-5V7z" />
+      <path d="M2 7l10 5 10-5" />
+      <path d="M12 22V12" />
+      <path d="m7.5 4.5 9 5" />
+    </svg>
   );
 }
 
@@ -195,7 +202,7 @@ export function DashboardSidebarNav() {
       <Link
         href="/dashboard/minecraft"
         className={`${linkBaseSidebar} ${activeCls(minecraft)}`}
-        title="Minecraft"
+        title="Jugadores de Minecraft"
         aria-current={minecraft ? "page" : undefined}
       >
         <IconMinecraft className={iconSidebar} />

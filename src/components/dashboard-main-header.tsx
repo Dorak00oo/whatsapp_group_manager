@@ -18,7 +18,7 @@ export function DashboardMainHeader() {
     : isParcela
       ? "Parcela"
       : isMinecraft
-        ? "Minecraft"
+        ? "Jugadores de Minecraft"
         : isImportar
           ? "Administración de los usuarios"
           : "Panel";
@@ -27,7 +27,7 @@ export function DashboardMainHeader() {
     : isParcela
       ? "Quién entra y sale del terreno monitoreado, con historial y fechas."
       : isMinecraft
-        ? "Estado de jugadores y configuración del servidor."
+        ? "Estado de actividad de jugadores del servidor de Minecraft."
         : isImportar
           ? "Administración de jugadores, allowlist, auditoría de gamertags y comparación con Minecraft."
           : "Directorio de personas, filtros, importación y monitoreo Minecraft.";
