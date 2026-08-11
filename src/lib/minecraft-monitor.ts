@@ -178,9 +178,34 @@ export function eventLabel(type: MonitorEventType): string {
   }
 }
 
-/** Alerta: ≥3 eventos críticos (fuego/TNT/quema) en 10 minutos por jugador. */
+/** Alerta: ≥3 eventos críticos (fuego/TNT/quema/wither) en 10 minutos por jugador. */
 export const MONITOR_ALERT_WINDOW_MS = 10 * 60 * 1000;
 export const MONITOR_ALERT_MIN_EVENTS = 3;
+/** Las alertas del panel duran 7 días (o hasta descartarlas). */
+export const MONITOR_ALERT_RETENTION_DAYS = 7;
+
+export const MONITOR_ALERT_CRITICAL_TYPES = new Set([
+  "fire_start",
+  "lava_place",
+  "tnt_place",
+  "tnt_ignite",
+  "block_burn",
+  "wither_summon",
+]);
+
+export function isMonitorAlertCriticalType(eventType: string): boolean {
+  return MONITOR_ALERT_CRITICAL_TYPES.has(eventType);
+}
+
+export function monitorAlertExpiresAt(from = new Date()): Date {
+  return new Date(
+    from.getTime() + MONITOR_ALERT_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  );
+}
+
+export function gamertagKey(gamertag: string): string {
+  return gamertag.trim().toLowerCase();
+}
 
 export function buildVandalismAlerts(
   events: Array<{
@@ -189,14 +214,7 @@ export function buildVandalismAlerts(
     occurredAt: string | Date;
   }>,
 ): Array<{ gamertag: string; count: number; windowStart: string; windowEnd: string }> {
-  const critical = new Set([
-    "fire_start",
-    "lava_place",
-    "tnt_place",
-    "tnt_ignite",
-    "block_burn",
-    "wither_summon",
-  ]);
+  const critical = MONITOR_ALERT_CRITICAL_TYPES;
   const byPlayer = new Map<string, Date[]>();
   for (const e of events) {
     if (!critical.has(e.eventType)) continue;

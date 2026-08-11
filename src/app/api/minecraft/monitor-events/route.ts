@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import {
-  buildVandalismAlerts,
   isMonitorEventType,
   MONITOR_RETENTION_DAYS,
   type MonitorEventType,
   type MonitorPriority,
 } from "@/lib/minecraft-monitor";
+import {
+  applyMonitorAlertsFromEvents,
+  listActiveMonitorAlerts,
+} from "@/lib/minecraft-monitor-alerts";
 import {
   getLastMonitorBatchAt,
   markMonitorBatchReceived,
@@ -149,6 +152,14 @@ export async function POST(request: Request) {
     })),
   });
 
+  await applyMonitorAlertsFromEvents(
+    rows.map((r) => ({
+      gamertag: r.gamertag,
+      eventType: r.eventType,
+      occurredAt: r.occurredAt,
+    })),
+  );
+
   const total = await prisma.minecraftMonitorEvent.count();
 
   return NextResponse.json({
@@ -232,13 +243,7 @@ export async function GET(request: Request) {
   });
 
   const total = await prisma.minecraftMonitorEvent.count({ where });
-  const alerts = buildVandalismAlerts(
-    events.map((e) => ({
-      gamertag: e.gamertag,
-      eventType: e.eventType,
-      occurredAt: e.occurredAt,
-    })),
-  );
+  const alerts = await listActiveMonitorAlerts();
 
   return NextResponse.json({
     ok: true,

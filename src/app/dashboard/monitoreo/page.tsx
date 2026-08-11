@@ -3,11 +3,11 @@ import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftMonitorSection } from "@/components/minecraft-monitor-section";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
 import {
-  buildVandalismAlerts,
   DEFAULT_MONITOR_EXCLUDE,
   parseExcludeList,
   type MonitorEventType,
 } from "@/lib/minecraft-monitor";
+import { listActiveMonitorAlerts } from "@/lib/minecraft-monitor-alerts";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { prisma } from "@/lib/prisma";
 
@@ -16,13 +16,14 @@ export default async function DashboardMonitoreoPage() {
   if (!session?.user) return null;
 
   try {
-    const [config, events, eventTotal] = await Promise.all([
+    const [config, events, eventTotal, alerts] = await Promise.all([
       prisma.minecraftConfig.findUnique({ where: { id: "default" } }),
       prisma.minecraftMonitorEvent.findMany({
         orderBy: { occurredAt: "desc" },
         take: 500,
       }),
       prisma.minecraftMonitorEvent.count(),
+      listActiveMonitorAlerts(),
     ]);
 
     const mapped = events.map((e) => {
@@ -46,14 +47,6 @@ export default async function DashboardMonitoreoPage() {
       };
     });
 
-    const alerts = buildVandalismAlerts(
-      events.map((e) => ({
-        gamertag: e.gamertag,
-        eventType: e.eventType,
-        occurredAt: e.occurredAt,
-      })),
-    );
-
     return (
       <section className="flex flex-col gap-4">
         <div>
@@ -63,7 +56,7 @@ export default async function DashboardMonitoreoPage() {
           <p className="mt-1 text-sm text-zinc-500">
             Bloques colocados/rotos, fuego, lava, TNT e invocación de wither en
             Overworld. El addon envía lotes cada 30 s (o al pedirlos). Historial
-            21 días.
+            21 días. Alertas 7 días (o hasta descartarlas).
           </p>
         </div>
         <MinecraftMonitorSection

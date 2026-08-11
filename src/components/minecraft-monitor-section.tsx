@@ -35,10 +35,13 @@ export type MonitorEventRow = {
 };
 
 type AlertRow = {
+  id: string;
   gamertag: string;
-  count: number;
+  eventCount: number;
+  witherCount: number;
   windowStart: string;
-  windowEnd: string;
+  lastEventAt: string;
+  expiresAt: string;
 };
 
 type Props = {
@@ -87,6 +90,7 @@ export function MinecraftMonitorSection({
   const [events, setEvents] = useState(initialEvents);
   const [totalEvents, setTotalEvents] = useState(initialTotal);
   const [alerts, setAlerts] = useState(initialAlerts);
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [excludeText, setExcludeText] = useState(
     initialExclude.join("\n") || DEFAULT_MONITOR_EXCLUDE.join("\n"),
   );
@@ -236,6 +240,26 @@ export function MinecraftMonitorSection({
     }
   }
 
+  async function dismissAlert(id: string) {
+    setDismissingId(id);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/minecraft/monitor-alerts/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        setMessage(data.error ?? "No se pudo descartar la alerta.");
+        return;
+      }
+      setAlerts((prev) => prev.filter((a) => a.id !== id));
+    } catch {
+      setMessage("Error de red al descartar la alerta.");
+    } finally {
+      setDismissingId(null);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {alerts.length > 0 ? (
@@ -244,24 +268,52 @@ export function MinecraftMonitorSection({
             Alertas de vandalismo
           </h3>
           <p className="text-xs text-zinc-600 dark:text-zinc-400">
-            ≥3 eventos de fuego/TNT/quema en 10 minutos.
+            ≥3 críticos en 10 min, o un wither. Una alerta por jugador: se suma
+            el contador si repite. Duran 7 días o hasta descartarlas.
           </p>
           <ul className="flex flex-col gap-2">
             {alerts.map((a) => (
               <li
-                key={`${a.gamertag}-${a.windowStart}`}
-                className="rounded-xl border border-red-200/80 bg-red-50/60 px-3 py-2 text-sm dark:border-red-900/50 dark:bg-red-950/30"
+                key={a.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200/80 bg-red-50/60 px-3 py-2 text-sm dark:border-red-900/50 dark:bg-red-950/30"
               >
-                <Link
-                  href={`/dashboard?q=${encodeURIComponent(a.gamertag)}`}
-                  className="font-semibold text-red-900 underline-offset-2 hover:underline dark:text-red-100"
+                <div>
+                  <Link
+                    href={`/dashboard?q=${encodeURIComponent(a.gamertag)}`}
+                    className="font-semibold text-red-900 underline-offset-2 hover:underline dark:text-red-100"
+                  >
+                    {a.gamertag}
+                  </Link>
+                  <span className="text-zinc-600 dark:text-zinc-400">
+                    {" "}
+                    — {a.eventCount} evento{a.eventCount === 1 ? "" : "s"} crítico
+                    {a.eventCount === 1 ? "" : "s"}
+                    {a.witherCount > 0
+                      ? ` · ${a.witherCount} wither${a.witherCount === 1 ? "" : "s"}`
+                      : ""}
+                  </span>
+                  <div className="mt-0.5 text-[11px] text-zinc-500">
+                    Último:{" "}
+                    {new Date(a.lastEventAt).toLocaleString("es-MX", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
+                    {" · "}
+                    Expira:{" "}
+                    {new Date(a.expiresAt).toLocaleString("es-MX", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={dismissingId === a.id}
+                  onClick={() => void dismissAlert(a.id)}
+                  className="rounded-md border border-red-300/80 px-2.5 py-1 text-xs font-medium text-red-800 hover:bg-red-100/80 disabled:opacity-50 dark:border-red-800 dark:text-red-100 dark:hover:bg-red-950/60"
                 >
-                  {a.gamertag}
-                </Link>
-                <span className="text-zinc-600 dark:text-zinc-400">
-                  {" "}
-                  — {a.count} eventos críticos
-                </span>
+                  {dismissingId === a.id ? "…" : "Descartar"}
+                </button>
               </li>
             ))}
           </ul>

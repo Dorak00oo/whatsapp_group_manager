@@ -182,6 +182,30 @@ model MinecraftMonitorEvent {
 }
 
 /**
+ * Alertas de vandalismo del monitoreo (7 días o hasta descartar).
+ * Una alerta abierta por jugador: eventos posteriores suman al contador.
+ */
+model MinecraftMonitorAlert {
+  id           String    @id @default(cuid())
+  gamertag     String
+  /** Clave normalizada para buscar la alerta abierta del jugador. */
+  gamertagKey  String    @map("gamertag_key")
+  eventCount   Int       @default(0) @map("event_count")
+  witherCount  Int       @default(0) @map("wither_count")
+  windowStart  DateTime  @map("window_start")
+  lastEventAt  DateTime  @map("last_event_at")
+  expiresAt    DateTime  @map("expires_at")
+  dismissedAt  DateTime? @map("dismissed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([gamertagKey, dismissedAt])
+  @@index([expiresAt])
+  @@index([lastEventAt(sort: Desc)])
+  @@map("minecraft_monitor_alerts")
+}
+
+/**
  * Entrada o salida de un jugador en la parcela monitoreada
  */
 model MinecraftParcelEvent {
