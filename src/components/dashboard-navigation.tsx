@@ -120,6 +120,26 @@ function IconAdmin({ className }: { className?: string }) {
   );
 }
 
+function IconMonitor({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className ?? iconSm}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
 /** Bloque / mundo Minecraft — mismo estilo de trazo que el resto del nav. */
 function IconMinecraft({ className }: { className?: string }) {
   return (
@@ -151,7 +171,8 @@ function useNavActive() {
   const minecraft = pathname.startsWith("/dashboard/minecraft");
   const comandos = pathname.startsWith("/dashboard/comandos");
   const parcela = pathname.startsWith("/dashboard/parcela");
-  return { list, add, bulk, minecraft, comandos, parcela };
+  const monitoreo = pathname.startsWith("/dashboard/monitoreo");
+  return { list, add, bulk, minecraft, comandos, parcela, monitoreo };
 }
 
 function activeCls(on: boolean) {
@@ -168,7 +189,8 @@ function activeTabCls(on: boolean) {
 
 /** Barra lateral: iconos pequeños (md+). */
 export function DashboardSidebarNav() {
-  const { list, add, bulk, minecraft, comandos, parcela } = useNavActive();
+  const { list, add, bulk, minecraft, comandos, parcela, monitoreo } =
+    useNavActive();
 
   return (
     <nav
@@ -214,6 +236,14 @@ export function DashboardSidebarNav() {
         aria-current={parcela ? "page" : undefined}
       >
         <IconParcel className={iconSidebar} />
+      </Link>
+      <Link
+        href="/dashboard/monitoreo"
+        className={`${linkBaseSidebar} ${activeCls(monitoreo)}`}
+        title="Monitoreo"
+        aria-current={monitoreo ? "page" : undefined}
+      >
+        <IconMonitor className={iconSidebar} />
       </Link>
       <Link
         href="/dashboard/comandos"

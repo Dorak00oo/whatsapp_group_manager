@@ -10,27 +10,31 @@ export function DashboardMainHeader() {
   const isComandos = pathname.startsWith("/dashboard/comandos");
   const isMinecraft = pathname.startsWith("/dashboard/minecraft");
   const isParcela = pathname.startsWith("/dashboard/parcela");
-
+  const isMonitoreo = pathname.startsWith("/dashboard/monitoreo");
   const isImportar = pathname.startsWith("/dashboard/importar");
 
   const title = isComandos
     ? "Comandos rápidos"
     : isParcela
       ? "Parcela"
-      : isMinecraft
-        ? "Jugadores de Minecraft"
-        : isImportar
-          ? "Administración de los usuarios"
-          : "Panel";
+      : isMonitoreo
+        ? "Monitoreo"
+        : isMinecraft
+          ? "Jugadores de Minecraft"
+          : isImportar
+            ? "Administración de los usuarios"
+            : "Panel";
   const subtitle = isComandos
     ? "Órdenes al mundo Bedrock vía el addon (espectador, survival, limpieza de mobs)."
     : isParcela
       ? "Quién entra y sale del terreno monitoreado, con historial y fechas."
-      : isMinecraft
-        ? "Estado de actividad de jugadores del servidor de Minecraft."
-        : isImportar
-          ? "Administración de jugadores, allowlist, auditoría de gamertags y comparación con Minecraft."
-          : "Directorio de personas, filtros, importación y monitoreo Minecraft.";
+      : isMonitoreo
+        ? "Bloques, fuego, lava y TNT en Overworld — filtros por jugador, ítem, hora y coordenadas."
+        : isMinecraft
+          ? "Estado de actividad de jugadores del servidor de Minecraft."
+          : isImportar
+            ? "Administración de jugadores, allowlist, auditoría de gamertags y comparación con Minecraft."
+            : "Directorio de personas, filtros, importación y monitoreo Minecraft.";
 
   return (
     <header className="mb-5 border-b border-zinc-200/80 pb-5 dark:border-zinc-800/80 max-md:hidden sm:mb-6 sm:pb-6 md:mb-8 xl:mb-8 xl:border-0 xl:pb-0">

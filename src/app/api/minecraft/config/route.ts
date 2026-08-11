@@ -5,6 +5,10 @@ import {
   type MinecraftConfigUpdateInput,
   minecraftConfigToPayload,
 } from "@/lib/minecraft-config-defaults";
+import {
+  DEFAULT_MONITOR_EXCLUDE,
+  normalizeBlockId,
+} from "@/lib/minecraft-monitor";
 import { parcelPrismaUpdateFromPayload, type ParcelConfigPayload } from "@/lib/minecraft-parcel";
 import { prisma } from "@/lib/prisma";
 
@@ -26,6 +30,7 @@ type ConfigBody = {
   daysPurge?: number;
   snapshotRetentionDays?: number;
   snapshotKeepMinimum?: number;
+  monitorExclude?: string[];
   parcel?: {
     enabled?: boolean;
     name?: string;
@@ -67,7 +72,24 @@ export async function GET(request: Request) {
 
     if (!config) {
       config = await prisma.minecraftConfig.create({
-        data: { id: "default", ...MINECRAFT_CONFIG_DEFAULTS },
+        data: {
+          id: "default",
+          daysInactive: MINECRAFT_CONFIG_DEFAULTS.daysInactive,
+          daysBlacklist: MINECRAFT_CONFIG_DEFAULTS.daysBlacklist,
+          daysPurge: MINECRAFT_CONFIG_DEFAULTS.daysPurge,
+          snapshotRetentionDays: MINECRAFT_CONFIG_DEFAULTS.snapshotRetentionDays,
+          snapshotKeepMinimum: MINECRAFT_CONFIG_DEFAULTS.snapshotKeepMinimum,
+          parcelEnabled: MINECRAFT_CONFIG_DEFAULTS.parcel.enabled,
+          parcelName: MINECRAFT_CONFIG_DEFAULTS.parcel.name,
+          parcelDimension: MINECRAFT_CONFIG_DEFAULTS.parcel.dimension,
+          parcelMinX: MINECRAFT_CONFIG_DEFAULTS.parcel.minX,
+          parcelMinY: MINECRAFT_CONFIG_DEFAULTS.parcel.minY,
+          parcelMinZ: MINECRAFT_CONFIG_DEFAULTS.parcel.minZ,
+          parcelMaxX: MINECRAFT_CONFIG_DEFAULTS.parcel.maxX,
+          parcelMaxY: MINECRAFT_CONFIG_DEFAULTS.parcel.maxY,
+          parcelMaxZ: MINECRAFT_CONFIG_DEFAULTS.parcel.maxZ,
+          monitorExcludeJson: JSON.stringify(DEFAULT_MONITOR_EXCLUDE),
+        },
       });
     }
 
@@ -136,6 +158,18 @@ export async function POST(request: Request) {
         ? parcelPrismaUpdateFromPayload(body.parcel as Partial<ParcelConfigPayload>)
         : {};
 
+    let monitorExcludeJson: string | undefined;
+    if (Array.isArray(body.monitorExclude)) {
+      const cleaned = body.monitorExclude
+        .filter((x): x is string => typeof x === "string")
+        .map((x) => normalizeBlockId(x))
+        .filter(Boolean);
+      monitorExcludeJson = JSON.stringify(
+        cleaned.length ? cleaned : DEFAULT_MONITOR_EXCLUDE,
+      );
+      updateData.monitorExcludeJson = monitorExcludeJson;
+    }
+
     const config = await prisma.minecraftConfig.upsert({
       where: { id: "default" },
       update: { ...updateData, ...parcelFields },
@@ -160,6 +194,9 @@ export async function POST(request: Request) {
         parcelMaxX: MINECRAFT_CONFIG_DEFAULTS.parcel.maxX,
         parcelMaxY: MINECRAFT_CONFIG_DEFAULTS.parcel.maxY,
         parcelMaxZ: MINECRAFT_CONFIG_DEFAULTS.parcel.maxZ,
+        monitorExcludeJson:
+          monitorExcludeJson ??
+          JSON.stringify(DEFAULT_MONITOR_EXCLUDE),
         ...parcelFields,
       },
     });

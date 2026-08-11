@@ -118,6 +118,17 @@ export function DashboardMobileMoreDrawer({ defaultThemeDark }: Props) {
           >
             Parcela
           </Link>
+          <Link
+            href="/dashboard/monitoreo"
+            onClick={closeMenu}
+            className={`rounded-xl px-3 py-2.5 text-sm font-medium ${
+              pathname.startsWith("/dashboard/monitoreo")
+                ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            }`}
+          >
+            Monitoreo
+          </Link>
         </nav>
         <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
           Claro u oscuro

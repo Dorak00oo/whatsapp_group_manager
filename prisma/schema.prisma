@@ -143,9 +143,42 @@ model MinecraftConfig {
   parcelMaxX            Int      @default(15) @map("parcel_max_x")
   parcelMaxY            Int      @default(79) @map("parcel_max_y")
   parcelMaxZ            Int      @default(15) @map("parcel_max_z")
+  /**
+   * JSON array de ids de bloque (sin prefijo minecraft:) excluidos del monitoreo place/break.
+   * null = usar lista por defecto del código.
+   */
+  monitorExcludeJson    String?  @map("monitor_exclude_json") @db.Text
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("minecraft_config")
+}
+
+/**
+ * Eventos de monitoreo Overworld: place/break, fuego, TNT, quema atribuida.
+ * Retención: 21 días (purga en POST/GET).
+ */
+model MinecraftMonitorEvent {
+  id            String   @id @default(cuid())
+  gamertag      String
+  eventType     String   @map("event_type")
+  occurredAt    DateTime @map("occurred_at")
+  posX          Int?     @map("pos_x")
+  posY          Int?     @map("pos_y")
+  posZ          Int?     @map("pos_z")
+  dimension     String?  @default("overworld")
+  blockType     String?  @map("block_type")
+  itemType      String?  @map("item_type")
+  priority      String   @default("normal")
+  fireId        String?  @map("fire_id")
+  relatedFireId String?  @map("related_fire_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([occurredAt(sort: Desc)])
+  @@index([gamertag])
+  @@index([eventType])
+  @@index([blockType])
+  @@index([fireId])
+  @@map("minecraft_monitor_events")
 }
 
 /**

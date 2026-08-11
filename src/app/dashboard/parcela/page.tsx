@@ -73,8 +73,8 @@ export default async function DashboardParcelaPage() {
             Parcela
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
-            El addon acumula eventos en el mundo y guarda un solo lote en la base
-            de datos cada 24 h (o cuando lo pedís). El historial es permanente.
+            El addon acumula eventos en el mundo y guarda un lote en la base
+            de datos cada 5 minutos (o cuando lo pedís). El historial es permanente.
           </p>
         </div>
         <MinecraftParcelSection

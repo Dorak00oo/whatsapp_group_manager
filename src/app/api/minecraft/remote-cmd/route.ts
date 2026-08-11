@@ -15,6 +15,7 @@ import {
   asRemoteCmdQueueData,
   isRemoteCmdAction,
   remoteCmdActionForAddon,
+  remoteCmdNeedsDestination,
   remoteCmdNeedsTarget,
   remoteCmdNeedsTargetList,
   type RemoteCmdAction,
@@ -107,7 +108,11 @@ export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) return unauthorized();
 
-  let body: { action?: unknown; targetGamertag?: unknown };
+  let body: {
+    action?: unknown;
+    targetGamertag?: unknown;
+    destinationGamertag?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
@@ -118,7 +123,7 @@ export async function POST(request: Request) {
     typeof body.action === "string" ? body.action.trim() : "";
   if (!isRemoteCmdAction(actionRaw)) {
     return badRequest(
-      `action debe ser uno de: spectator, survival, kill_silverfish, kill_withers, allowlist_sync, allowlist_sync_corrected`,
+      `action debe ser uno de: spectator, survival, tp, kill_silverfish, kill_withers, allowlist_sync, allowlist_sync_corrected`,
     );
   }
   const action: RemoteCmdAction = actionRaw;
@@ -128,7 +133,11 @@ export async function POST(request: Request) {
     const t =
       typeof body.targetGamertag === "string" ? body.targetGamertag.trim() : "";
     if (!t) {
-      return badRequest("targetGamertag es obligatorio para spectator/survival");
+      return badRequest(
+        action === "tp"
+          ? "targetGamertag (moderador) es obligatorio para tp"
+          : "targetGamertag es obligatorio para spectator/survival",
+      );
     }
     if (!(await isAdminGamertag(t))) {
       return badRequest(
@@ -136,6 +145,21 @@ export async function POST(request: Request) {
       );
     }
     targetGamertag = t;
+  }
+
+  let destinationGamertag: string | null = null;
+  if (remoteCmdNeedsDestination(action)) {
+    const d =
+      typeof body.destinationGamertag === "string"
+        ? body.destinationGamertag.trim()
+        : "";
+    if (!d) {
+      return badRequest("destinationGamertag es obligatorio para tp");
+    }
+    if (targetGamertag && d.toLowerCase() === targetGamertag.toLowerCase()) {
+      return badRequest("Origen y destino del tp deben ser jugadores distintos");
+    }
+    destinationGamertag = d;
   }
 
   let targetGamertagsAdd: string[] | null = null;
@@ -212,6 +236,7 @@ export async function POST(request: Request) {
         data: {
           action,
           targetGamertag,
+          destinationGamertag,
           targetGamertagsAdd,
           targetGamertagsRemove,
           pendingCorrectionIds,
@@ -224,6 +249,7 @@ export async function POST(request: Request) {
         data: {
           action,
           targetGamertag,
+          destinationGamertag,
           targetGamertagsAdd,
           targetGamertagsRemove,
           pendingCorrectionIds,
@@ -238,6 +264,7 @@ export async function POST(request: Request) {
     ok: true,
     action,
     targetGamertag,
+    destinationGamertag,
     targetGamertagsAdd,
     targetGamertagsRemove,
     pendingCorrectionIds,
@@ -273,6 +300,7 @@ export async function GET(request: Request) {
     pending,
     action,
     targetGamertag: pending ? (data.targetGamertag ?? null) : null,
+    destinationGamertag: pending ? (data.destinationGamertag ?? null) : null,
     targetGamertagsAdd: pending ? (data.targetGamertagsAdd ?? null) : null,
     targetGamertagsRemove: pending ? (data.targetGamertagsRemove ?? null) : null,
     requestedAt: data.requestedAt ?? null,
@@ -321,6 +349,7 @@ export async function PUT(request: Request) {
         data: {
           action: prev.action,
           targetGamertag: prev.targetGamertag ?? null,
+          destinationGamertag: prev.destinationGamertag ?? null,
           targetGamertagsAdd: prev.targetGamertagsAdd ?? null,
           targetGamertagsRemove: prev.targetGamertagsRemove ?? null,
           pendingCorrectionIds: prev.pendingCorrectionIds ?? null,
