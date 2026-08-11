@@ -5,7 +5,8 @@ import { useCallback, useMemo, useState } from "react";
 import {
   DEFAULT_MONITOR_EXCLUDE,
   eventLabel,
-  MONITOR_EVENT_TYPES,
+  MONITOR_FILTER_OPTIONS,
+  MONITOR_PAGE_SIZE,
   type MonitorEventType,
 } from "@/lib/minecraft-monitor";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
@@ -53,6 +54,8 @@ type Props = {
 
 const POLL_MS = 3000;
 const POLL_MAX_ATTEMPTS = 20;
+/** Números visibles en la ventana central (sin contar 1 ni última). */
+const PAGE_WINDOW = 9;
 
 function mapApiEvents(
   raw: Array<{
@@ -81,6 +84,28 @@ function mapApiEvents(
   });
 }
 
+/** Páginas a mostrar: siempre 1 y última; ventana centrada en `current`. */
+function buildPageItems(current: number, totalPages: number): number[] {
+  if (totalPages <= 1) return [1];
+  if (totalPages <= PAGE_WINDOW + 2) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const half = Math.floor(PAGE_WINDOW / 2);
+  let start = Math.max(2, current - half);
+  let end = Math.min(totalPages - 1, current + half);
+
+  if (end - start + 1 < PAGE_WINDOW) {
+    if (start === 2) end = Math.min(totalPages - 1, start + PAGE_WINDOW - 1);
+    else start = Math.max(2, end - PAGE_WINDOW + 1);
+  }
+
+  const pages = [1];
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (pages[pages.length - 1] !== totalPages) pages.push(totalPages);
+  return pages;
+}
+
 export function MinecraftMonitorSection({
   events: initialEvents,
   totalEvents: initialTotal,
@@ -89,6 +114,10 @@ export function MinecraftMonitorSection({
 }: Props) {
   const [events, setEvents] = useState(initialEvents);
   const [totalEvents, setTotalEvents] = useState(initialTotal);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(
+    Math.max(1, Math.ceil(initialTotal / MONITOR_PAGE_SIZE)),
+  );
   const [alerts, setAlerts] = useState(initialAlerts);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [excludeText, setExcludeText] = useState(
@@ -112,7 +141,7 @@ export function MinecraftMonitorSection({
   const [filterMaxZ, setFilterMaxZ] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const queryString = useMemo(() => {
+  const filterQueryString = useMemo(() => {
     const p = new URLSearchParams();
     if (filterGamertag.trim()) p.set("gamertag", filterGamertag.trim());
     if (filterEvent) p.set("event", filterEvent);
@@ -125,6 +154,7 @@ export function MinecraftMonitorSection({
     if (filterMaxX.trim()) p.set("maxX", filterMaxX.trim());
     if (filterMaxY.trim()) p.set("maxY", filterMaxY.trim());
     if (filterMaxZ.trim()) p.set("maxZ", filterMaxZ.trim());
+    p.set("pageSize", String(MONITOR_PAGE_SIZE));
     return p.toString();
   }, [
     filterGamertag,
@@ -140,40 +170,74 @@ export function MinecraftMonitorSection({
     filterMaxZ,
   ]);
 
-  const loadFromApi = useCallback(async () => {
-    const res = await fetch(
-      `/api/minecraft/monitor-events${queryString ? `?${queryString}` : ""}`,
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      ok?: boolean;
-      lastBatchAt?: string | null;
-      total?: number;
-      alerts?: AlertRow[];
-      events?: Parameters<typeof mapApiEvents>[0];
-    };
-    if (!data.ok || !Array.isArray(data.events)) return null;
-    return {
-      lastBatchAt: data.lastBatchAt ?? null,
-      total: data.total ?? data.events.length,
-      alerts: data.alerts ?? [],
-      events: mapApiEvents(data.events),
-    };
-  }, [queryString]);
+  const loadPage = useCallback(
+    async (pageNum: number) => {
+      const p = new URLSearchParams(filterQueryString);
+      p.set("page", String(pageNum));
+      const res = await fetch(`/api/minecraft/monitor-events?${p}`);
+      if (!res.ok) return null;
+      const data = (await res.json()) as {
+        ok?: boolean;
+        lastBatchAt?: string | null;
+        total?: number;
+        page?: number;
+        totalPages?: number;
+        alerts?: AlertRow[];
+        events?: Parameters<typeof mapApiEvents>[0];
+      };
+      if (!data.ok || !Array.isArray(data.events)) return null;
+      const total = data.total ?? data.events.length;
+      const pages =
+        data.totalPages ?? Math.max(1, Math.ceil(total / MONITOR_PAGE_SIZE));
+      return {
+        lastBatchAt: data.lastBatchAt ?? null,
+        total,
+        page: data.page ?? pageNum,
+        totalPages: pages,
+        alerts: data.alerts ?? [],
+        events: mapApiEvents(data.events),
+      };
+    },
+    [filterQueryString],
+  );
+
+  function applyLoaded(
+    data: NonNullable<Awaited<ReturnType<typeof loadPage>>>,
+  ) {
+    setEvents(data.events);
+    setTotalEvents(data.total);
+    setTotalPages(data.totalPages);
+    setPage(data.page);
+    setAlerts(data.alerts);
+    setLastBatchAt(data.lastBatchAt);
+  }
 
   async function applyFilters() {
     setLoading(true);
     setMessage(null);
     try {
-      const data = await loadFromApi();
+      const data = await loadPage(1);
       if (!data) {
         setMessage("No se pudo cargar el historial.");
         return;
       }
-      setEvents(data.events);
-      setTotalEvents(data.total);
-      setAlerts(data.alerts);
-      setLastBatchAt(data.lastBatchAt);
+      applyLoaded(data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function goToPage(next: number) {
+    if (next < 1 || next > totalPages || next === page) return;
+    setLoading(true);
+    setMessage(null);
+    try {
+      const data = await loadPage(next);
+      if (!data) {
+        setMessage("No se pudo cargar el historial.");
+        return;
+      }
+      applyLoaded(data);
     } finally {
       setLoading(false);
     }
@@ -193,13 +257,10 @@ export function MinecraftMonitorSection({
       setMessage("Pedido enviado. Esperando lote del addon…");
       for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
         await new Promise((r) => setTimeout(r, POLL_MS));
-        const data = await loadFromApi();
+        const data = await loadPage(page);
         if (!data) continue;
-        setEvents(data.events);
-        setTotalEvents(data.total);
-        setAlerts(data.alerts);
+        applyLoaded(data);
         if (data.lastBatchAt && data.lastBatchAt !== lastBatchAt) {
-          setLastBatchAt(data.lastBatchAt);
           setMessage("Lote recibido.");
           return;
         }
@@ -234,7 +295,9 @@ export function MinecraftMonitorSection({
       if (data.ok && data.config?.monitorExclude) {
         setExcludeText(data.config.monitorExclude.join("\n"));
       }
-      setMessage("Lista de excluidos guardada. El addon la tomará en el próximo sync.");
+      setMessage(
+        "Lista de excluidos guardada. El addon la tomará en el próximo sync.",
+      );
     } finally {
       setSavingExclude(false);
     }
@@ -260,10 +323,21 @@ export function MinecraftMonitorSection({
     }
   }
 
+  const pageItems = useMemo(
+    () => buildPageItems(page, totalPages),
+    [page, totalPages],
+  );
+
+  const pageLinkClass =
+    "text-sky-600 hover:underline disabled:pointer-events-none disabled:opacity-40 dark:text-sky-400";
+  const pageActiveClass = "font-semibold text-zinc-900 dark:text-zinc-50";
+
   return (
     <div className="flex flex-col gap-6">
       {alerts.length > 0 ? (
-        <div className={`${softPanel} gap-3 border-red-300/80 dark:border-red-900/60`}>
+        <div
+          className={`${softPanel} gap-3 border-red-300/80 dark:border-red-900/60`}
+        >
           <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">
             Alertas de vandalismo
           </h3>
@@ -286,7 +360,8 @@ export function MinecraftMonitorSection({
                   </Link>
                   <span className="text-zinc-600 dark:text-zinc-400">
                     {" "}
-                    — {a.eventCount} evento{a.eventCount === 1 ? "" : "s"} crítico
+                    — {a.eventCount} evento{a.eventCount === 1 ? "" : "s"}{" "}
+                    crítico
                     {a.eventCount === 1 ? "" : "s"}
                     {a.witherCount > 0
                       ? ` · ${a.witherCount} wither${a.witherCount === 1 ? "" : "s"}`
@@ -327,7 +402,9 @@ export function MinecraftMonitorSection({
               Historial de monitoreo
             </h3>
             <p className="mt-0.5 text-xs text-zinc-500">
-              {totalEvents} eventos (retención 21 días). El addon envía cada 30 s.
+              {totalEvents} eventos (retención 21 días). El addon envía cada 30
+              s.
+              {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""}
             </p>
           </div>
           <button
@@ -358,9 +435,9 @@ export function MinecraftMonitorSection({
               className={softInputNeutral}
             >
               <option value="">Todos</option>
-              {MONITOR_EVENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {eventLabel(t)}
+              {MONITOR_FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>
@@ -407,7 +484,10 @@ export function MinecraftMonitorSection({
                   ["Z", filterMinZ, setFilterMinZ],
                 ] as const
               ).map(([label, value, setValue]) => (
-                <label key={`min-${label}`} className="flex flex-col gap-1 text-xs font-semibold">
+                <label
+                  key={`min-${label}`}
+                  className="flex flex-col gap-1 text-xs font-semibold"
+                >
                   {label}
                   <input
                     value={value}
@@ -432,7 +512,10 @@ export function MinecraftMonitorSection({
                   ["Z", filterMaxZ, setFilterMaxZ],
                 ] as const
               ).map(([label, value, setValue]) => (
-                <label key={`max-${label}`} className="flex flex-col gap-1 text-xs font-semibold">
+                <label
+                  key={`max-${label}`}
+                  className="flex flex-col gap-1 text-xs font-semibold"
+                >
                   {label}
                   <input
                     value={value}
@@ -447,7 +530,8 @@ export function MinecraftMonitorSection({
           </div>
         </div>
         <p className="text-[11px] text-zinc-500">
-          Por cada eje hace falta min y max para filtrar (si van al revés, se ordenan solos).
+          Por cada eje hace falta min y max para filtrar (si van al revés, se
+          ordenan solos).
         </p>
 
         <button
@@ -493,7 +577,9 @@ export function MinecraftMonitorSection({
                   >
                     <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
                       <div>{e.timeMexico}</div>
-                      <div className="text-[10px] opacity-70">{e.timeColombia}</div>
+                      <div className="text-[10px] opacity-70">
+                        {e.timeColombia}
+                      </div>
                     </td>
                     <td className="px-3 py-2">
                       <Link
@@ -537,6 +623,47 @@ export function MinecraftMonitorSection({
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 ? (
+          <nav
+            className="flex flex-wrap items-center justify-center gap-3 text-sm"
+            aria-label="Paginación del historial"
+          >
+            <button
+              type="button"
+              disabled={loading || page <= 1}
+              onClick={() => void goToPage(page - 1)}
+              className={pageLinkClass}
+            >
+              Anterior
+            </button>
+            {pageItems.map((p) =>
+              p === page ? (
+                <span key={p} className={pageActiveClass} aria-current="page">
+                  {p}
+                </span>
+              ) : (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void goToPage(p)}
+                  className={pageLinkClass}
+                >
+                  {p}
+                </button>
+              ),
+            )}
+            <button
+              type="button"
+              disabled={loading || page >= totalPages}
+              onClick={() => void goToPage(page + 1)}
+              className={pageLinkClass}
+            >
+              Siguiente
+            </button>
+          </nav>
+        ) : null}
       </div>
 
       <div className={`${softPanel} gap-3`}>

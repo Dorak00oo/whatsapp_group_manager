@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import {
   isMonitorEventType,
+  MONITOR_PAGE_SIZE,
   MONITOR_RETENTION_DAYS,
+  resolveMonitorEventFilter,
   type MonitorEventType,
   type MonitorPriority,
 } from "@/lib/minecraft-monitor";
@@ -19,7 +21,7 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 
 const MAX_EVENTS_PER_POST = 500;
-const PANEL_HISTORY_LIMIT = 500;
+const PANEL_MAX_PAGE_SIZE = 100;
 
 function unauthorized() {
   return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -187,14 +189,24 @@ export async function GET(request: Request) {
   const maxY = url.searchParams.get("maxY")?.trim() ?? "";
   const maxZ = url.searchParams.get("maxZ")?.trim() ?? "";
 
+  const pageSizeRaw = Number(url.searchParams.get("pageSize") ?? MONITOR_PAGE_SIZE);
+  const pageSize = Number.isFinite(pageSizeRaw)
+    ? Math.min(PANEL_MAX_PAGE_SIZE, Math.max(1, Math.floor(pageSizeRaw)))
+    : MONITOR_PAGE_SIZE;
+  const pageRaw = Number(url.searchParams.get("page") ?? 1);
+  let page = Number.isFinite(pageRaw) ? Math.max(1, Math.floor(pageRaw)) : 1;
+
   await purgeOldMonitorEvents();
 
   const where: Record<string, unknown> = {};
   if (gamertag) {
     where.gamertag = { contains: gamertag, mode: "insensitive" };
   }
-  if (eventType && isMonitorEventType(eventType)) {
-    where.eventType = eventType;
+  const eventTypes = resolveMonitorEventFilter(eventType);
+  if (eventTypes?.length === 1) {
+    where.eventType = eventTypes[0];
+  } else if (eventTypes && eventTypes.length > 1) {
+    where.eventType = { in: eventTypes };
   }
   if (item) {
     where.OR = [
@@ -236,19 +248,26 @@ export async function GET(request: Request) {
   applyAxisRange("posY", minY, maxY);
   applyAxisRange("posZ", minZ, maxZ);
 
+  const total = await prisma.minecraftMonitorEvent.count({ where });
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (page > totalPages) page = totalPages;
+
   const events = await prisma.minecraftMonitorEvent.findMany({
     where,
     orderBy: { occurredAt: "desc" },
-    take: PANEL_HISTORY_LIMIT,
+    skip: (page - 1) * pageSize,
+    take: pageSize,
   });
 
-  const total = await prisma.minecraftMonitorEvent.count({ where });
   const alerts = await listActiveMonitorAlerts();
 
   return NextResponse.json({
     ok: true,
     lastBatchAt: getLastMonitorBatchAt(),
     total,
+    page,
+    pageSize,
+    totalPages,
     alerts,
     events: events.map((e) => ({
       id: e.id,

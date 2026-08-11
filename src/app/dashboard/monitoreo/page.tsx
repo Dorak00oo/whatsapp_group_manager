@@ -4,6 +4,7 @@ import { MinecraftMonitorSection } from "@/components/minecraft-monitor-section"
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
 import {
   DEFAULT_MONITOR_EXCLUDE,
+  MONITOR_PAGE_SIZE,
   parseExcludeList,
   type MonitorEventType,
 } from "@/lib/minecraft-monitor";
@@ -20,7 +21,7 @@ export default async function DashboardMonitoreoPage() {
       prisma.minecraftConfig.findUnique({ where: { id: "default" } }),
       prisma.minecraftMonitorEvent.findMany({
         orderBy: { occurredAt: "desc" },
-        take: 500,
+        take: MONITOR_PAGE_SIZE,
       }),
       prisma.minecraftMonitorEvent.count(),
       listActiveMonitorAlerts(),

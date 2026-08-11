@@ -27,6 +27,41 @@ export function isMonitorEventType(v: string): v is MonitorEventType {
   return (MONITOR_EVENT_TYPES as string[]).includes(v);
 }
 
+/** Valor de query `event=` para agrupar fuego / lava / quema en el panel. */
+export const FIRE_GROUP_FILTER_VALUE = "fire_group";
+
+export const FIRE_GROUP_EVENT_TYPES: MonitorEventType[] = [
+  "fire_start",
+  "lava_place",
+  "block_burn",
+];
+
+export const MONITOR_PAGE_SIZE = 50;
+
+/** Opciones del filtro Tipo (fuego/lava/quema unificados). */
+export const MONITOR_FILTER_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "block_break", label: "Rompió" },
+  { value: "block_place", label: "Colocó" },
+  { value: FIRE_GROUP_FILTER_VALUE, label: "Fuego / lava" },
+  { value: "tnt_place", label: "Colocó TNT" },
+  { value: "tnt_ignite", label: "Encendió TNT" },
+  { value: "wither_summon", label: "Invocó wither" },
+];
+
+/**
+ * Resuelve el param `event` del panel a tipos de BD.
+ * `null` = sin filtro de tipo.
+ */
+export function resolveMonitorEventFilter(
+  eventParam: string,
+): MonitorEventType[] | null {
+  const v = eventParam.trim();
+  if (!v) return null;
+  if (v === FIRE_GROUP_FILTER_VALUE) return [...FIRE_GROUP_EVENT_TYPES];
+  if (isMonitorEventType(v)) return [v];
+  return null;
+}
+
 /** Lista base de ruido (sin prefijo minecraft:). Editable desde el panel. */
 export const DEFAULT_MONITOR_EXCLUDE: string[] = [
   "grass_block",
