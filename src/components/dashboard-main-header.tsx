@@ -29,7 +29,7 @@ export function DashboardMainHeader() {
     : isParcela
       ? "Quién entra y sale del terreno monitoreado, con historial y fechas."
       : isMonitoreo
-        ? "Bloques, fuego, lava y TNT en Overworld — filtros por jugador, ítem, hora y coordenadas."
+        ? "Bloques, fuego, lava, TNT y withers en Overworld — filtros por jugador, ítem, hora y coordenadas."
         : isMinecraft
           ? "Estado de actividad de jugadores del servidor de Minecraft."
           : isImportar

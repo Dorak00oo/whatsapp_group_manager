@@ -7,7 +7,8 @@ export type MonitorEventType =
   | "lava_place"
   | "tnt_place"
   | "tnt_ignite"
-  | "block_burn";
+  | "block_burn"
+  | "wither_summon";
 
 export type MonitorPriority = "critical" | "high" | "normal";
 
@@ -19,6 +20,7 @@ export const MONITOR_EVENT_TYPES: MonitorEventType[] = [
   "tnt_place",
   "tnt_ignite",
   "block_burn",
+  "wither_summon",
 ];
 
 export function isMonitorEventType(v: string): v is MonitorEventType {
@@ -169,6 +171,8 @@ export function eventLabel(type: MonitorEventType): string {
       return "Encendió TNT";
     case "block_burn":
       return "Quema atribuida";
+    case "wither_summon":
+      return "Invocó wither";
     default:
       return type;
   }
@@ -191,6 +195,7 @@ export function buildVandalismAlerts(
     "tnt_place",
     "tnt_ignite",
     "block_burn",
+    "wither_summon",
   ]);
   const byPlayer = new Map<string, Date[]>();
   for (const e of events) {
