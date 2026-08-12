@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  animalLabel,
   DEFAULT_MONITOR_EXCLUDE,
   eventLabel,
   formatAlertTypeBreakdown,
@@ -664,7 +665,9 @@ export function MinecraftMonitorSection({
                       </span>
                     </td>
                     <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">
-                      {e.blockType || e.itemType || "—"}
+                      {e.event === "animal_kill"
+                        ? animalLabel(e.blockType || e.itemType || "")
+                        : e.blockType || e.itemType || "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
                       {e.x != null && e.y != null && e.z != null

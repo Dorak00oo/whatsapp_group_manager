@@ -8,7 +8,8 @@ export type MonitorEventType =
   | "tnt_place"
   | "tnt_ignite"
   | "block_burn"
-  | "wither_summon";
+  | "wither_summon"
+  | "animal_kill";
 
 export type MonitorPriority = "critical" | "high" | "normal";
 
@@ -21,7 +22,64 @@ export const MONITOR_EVENT_TYPES: MonitorEventType[] = [
   "tnt_ignite",
   "block_burn",
   "wither_summon",
+  "animal_kill",
 ];
+
+/** Animales domésticos / colección monitoreados (sin prefijo minecraft:). */
+export const MONITOR_PROTECTED_ANIMALS: string[] = [
+  "wolf",
+  "cat",
+  "ocelot",
+  "parrot",
+  "horse",
+  "donkey",
+  "mule",
+  "llama",
+  "camel",
+  "panda",
+  "fox",
+  "axolotl",
+  "allay",
+  "sniffer",
+  "armadillo",
+];
+
+export function animalLabel(id: string): string {
+  switch (normalizeBlockId(id)) {
+    case "wolf":
+      return "Lobo/perro";
+    case "cat":
+      return "Gato";
+    case "ocelot":
+      return "Ocelote";
+    case "parrot":
+      return "Loro";
+    case "horse":
+      return "Caballo";
+    case "donkey":
+      return "Burro";
+    case "mule":
+      return "Mula";
+    case "llama":
+      return "Llama";
+    case "camel":
+      return "Camello";
+    case "panda":
+      return "Panda";
+    case "fox":
+      return "Zorro";
+    case "axolotl":
+      return "Ajolote";
+    case "allay":
+      return "Allay";
+    case "sniffer":
+      return "Sniffer";
+    case "armadillo":
+      return "Armadillo";
+    default:
+      return normalizeBlockId(id) || "—";
+  }
+}
 
 export function isMonitorEventType(v: string): v is MonitorEventType {
   return (MONITOR_EVENT_TYPES as string[]).includes(v);
@@ -46,6 +104,7 @@ export const MONITOR_FILTER_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "tnt_place", label: "Colocó TNT" },
   { value: "tnt_ignite", label: "Encendió TNT" },
   { value: "wither_summon", label: "Invocó wither" },
+  { value: "animal_kill", label: "Mató animal" },
 ];
 
 /**
@@ -208,12 +267,14 @@ export function eventLabel(type: MonitorEventType): string {
       return "Quema atribuida";
     case "wither_summon":
       return "Invocó wither";
+    case "animal_kill":
+      return "Mató animal";
     default:
       return type;
   }
 }
 
-/** Alerta: ≥3 eventos críticos (fuego/TNT/quema/wither) en 10 minutos por jugador. */
+/** Alerta: ≥3 eventos críticos (fuego/TNT/quema/wither/animales) en 10 minutos por jugador. */
 export const MONITOR_ALERT_WINDOW_MS = 10 * 60 * 1000;
 export const MONITOR_ALERT_MIN_EVENTS = 3;
 /** Las alertas del panel duran 5 días (o hasta descartarlas). */
@@ -226,6 +287,7 @@ export const MONITOR_ALERT_CRITICAL_TYPES = new Set([
   "tnt_ignite",
   "block_burn",
   "wither_summon",
+  "animal_kill",
 ]);
 
 export function isMonitorAlertCriticalType(eventType: string): boolean {
@@ -242,6 +304,7 @@ const ALERT_COUNT_DISPLAY_ORDER = [
   "tnt_place",
   "tnt_ignite",
   "wither_summon",
+  "animal_kill",
 ] as const;
 
 export function tallyCriticalAlertTypes(
@@ -302,6 +365,8 @@ function alertTypePhrase(eventType: string, n: number): string {
       return n === 1 ? "1 TNT encendida" : `${n} TNT encendidas`;
     case "wither_summon":
       return n === 1 ? "1 wither" : `${n} withers`;
+    case "animal_kill":
+      return n === 1 ? "1 animal" : `${n} animales`;
     default:
       return `${n} ${eventType}`;
   }

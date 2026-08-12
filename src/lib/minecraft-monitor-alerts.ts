@@ -37,6 +37,7 @@ const CRITICAL_EVENT_TYPES = [
   "tnt_ignite",
   "block_burn",
   "wither_summon",
+  "animal_kill",
 ] as const;
 
 /**

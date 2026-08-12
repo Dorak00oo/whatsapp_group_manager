@@ -55,9 +55,10 @@ export default async function DashboardMonitoreoPage() {
             Monitoreo
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
-            Bloques colocados/rotos, fuego, lava, TNT e invocación de wither en
-            Overworld. El addon envía lotes cada 30 s (o al pedirlos). Historial
-            7 días. Alertas 5 días (o hasta descartarlas).
+            Bloques colocados/rotos, fuego, lava, TNT, wither y animales
+            domésticos/colección en Overworld. El addon envía lotes cada 30 s (o
+            al pedirlos). Historial 7 días. Alertas 5 días (o hasta
+            descartarlas).
           </p>
         </div>
         <MinecraftMonitorSection
