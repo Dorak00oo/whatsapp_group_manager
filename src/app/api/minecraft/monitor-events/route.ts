@@ -159,6 +159,8 @@ export async function POST(request: Request) {
       gamertag: r.gamertag,
       eventType: r.eventType,
       occurredAt: r.occurredAt,
+      blockType: r.blockType,
+      itemType: r.itemType,
     })),
   );
 

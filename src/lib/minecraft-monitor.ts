@@ -296,6 +296,22 @@ export function isMonitorAlertCriticalType(eventType: string): boolean {
 
 export type MonitorAlertCounts = Record<string, number>;
 
+/** Prefijo en countsJson para desglose por especie: animal_kill:wolf */
+export const ANIMAL_KILL_COUNT_PREFIX = "animal_kill:";
+
+export function animalKillCountKey(animalId: string): string {
+  const id = normalizeBlockId(animalId) || "unknown";
+  return `${ANIMAL_KILL_COUNT_PREFIX}${id}`;
+}
+
+export function isAnimalKillCountKey(key: string): boolean {
+  return key.startsWith(ANIMAL_KILL_COUNT_PREFIX);
+}
+
+export function animalIdFromCountKey(key: string): string {
+  return key.slice(ANIMAL_KILL_COUNT_PREFIX.length);
+}
+
 /** Orden de presentación en la tarjeta de alerta. */
 const ALERT_COUNT_DISPLAY_ORDER = [
   "block_burn",
@@ -304,15 +320,27 @@ const ALERT_COUNT_DISPLAY_ORDER = [
   "tnt_place",
   "tnt_ignite",
   "wither_summon",
-  "animal_kill",
 ] as const;
 
 export function tallyCriticalAlertTypes(
-  events: Array<{ eventType: string }>,
+  events: Array<{
+    eventType: string;
+    blockType?: string | null;
+    itemType?: string | null;
+  }>,
 ): MonitorAlertCounts {
   const out: MonitorAlertCounts = {};
   for (const e of events) {
     if (!isMonitorAlertCriticalType(e.eventType)) continue;
+    if (e.eventType === "animal_kill") {
+      const animalId =
+        normalizeBlockId(e.blockType ?? "") ||
+        normalizeBlockId(e.itemType ?? "") ||
+        "unknown";
+      const key = animalKillCountKey(animalId);
+      out[key] = (out[key] ?? 0) + 1;
+      continue;
+    }
     out[e.eventType] = (out[e.eventType] ?? 0) + 1;
   }
   return out;
@@ -351,7 +379,33 @@ export function mergeAlertCounts(
   return out;
 }
 
+function animalAlertPhrase(animalId: string, n: number): string {
+  const id = normalizeBlockId(animalId);
+  const pair: Record<string, [string, string]> = {
+    wolf: ["lobo/perro", "lobos/perros"],
+    cat: ["gato", "gatos"],
+    ocelot: ["ocelote", "ocelotes"],
+    parrot: ["loro", "loros"],
+    horse: ["caballo", "caballos"],
+    donkey: ["burro", "burros"],
+    mule: ["mula", "mulas"],
+    llama: ["llama", "llamas"],
+    camel: ["camello", "camellos"],
+    panda: ["panda", "pandas"],
+    fox: ["zorro", "zorros"],
+    axolotl: ["ajolote", "ajolotes"],
+    allay: ["allay", "allays"],
+    sniffer: ["sniffer", "sniffers"],
+    armadillo: ["armadillo", "armadillos"],
+  };
+  const [one, many] = pair[id] ?? [id || "animal", `${id || "animal"}s`];
+  return n === 1 ? `1 ${one}` : `${n} ${many}`;
+}
+
 function alertTypePhrase(eventType: string, n: number): string {
+  if (isAnimalKillCountKey(eventType)) {
+    return animalAlertPhrase(animalIdFromCountKey(eventType), n);
+  }
   switch (eventType) {
     case "block_burn":
       return n === 1 ? "1 quemadura" : `${n} quemaduras`;
@@ -376,12 +430,22 @@ function alertTypePhrase(eventType: string, n: number): string {
 export function formatAlertTypeBreakdown(counts: MonitorAlertCounts): string {
   const parts: string[] = [];
   const seen = new Set<string>();
+
   for (const type of ALERT_COUNT_DISPLAY_ORDER) {
     const n = counts[type] ?? 0;
     if (n <= 0) continue;
     parts.push(alertTypePhrase(type, n));
     seen.add(type);
   }
+
+  for (const animalId of MONITOR_PROTECTED_ANIMALS) {
+    const key = animalKillCountKey(animalId);
+    const n = counts[key] ?? 0;
+    if (n <= 0) continue;
+    parts.push(alertTypePhrase(key, n));
+    seen.add(key);
+  }
+
   for (const [type, n] of Object.entries(counts)) {
     if (seen.has(type) || n <= 0) continue;
     parts.push(alertTypePhrase(type, n));

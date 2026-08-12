@@ -15,6 +15,8 @@ export type MonitorAlertEventInput = {
   gamertag: string;
   eventType: string;
   occurredAt: Date;
+  blockType?: string | null;
+  itemType?: string | null;
 };
 
 export type { MonitorAlertCounts };
@@ -55,6 +57,8 @@ export async function applyMonitorAlertsFromEvents(
       gamertag: e.gamertag.trim(),
       eventType: e.eventType,
       occurredAt: e.occurredAt,
+      blockType: e.blockType ?? null,
+      itemType: e.itemType ?? null,
     }))
     .filter((e) => e.gamertag.length > 0);
 
@@ -128,7 +132,13 @@ export async function applyMonitorAlertsFromEvents(
           eventType: { in: [...CRITICAL_EVENT_TYPES] },
           occurredAt: { gte: lookback },
         },
-        select: { gamertag: true, eventType: true, occurredAt: true },
+        select: {
+          gamertag: true,
+          eventType: true,
+          occurredAt: true,
+          blockType: true,
+          itemType: true,
+        },
         take: 200,
       });
       const computed = buildVandalismAlerts(recent);
