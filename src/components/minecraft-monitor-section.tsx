@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import {
   DEFAULT_MONITOR_EXCLUDE,
   eventLabel,
+  formatAlertTypeBreakdown,
   MONITOR_FILTER_OPTIONS,
   MONITOR_PAGE_SIZE,
   type MonitorEventType,
@@ -40,6 +41,7 @@ type AlertRow = {
   gamertag: string;
   eventCount: number;
   witherCount: number;
+  counts?: Record<string, number>;
   windowStart: string;
   lastEventAt: string;
   expiresAt: string;
@@ -360,12 +362,16 @@ export function MinecraftMonitorSection({
                   </Link>
                   <span className="text-zinc-600 dark:text-zinc-400">
                     {" "}
-                    — {a.eventCount} evento{a.eventCount === 1 ? "" : "s"}{" "}
-                    crítico
-                    {a.eventCount === 1 ? "" : "s"}
-                    {a.witherCount > 0
-                      ? ` · ${a.witherCount} wither${a.witherCount === 1 ? "" : "s"}`
-                      : ""}
+                    —{" "}
+                    {(() => {
+                      const breakdown = formatAlertTypeBreakdown(a.counts ?? {});
+                      if (breakdown) return breakdown;
+                      return `${a.eventCount} evento${a.eventCount === 1 ? "" : "s"} crítico${a.eventCount === 1 ? "" : "s"}${
+                        a.witherCount > 0
+                          ? ` · ${a.witherCount} wither${a.witherCount === 1 ? "" : "s"}`
+                          : ""
+                      }`;
+                    })()}
                   </span>
                   <div className="mt-0.5 text-[11px] text-zinc-500">
                     Último:{" "}

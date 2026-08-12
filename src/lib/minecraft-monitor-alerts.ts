@@ -2,8 +2,12 @@ import {
   buildVandalismAlerts,
   gamertagKey,
   isMonitorAlertCriticalType,
+  mergeAlertCounts,
   MONITOR_ALERT_WINDOW_MS,
   monitorAlertExpiresAt,
+  parseAlertCountsJson,
+  tallyCriticalAlertTypes,
+  type MonitorAlertCounts,
 } from "@/lib/minecraft-monitor";
 import { prisma } from "@/lib/prisma";
 
@@ -13,15 +17,27 @@ export type MonitorAlertEventInput = {
   occurredAt: Date;
 };
 
+export type { MonitorAlertCounts };
+
 export type MonitorAlertRow = {
   id: string;
   gamertag: string;
   eventCount: number;
   witherCount: number;
+  counts: MonitorAlertCounts;
   windowStart: string;
   lastEventAt: string;
   expiresAt: string;
 };
+
+const CRITICAL_EVENT_TYPES = [
+  "fire_start",
+  "lava_place",
+  "tnt_place",
+  "tnt_ignite",
+  "block_burn",
+  "wither_summon",
+] as const;
 
 /**
  * Tras guardar un lote: abre o incrementa alertas (una abierta por jugador).
@@ -64,6 +80,7 @@ export async function applyMonitorAlertsFromEvents(
     const batchWithers = playerEvents.filter(
       (e) => e.eventType === "wither_summon",
     ).length;
+    const batchCounts = tallyCriticalAlertTypes(playerEvents);
     const batchFirst = playerEvents[0]!.occurredAt;
     const batchLast = playerEvents[playerEvents.length - 1]!.occurredAt;
 
@@ -77,13 +94,19 @@ export async function applyMonitorAlertsFromEvents(
     });
 
     if (open) {
+      const merged = mergeAlertCounts(
+        parseAlertCountsJson(open.countsJson),
+        batchCounts,
+      );
       await prisma.minecraftMonitorAlert.update({
         where: { id: open.id },
         data: {
           gamertag: display,
           eventCount: open.eventCount + batchCritical,
           witherCount: open.witherCount + batchWithers,
-          lastEventAt: batchLast > open.lastEventAt ? batchLast : open.lastEventAt,
+          countsJson: JSON.stringify(merged),
+          lastEventAt:
+            batchLast > open.lastEventAt ? batchLast : open.lastEventAt,
           expiresAt: monitorAlertExpiresAt(now),
         },
       });
@@ -93,6 +116,7 @@ export async function applyMonitorAlertsFromEvents(
     const hasWither = batchWithers > 0;
     let shouldOpen = hasWither;
     let initialCount = batchCritical;
+    let initialCounts = batchCounts;
     let windowStart = batchFirst;
 
     if (!shouldOpen) {
@@ -100,29 +124,26 @@ export async function applyMonitorAlertsFromEvents(
       const recent = await prisma.minecraftMonitorEvent.findMany({
         where: {
           gamertag: { equals: display, mode: "insensitive" },
-          eventType: {
-            in: [
-              "fire_start",
-              "lava_place",
-              "tnt_place",
-              "tnt_ignite",
-              "block_burn",
-              "wither_summon",
-            ],
-          },
+          eventType: { in: [...CRITICAL_EVENT_TYPES] },
           occurredAt: { gte: lookback },
         },
         select: { gamertag: true, eventType: true, occurredAt: true },
         take: 200,
       });
       const computed = buildVandalismAlerts(recent);
-      const hit = computed.find(
-        (a) => gamertagKey(a.gamertag) === key,
-      );
+      const hit = computed.find((a) => gamertagKey(a.gamertag) === key);
       if (hit) {
         shouldOpen = true;
         initialCount = Math.max(hit.count, batchCritical);
         windowStart = new Date(hit.windowStart);
+        const windowEnd = new Date(hit.windowEnd);
+        const inWindow = recent.filter((e) => {
+          const t = e.occurredAt.getTime();
+          return t >= windowStart.getTime() && t <= windowEnd.getTime();
+        });
+        initialCounts = tallyCriticalAlertTypes(
+          inWindow.length > 0 ? inWindow : playerEvents,
+        );
       }
     }
 
@@ -133,7 +154,8 @@ export async function applyMonitorAlertsFromEvents(
         gamertag: display,
         gamertagKey: key,
         eventCount: initialCount,
-        witherCount: batchWithers,
+        witherCount: initialCounts.wither_summon ?? batchWithers,
+        countsJson: JSON.stringify(initialCounts),
         windowStart,
         lastEventAt: batchLast,
         expiresAt: monitorAlertExpiresAt(now),
@@ -171,6 +193,7 @@ export async function listActiveMonitorAlerts(): Promise<MonitorAlertRow[]> {
     gamertag: r.gamertag,
     eventCount: r.eventCount,
     witherCount: r.witherCount,
+    counts: parseAlertCountsJson(r.countsJson),
     windowStart: r.windowStart.toISOString(),
     lastEventAt: r.lastEventAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),

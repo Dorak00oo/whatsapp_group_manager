@@ -192,6 +192,8 @@ model MinecraftMonitorAlert {
   gamertagKey  String    @map("gamertag_key")
   eventCount   Int       @default(0) @map("event_count")
   witherCount  Int       @default(0) @map("wither_count")
+  /** Conteos por eventType crítico, JSON ej. {"block_burn":22,"wither_summon":2}. */
+  countsJson   String    @default("{}") @map("counts_json")
   windowStart  DateTime  @map("window_start")
   lastEventAt  DateTime  @map("last_event_at")
   expiresAt    DateTime  @map("expires_at")

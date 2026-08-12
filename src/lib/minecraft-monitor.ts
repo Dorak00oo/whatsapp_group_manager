@@ -232,6 +232,98 @@ export function isMonitorAlertCriticalType(eventType: string): boolean {
   return MONITOR_ALERT_CRITICAL_TYPES.has(eventType);
 }
 
+export type MonitorAlertCounts = Record<string, number>;
+
+/** Orden de presentación en la tarjeta de alerta. */
+const ALERT_COUNT_DISPLAY_ORDER = [
+  "block_burn",
+  "fire_start",
+  "lava_place",
+  "tnt_place",
+  "tnt_ignite",
+  "wither_summon",
+] as const;
+
+export function tallyCriticalAlertTypes(
+  events: Array<{ eventType: string }>,
+): MonitorAlertCounts {
+  const out: MonitorAlertCounts = {};
+  for (const e of events) {
+    if (!isMonitorAlertCriticalType(e.eventType)) continue;
+    out[e.eventType] = (out[e.eventType] ?? 0) + 1;
+  }
+  return out;
+}
+
+export function parseAlertCountsJson(
+  raw: string | null | undefined,
+): MonitorAlertCounts {
+  if (!raw?.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    const out: MonitorAlertCounts = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+        out[k] = Math.floor(v);
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function mergeAlertCounts(
+  base: MonitorAlertCounts,
+  add: MonitorAlertCounts,
+): MonitorAlertCounts {
+  const out: MonitorAlertCounts = { ...base };
+  for (const [k, v] of Object.entries(add)) {
+    if (!v) continue;
+    out[k] = (out[k] ?? 0) + v;
+  }
+  return out;
+}
+
+function alertTypePhrase(eventType: string, n: number): string {
+  switch (eventType) {
+    case "block_burn":
+      return n === 1 ? "1 quemadura" : `${n} quemaduras`;
+    case "fire_start":
+      return n === 1 ? "1 fuego" : `${n} fuegos`;
+    case "lava_place":
+      return n === 1 ? "1 lava" : `${n} lavas`;
+    case "tnt_place":
+      return n === 1 ? "1 TNT colocada" : `${n} TNT colocadas`;
+    case "tnt_ignite":
+      return n === 1 ? "1 TNT encendida" : `${n} TNT encendidas`;
+    case "wither_summon":
+      return n === 1 ? "1 wither" : `${n} withers`;
+    default:
+      return `${n} ${eventType}`;
+  }
+}
+
+/** Texto del desglose; vacío si no hay conteos. */
+export function formatAlertTypeBreakdown(counts: MonitorAlertCounts): string {
+  const parts: string[] = [];
+  const seen = new Set<string>();
+  for (const type of ALERT_COUNT_DISPLAY_ORDER) {
+    const n = counts[type] ?? 0;
+    if (n <= 0) continue;
+    parts.push(alertTypePhrase(type, n));
+    seen.add(type);
+  }
+  for (const [type, n] of Object.entries(counts)) {
+    if (seen.has(type) || n <= 0) continue;
+    parts.push(alertTypePhrase(type, n));
+  }
+  return parts.join(", ");
+}
+
 export function monitorAlertExpiresAt(from = new Date()): Date {
   return new Date(
     from.getTime() + MONITOR_ALERT_RETENTION_DAYS * 24 * 60 * 60 * 1000,
