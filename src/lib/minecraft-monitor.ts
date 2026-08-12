@@ -1,4 +1,4 @@
-export const MONITOR_RETENTION_DAYS = 21;
+export const MONITOR_RETENTION_DAYS = 7;
 
 export type MonitorEventType =
   | "block_break"
@@ -36,7 +36,7 @@ export const FIRE_GROUP_EVENT_TYPES: MonitorEventType[] = [
   "block_burn",
 ];
 
-export const MONITOR_PAGE_SIZE = 50;
+export const MONITOR_PAGE_SIZE = 100;
 
 /** Opciones del filtro Tipo (fuego/lava/quema unificados). */
 export const MONITOR_FILTER_OPTIONS: Array<{ value: string; label: string }> = [
@@ -216,8 +216,8 @@ export function eventLabel(type: MonitorEventType): string {
 /** Alerta: ≥3 eventos críticos (fuego/TNT/quema/wither) en 10 minutos por jugador. */
 export const MONITOR_ALERT_WINDOW_MS = 10 * 60 * 1000;
 export const MONITOR_ALERT_MIN_EVENTS = 3;
-/** Las alertas del panel duran 7 días (o hasta descartarlas). */
-export const MONITOR_ALERT_RETENTION_DAYS = 7;
+/** Las alertas del panel duran 5 días (o hasta descartarlas). */
+export const MONITOR_ALERT_RETENTION_DAYS = 5;
 
 export const MONITOR_ALERT_CRITICAL_TYPES = new Set([
   "fire_start",

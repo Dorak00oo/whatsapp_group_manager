@@ -400,7 +400,7 @@ export function MinecraftMonitorSection({
           </h3>
           <p className="text-xs text-zinc-600 dark:text-zinc-400">
             ≥3 críticos en 10 min, o un wither. Una alerta por jugador: se suma
-            el contador si repite. Duran 7 días o hasta descartarlas.
+            el contador si repite. Duran 5 días o hasta descartarlas.
           </p>
           <ul className="flex flex-col gap-2">
             {alerts.map((a) => (
@@ -463,7 +463,7 @@ export function MinecraftMonitorSection({
               Historial de monitoreo
             </h3>
             <p className="mt-0.5 text-xs text-zinc-500">
-              {totalEvents} eventos (retención 21 días). Actualización automática
+              {totalEvents} eventos (retención 7 días). Actualización automática
               cada 20 s; el addon envía cada ~30 s.
               {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""}
             </p>

@@ -155,7 +155,7 @@ model MinecraftConfig {
 
 /**
  * Eventos de monitoreo Overworld: place/break, fuego, TNT, quema atribuida.
- * Retención: 21 días (purga en POST/GET).
+ * Retención: 7 días (purga en POST/GET).
  */
 model MinecraftMonitorEvent {
   id            String   @id @default(cuid())
@@ -182,7 +182,7 @@ model MinecraftMonitorEvent {
 }
 
 /**
- * Alertas de vandalismo del monitoreo (7 días o hasta descartar).
+ * Alertas de vandalismo del monitoreo (5 días o hasta descartar).
  * Una alerta abierta por jugador: eventos posteriores suman al contador.
  */
 model MinecraftMonitorAlert {

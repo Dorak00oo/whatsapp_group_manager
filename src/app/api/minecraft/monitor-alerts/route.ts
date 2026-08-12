@@ -8,7 +8,7 @@ function unauthorized() {
   return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 }
 
-/** Panel: alertas activas (7 días, no descartadas). */
+/** Panel: alertas activas (5 días, no descartadas). */
 export async function GET() {
   const session = await auth();
   if (!session?.user) return unauthorized();
