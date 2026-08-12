@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_MONITOR_EXCLUDE,
   eventLabel,
@@ -54,8 +54,11 @@ type Props = {
   monitorExclude: string[];
 };
 
+/** Polling tras “Pedir lote ahora”. */
 const POLL_MS = 3000;
 const POLL_MAX_ATTEMPTS = 20;
+/** Auto-refresh del panel mientras la pestaña está visible. */
+const AUTO_REFRESH_MS = 20_000;
 /** Números visibles en la ventana central (sin contar 1 ni última). */
 const PAGE_WINDOW = 9;
 
@@ -172,36 +175,40 @@ export function MinecraftMonitorSection({
     filterMaxZ,
   ]);
 
-  const loadPage = useCallback(
-    async (pageNum: number) => {
-      const p = new URLSearchParams(filterQueryString);
-      p.set("page", String(pageNum));
-      const res = await fetch(`/api/minecraft/monitor-events?${p}`);
-      if (!res.ok) return null;
-      const data = (await res.json()) as {
-        ok?: boolean;
-        lastBatchAt?: string | null;
-        total?: number;
-        page?: number;
-        totalPages?: number;
-        alerts?: AlertRow[];
-        events?: Parameters<typeof mapApiEvents>[0];
-      };
-      if (!data.ok || !Array.isArray(data.events)) return null;
-      const total = data.total ?? data.events.length;
-      const pages =
-        data.totalPages ?? Math.max(1, Math.ceil(total / MONITOR_PAGE_SIZE));
-      return {
-        lastBatchAt: data.lastBatchAt ?? null,
-        total,
-        page: data.page ?? pageNum,
-        totalPages: pages,
-        alerts: data.alerts ?? [],
-        events: mapApiEvents(data.events),
-      };
-    },
-    [filterQueryString],
-  );
+  /** Filtros confirmados con “Aplicar”; el auto-refresh no usa el borrador del form. */
+  const [appliedQuery, setAppliedQuery] = useState(() => {
+    const p = new URLSearchParams();
+    p.set("pageSize", String(MONITOR_PAGE_SIZE));
+    return p.toString();
+  });
+
+  const loadPage = useCallback(async (pageNum: number, query = appliedQuery) => {
+    const p = new URLSearchParams(query);
+    p.set("page", String(pageNum));
+    const res = await fetch(`/api/minecraft/monitor-events?${p}`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      ok?: boolean;
+      lastBatchAt?: string | null;
+      total?: number;
+      page?: number;
+      totalPages?: number;
+      alerts?: AlertRow[];
+      events?: Parameters<typeof mapApiEvents>[0];
+    };
+    if (!data.ok || !Array.isArray(data.events)) return null;
+    const total = data.total ?? data.events.length;
+    const pages =
+      data.totalPages ?? Math.max(1, Math.ceil(total / MONITOR_PAGE_SIZE));
+    return {
+      lastBatchAt: data.lastBatchAt ?? null,
+      total,
+      page: data.page ?? pageNum,
+      totalPages: pages,
+      alerts: data.alerts ?? [],
+      events: mapApiEvents(data.events),
+    };
+  }, [appliedQuery]);
 
   function applyLoaded(
     data: NonNullable<Awaited<ReturnType<typeof loadPage>>>,
@@ -214,15 +221,63 @@ export function MinecraftMonitorSection({
     setLastBatchAt(data.lastBatchAt);
   }
 
+  const loadingRef = useRef(loading);
+  const syncingRef = useRef(syncing);
+  const pageRef = useRef(page);
+  loadingRef.current = loading;
+  syncingRef.current = syncing;
+  pageRef.current = page;
+
+  useEffect(() => {
+    let id: ReturnType<typeof setInterval> | undefined;
+
+    const tick = () => {
+      if (loadingRef.current || syncingRef.current) return;
+      void loadPage(pageRef.current).then((data) => {
+        if (data) applyLoaded(data);
+      });
+    };
+
+    const startIfVisible = () => {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState !== "visible") return;
+      if (id !== undefined) return;
+      id = setInterval(tick, AUTO_REFRESH_MS);
+    };
+
+    const stop = () => {
+      if (id !== undefined) {
+        clearInterval(id);
+        id = undefined;
+      }
+    };
+
+    const onVis = () => {
+      stop();
+      if (document.visibilityState === "visible") {
+        tick();
+        startIfVisible();
+      }
+    };
+
+    startIfVisible();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [loadPage]);
+
   async function applyFilters() {
     setLoading(true);
     setMessage(null);
     try {
-      const data = await loadPage(1);
+      const data = await loadPage(1, filterQueryString);
       if (!data) {
         setMessage("No se pudo cargar el historial.");
         return;
       }
+      setAppliedQuery(filterQueryString);
       applyLoaded(data);
     } finally {
       setLoading(false);
@@ -408,8 +463,8 @@ export function MinecraftMonitorSection({
               Historial de monitoreo
             </h3>
             <p className="mt-0.5 text-xs text-zinc-500">
-              {totalEvents} eventos (retención 21 días). El addon envía cada 30
-              s.
+              {totalEvents} eventos (retención 21 días). Actualización automática
+              cada 20 s; el addon envía cada ~30 s.
               {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""}
             </p>
           </div>
