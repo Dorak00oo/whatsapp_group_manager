@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { resolveDatabaseUrl } from "@/lib/database-url";
 import { authLog } from "@/lib/auth-log";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -93,6 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           };
         } catch (e) {
           const err = e as Error;
+          const { resolveDatabaseUrl } = await import("@/lib/database-url");
           const hasUrl = Boolean(resolveDatabaseUrl());
           console.error("[login-auth] authorize: FALLO — Prisma/BD", {
             name: err?.name,

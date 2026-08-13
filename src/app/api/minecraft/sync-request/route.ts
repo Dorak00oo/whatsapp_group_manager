@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  enqueueMinecraftPanelCommand,
+  MINECRAFT_SYNC_QUEUE_ID,
+} from "@/lib/minecraft-sync-request";
 
 export const runtime = "nodejs";
 
-const SETTINGS_ID = "minecraft_sync_request";
+const SETTINGS_ID = MINECRAFT_SYNC_QUEUE_ID;
 
 const ALLOWED_PANEL_COMMANDS = new Set(["syncall"]);
 
@@ -33,39 +37,20 @@ export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) return unauthorized();
 
-  let command = "syncall";
+  let command: "syncall" = "syncall";
   try {
     const body = (await request.json()) as { command?: unknown };
     if (
       typeof body.command === "string" &&
       ALLOWED_PANEL_COMMANDS.has(body.command.trim())
     ) {
-      command = body.command.trim();
+      command = body.command.trim() as "syncall";
     }
   } catch {
     /* sin cuerpo / no JSON → syncall */
   }
 
-  const requestedAt = new Date().toISOString();
-
-  await prisma.minecraftSyncQueue.upsert({
-    where: { id: SETTINGS_ID },
-    update: {
-      data: {
-        command,
-        requestedAt,
-        handledAt: null,
-      },
-    },
-    create: {
-      id: SETTINGS_ID,
-      data: {
-        command,
-        requestedAt,
-        handledAt: null,
-      },
-    },
-  });
+  const { requestedAt } = await enqueueMinecraftPanelCommand(command);
 
   return NextResponse.json({ ok: true, command, requestedAt });
 }

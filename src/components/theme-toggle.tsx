@@ -106,10 +106,9 @@ export function ThemeToggle({
   const rad = compact ? "rounded-lg" : "rounded-xl";
   const icon = compact ? 18 : 20;
 
-  const columnBtn = columnCompact
-    ? "flex size-9 shrink-0 items-center justify-center rounded-full transition-colors duration-200"
-    : "flex size-12 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
-  const columnIcon = columnCompact ? 18 : 22;
+  const columnBtn =
+    "flex size-12 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
+  const columnIcon = 22;
   const columnActive =
     "bg-zinc-900 text-white shadow-md dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-none";
   const columnIdle =

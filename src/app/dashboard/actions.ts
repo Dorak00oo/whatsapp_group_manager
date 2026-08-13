@@ -358,6 +358,8 @@ export type SyncFromMinecraftResult =
       updatedRows: number;
       minecraftCount: number;
       matchedGamertags: number;
+      activated: string[];
+      deactivated: string[];
     }
   | { error: string };
 
@@ -372,6 +374,7 @@ export async function syncDirectoryFromMinecraftPanel(): Promise<SyncFromMinecra
     const summary = await syncDirectoryMembersFromMinecraftTable(userId);
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/minecraft");
+    revalidatePath("/dashboard/importar");
     return { ok: true, ...summary };
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {

@@ -1,10 +1,26 @@
+export type BlacklistReconcileReason = "not_in_directory" | "left_group";
+
 export type ActiveCompareEntry = {
   /** Id de la fila de origen (miembro o jugador); único aunque el gamertag se repita. */
   id: string;
   gamertag: string;
   label: string;
   detail?: string | null;
+  /** Solo en sospechosos MC: motivo para conciliar a blacklist. */
+  reason?: BlacklistReconcileReason | null;
 };
+
+export function isBlacklistReconcileCandidate(
+  entry: Pick<ActiveCompareEntry, "reason">,
+): boolean {
+  return entry.reason === "not_in_directory" || entry.reason === "left_group";
+}
+
+export function blacklistReconcileCandidates(
+  entries: ActiveCompareEntry[],
+): ActiveCompareEntry[] {
+  return entries.filter(isBlacklistReconcileCandidate);
+}
 
 export type ActiveCompareSummary = {
   whatsappCount: number;
@@ -92,14 +108,17 @@ export function buildActiveCompareData(
       .map((r) => {
         const wa = waByTag.get(tagKey(r.gamertag));
         let detail = r.detail ?? null;
+        let reason: BlacklistReconcileReason | null = null;
         if (!wa) {
           detail = "No está en el directorio";
+          reason = "not_in_directory";
         } else if (wa.leftAt != null) {
           detail = "Marcado como «se salió» del grupo";
+          reason = "left_group";
         } else if (!wa.active) {
           detail = "En directorio pero inactivo en WhatsApp";
         }
-        return { ...r, detail };
+        return { ...r, detail, reason };
       }),
   );
 

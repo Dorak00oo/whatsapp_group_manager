@@ -41,11 +41,10 @@ export function normalizeDatabaseUrlForPg(url: string): string {
  * reciba URL vacía cuando Next/Turbopack sustituye process.env en el bundle.
  */
 export function resolveDatabaseUrl(): string {
-  const root = process.cwd();
   const merged: Record<string, string> = {};
 
   for (const name of [".env", ".env.local"] as const) {
-    const file = path.join(root, name);
+    const file = path.join(/* turbopackIgnore: true */ process.cwd(), name);
     try {
       if (fs.existsSync(file)) {
         Object.assign(merged, parse(fs.readFileSync(file, "utf8")));
