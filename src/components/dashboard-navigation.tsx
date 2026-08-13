@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const iconSm = "size-5";
-const iconSidebar = "size-5";
+const iconSidebar = "size-[18px]";
 
 function IconList({ className }: { className?: string }) {
   return (
@@ -54,7 +54,7 @@ function IconUserPlus({ className }: { className?: string }) {
 
 /** Iconos circulares — lateral escritorio (carril estrecho). */
 const linkBaseSidebar =
-  "flex size-12 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
+  "flex size-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
 
 function IconParcel({ className }: { className?: string }) {
   return (
