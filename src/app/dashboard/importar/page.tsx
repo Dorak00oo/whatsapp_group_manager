@@ -134,14 +134,14 @@ export default async function DashboardImportarPage() {
 
       <PlayerAdminStrikePanel members={playerAdminMembers} />
 
-      <DirectoryAllowlistExport activeCount={activeCount} />
-
       <GamertagAuditPanel />
 
       <DirectoryMinecraftActiveCompare
         data={compareData}
         snapshotAt={snapshotAt}
       />
+
+      <DirectoryAllowlistExport activeCount={activeCount} />
     </section>
   );
 }
