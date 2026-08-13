@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import {
   animalLabel,
   DEFAULT_MONITOR_EXCLUDE,
@@ -62,6 +70,12 @@ const POLL_MAX_ATTEMPTS = 20;
 const AUTO_REFRESH_MS = 20_000;
 /** Números visibles en la ventana central (sin contar 1 ni última). */
 const PAGE_WINDOW = 9;
+
+function emptyMonitorQuery() {
+  const p = new URLSearchParams();
+  p.set("pageSize", String(MONITOR_PAGE_SIZE));
+  return p.toString();
+}
 
 function mapApiEvents(
   raw: Array<{
@@ -177,11 +191,7 @@ export function MinecraftMonitorSection({
   ]);
 
   /** Filtros confirmados con “Aplicar”; el auto-refresh no usa el borrador del form. */
-  const [appliedQuery, setAppliedQuery] = useState(() => {
-    const p = new URLSearchParams();
-    p.set("pageSize", String(MONITOR_PAGE_SIZE));
-    return p.toString();
-  });
+  const [appliedQuery, setAppliedQuery] = useState(emptyMonitorQuery);
 
   const loadPage = useCallback(async (pageNum: number, query = appliedQuery) => {
     const p = new URLSearchParams(query);
@@ -269,20 +279,52 @@ export function MinecraftMonitorSection({
     };
   }, [loadPage]);
 
-  async function applyFilters() {
+  async function applyQuery(query: string) {
     setLoading(true);
     setMessage(null);
     try {
-      const data = await loadPage(1, filterQueryString);
+      const data = await loadPage(1, query);
       if (!data) {
         setMessage("No se pudo cargar el historial.");
         return;
       }
-      setAppliedQuery(filterQueryString);
+      setAppliedQuery(query);
       applyLoaded(data);
     } finally {
       setLoading(false);
     }
+  }
+
+  function applyFilters() {
+    void applyQuery(filterQueryString);
+  }
+
+  function clearFilters() {
+    setFilterGamertag("");
+    setFilterEvent("");
+    setFilterItem("");
+    setFilterFrom("");
+    setFilterTo("");
+    setFilterMinX("");
+    setFilterMinY("");
+    setFilterMinZ("");
+    setFilterMaxX("");
+    setFilterMaxY("");
+    setFilterMaxZ("");
+    void applyQuery(emptyMonitorQuery());
+  }
+
+  function handleFilterFormSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    applyFilters();
+  }
+
+  function handleFilterFormKeyDown(e: KeyboardEvent<HTMLFormElement>) {
+    if (e.key !== "Enter") return;
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "TEXTAREA" || tag === "BUTTON") return;
+    e.preventDefault();
+    applyFilters();
   }
 
   async function goToPage(next: number) {
@@ -469,16 +511,31 @@ export function MinecraftMonitorSection({
               {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""}
             </p>
           </div>
-          <button
-            type="button"
-            disabled={syncing}
-            onClick={() => void requestBatch()}
-            className={softBtnPrimary}
-          >
-            {syncing ? "Pidiendo lote…" : "Pedir lote ahora"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={syncing}
+              onClick={() => void requestBatch()}
+              className={softBtnPrimary}
+            >
+              {syncing ? "Pidiendo lote…" : "Pedir lote ahora"}
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={clearFilters}
+              className={softBtnLavender}
+            >
+              Limpiar filtros
+            </button>
+          </div>
         </div>
 
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={handleFilterFormSubmit}
+          onKeyDown={handleFilterFormKeyDown}
+        >
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <label className="flex flex-col gap-1 text-xs font-semibold">
             Jugador
@@ -597,13 +654,13 @@ export function MinecraftMonitorSection({
         </p>
 
         <button
-          type="button"
+          type="submit"
           disabled={loading}
-          onClick={() => void applyFilters()}
           className={softBtnLavender}
         >
           {loading ? "Filtrando…" : "Aplicar filtros"}
         </button>
+        </form>
 
         {message ? (
           <p className="text-xs text-zinc-600 dark:text-zinc-400">{message}</p>
