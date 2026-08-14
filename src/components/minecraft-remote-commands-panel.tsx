@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { XyzCoordFields } from "@/components/xyz-coord-fields";
 
 export type AdminOption = {
   id: string;
@@ -16,6 +17,7 @@ type CmdAction =
   | "spectator"
   | "survival"
   | "tp"
+  | "tp_coords"
   | "kill_silverfish"
   | "kill_withers";
 
@@ -29,8 +31,10 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
   const [targetGamertag, setTargetGamertag] = useState(
     () => admins[0]?.gamertag ?? "",
   );
-  const [tpFrom, setTpFrom] = useState("");
   const [tpTo, setTpTo] = useState("");
+  const [coordX, setCoordX] = useState("");
+  const [coordY, setCoordY] = useState("");
+  const [coordZ, setCoordZ] = useState("");
   const [onlinePlayers, setOnlinePlayers] = useState<string[]>([]);
   const [onlineReportedAt, setOnlineReportedAt] = useState<string | null>(null);
   const [onlineFresh, setOnlineFresh] = useState(false);
@@ -42,10 +46,14 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
     [admins],
   );
 
-  const onlineMods = useMemo(
-    () => onlinePlayers.filter((p) => adminTagsLower.has(p.toLowerCase())),
-    [onlinePlayers, adminTagsLower],
+  const selectedOnline = useMemo(
+    () =>
+      Boolean(targetGamertag) &&
+      onlinePlayers.some((p) => sameTag(p, targetGamertag)),
+    [onlinePlayers, targetGamertag],
   );
+
+  const rosterKnown = onlineFresh || onlinePlayers.length > 0;
 
   const refreshOnline = useCallback(async () => {
     try {
@@ -74,29 +82,40 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
   }, [refreshOnline]);
 
   useEffect(() => {
-    if (onlineMods.length === 0) {
-      setTpFrom("");
-      return;
-    }
-    setTpFrom((prev) =>
-      prev && onlineMods.some((p) => sameTag(p, prev)) ? prev : onlineMods[0],
-    );
-  }, [onlineMods]);
-
-  useEffect(() => {
     if (onlinePlayers.length === 0) {
       setTpTo("");
       return;
     }
     setTpTo((prev) => {
-      const candidates = onlinePlayers.filter((p) => !sameTag(p, tpFrom));
+      const candidates = onlinePlayers.filter(
+        (p) => !sameTag(p, targetGamertag),
+      );
       const pool = candidates.length > 0 ? candidates : onlinePlayers;
-      if (prev && pool.some((p) => sameTag(p, prev)) && !sameTag(prev, tpFrom)) {
+      if (
+        prev &&
+        pool.some((p) => sameTag(p, prev)) &&
+        !sameTag(prev, targetGamertag)
+      ) {
         return prev;
       }
       return pool[0] ?? "";
     });
-  }, [onlinePlayers, tpFrom]);
+  }, [onlinePlayers, targetGamertag]);
+
+  function requireActiveModerator(): boolean {
+    const tag = targetGamertag.trim();
+    if (!tag) {
+      setMessage("Elegí un admin del listado.");
+      return false;
+    }
+    if (!onlinePlayers.some((p) => sameTag(p, tag))) {
+      setMessage(
+        `${tag} no está activo en el servidor. Cambiá el gamertag o pedile que entre.`,
+      );
+      return false;
+    }
+    return true;
+  }
 
   async function send(
     action: CmdAction,
@@ -106,33 +125,45 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
     setMessage(null);
     try {
       const body: {
-        action: CmdAction;
+        action: "spectator" | "survival" | "tp" | "kill_silverfish" | "kill_withers";
         targetGamertag?: string;
         destinationGamertag?: string;
-      } = { action };
+        destinationX?: string;
+        destinationY?: string;
+        destinationZ?: string;
+      } = {
+        action: action === "tp_coords" ? "tp" : action,
+      };
 
-      if (action === "spectator" || action === "survival") {
-        const tag = (extra?.targetGamertag ?? targetGamertag).trim();
-        if (!tag) {
-          setMessage("Elegí un admin del listado.");
-          return;
-        }
-        body.targetGamertag = tag;
+      if (
+        action === "spectator" ||
+        action === "survival" ||
+        action === "tp" ||
+        action === "tp_coords"
+      ) {
+        if (!requireActiveModerator()) return;
+        body.targetGamertag = (
+          extra?.targetGamertag ?? targetGamertag
+        ).trim();
       }
 
       if (action === "tp") {
-        const from = (extra?.targetGamertag ?? tpFrom).trim();
         const to = (extra?.destinationGamertag ?? tpTo).trim();
-        if (!from || !to) {
-          setMessage("Elegí moderador origen y jugador destino (online).");
+        if (!to) {
+          setMessage("Elegí un jugador destino (online).");
           return;
         }
-        if (sameTag(from, to)) {
+        if (sameTag(body.targetGamertag ?? "", to)) {
           setMessage("Origen y destino deben ser distintos.");
           return;
         }
-        body.targetGamertag = from;
         body.destinationGamertag = to;
+      }
+
+      if (action === "tp_coords") {
+        body.destinationX = coordX;
+        body.destinationY = coordY;
+        body.destinationZ = coordZ;
       }
 
       const res = await fetch("/api/minecraft/remote-cmd", {
@@ -145,11 +176,22 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
         setMessage(data.error ?? "No se pudo encolar el comando");
         return;
       }
-      setMessage(
-        action === "tp"
-          ? `TP encolado: ${body.targetGamertag} → ${body.destinationGamertag}. El addon lo ejecuta en unos segundos.`
-          : "Comando enviado al servidor. El addon lo ejecuta en unos segundos (polling rápido).",
-      );
+      if (action === "tp") {
+        setMessage(
+          `TP encolado: ${body.targetGamertag} → ${body.destinationGamertag}. El addon lo ejecuta en unos segundos.`,
+        );
+      } else if (action === "tp_coords") {
+        const x = coordX.trim() || "~";
+        const y = coordY.trim() || "~";
+        const z = coordZ.trim() || "~";
+        setMessage(
+          `TP encolado: ${body.targetGamertag} → ${x} ${y} ${z}. El addon lo ejecuta en unos segundos.`,
+        );
+      } else {
+        setMessage(
+          "Comando enviado al servidor. El addon lo ejecuta en unos segundos (polling rápido).",
+        );
+      }
     } catch {
       setMessage("Error de red al enviar el comando.");
     } finally {
@@ -171,13 +213,16 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
         })}`
       : "Sin roster fresco del addon (espera ~30 s o revisá que el pack esté cargado)";
 
+  const needsModerator = loading !== null || admins.length === 0 || !selectedOnline;
+
   return (
     <div className="flex flex-col gap-6">
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
         Los comandos se encolan en la misma cola ligera que el sync del addon (sin
-        tablas nuevas). Solo gamertags con rol{" "}
-        <span className="font-medium">admin</span> en el directorio pueden usarse
-        para espectador / survival / origen del TP.
+        tablas nuevas). El gamertag de abajo se usa para espectador, survival y
+        origen del TP: tiene que estar marcado como{" "}
+        <span className="font-medium">admin</span> en el directorio y activo en
+        el servidor.
       </p>
 
       {admins.length === 0 ? (
@@ -191,7 +236,7 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
             htmlFor="remote-cmd-target"
             className="block text-sm font-medium text-zinc-800 dark:text-zinc-200"
           >
-            Admin (gamertag en el servidor)
+            Moderador (gamertag)
           </label>
           <select
             id="remote-cmd-target"
@@ -202,16 +247,29 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
             {admins.map((a) => (
               <option key={a.id} value={a.gamertag}>
                 {labelFor(a)}
+                {onlinePlayers.some((p) => sameTag(p, a.gamertag))
+                  ? " · online"
+                  : ""}
               </option>
             ))}
           </select>
+          <p className="mt-2 text-xs text-zinc-500">{onlineLabel}.</p>
+          {targetGamertag && rosterKnown && !selectedOnline ? (
+            <p
+              className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+              role="status"
+            >
+              {targetGamertag} no está activo en el servidor. Cambiá el gamertag
+              o pedile que entre.
+            </p>
+          ) : null}
         </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <button
           type="button"
-          disabled={loading !== null || admins.length === 0}
+          disabled={needsModerator}
           onClick={() => void send("spectator")}
           className="rounded-lg bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-700 disabled:opacity-50"
         >
@@ -219,7 +277,7 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
         </button>
         <button
           type="button"
-          disabled={loading !== null || admins.length === 0}
+          disabled={needsModerator}
           onClick={() => void send("survival")}
           className="rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
         >
@@ -254,8 +312,8 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
               Teleport (TP)
             </h3>
             <p className="mt-1 text-xs text-zinc-500">
-              Mueve un moderador online hacia otro jugador online (incluye
-              moderadores en el destino). {onlineLabel}.
+              Usa el moderador de arriba como origen. Destino: otro jugador
+              online o coordenadas (eje vacío = ~). {onlineLabel}.
             </p>
           </div>
           <button
@@ -270,63 +328,78 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
         {onlinePlayers.length === 0 ? (
           <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
             Nadie online reportado. Cuando el addon publique el roster vas a
-            poder elegir origen y destino.
+            poder elegir destino y mandar TP.
           </p>
         ) : (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-medium text-zinc-800 dark:text-zinc-200">
-              Moderador (origen)
-              <select
-                value={tpFrom}
-                onChange={(e) => setTpFrom(e.target.value)}
-                disabled={onlineMods.length === 0}
-                className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-              >
-                {onlineMods.length === 0 ? (
-                  <option value="">Ningún admin online</option>
-                ) : (
-                  onlineMods.map((name) => (
-                    <option key={`from-${name}`} value={name}>
-                      {name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-            <label className="block text-sm font-medium text-zinc-800 dark:text-zinc-200">
+          <div className="mt-3 flex max-w-md flex-col gap-2">
+            <label
+              htmlFor="remote-cmd-tp-to"
+              className="text-sm font-medium text-zinc-800 dark:text-zinc-200"
+            >
               Jugador (destino, incluye mods)
-              <select
-                value={tpTo}
-                onChange={(e) => setTpTo(e.target.value)}
-                className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-              >
-                {onlinePlayers
-                  .filter((p) => !sameTag(p, tpFrom))
-                  .map((name) => (
-                    <option key={`to-${name}`} value={name}>
-                      {name}
-                      {adminTagsLower.has(name.toLowerCase()) ? " (mod)" : ""}
-                    </option>
-                  ))}
-              </select>
             </label>
+            <select
+              id="remote-cmd-tp-to"
+              value={tpTo}
+              onChange={(e) => setTpTo(e.target.value)}
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+            >
+              {onlinePlayers
+                .filter((p) => !sameTag(p, targetGamertag))
+                .map((name) => (
+                  <option key={`to-${name}`} value={name}>
+                    {name}
+                    {adminTagsLower.has(name.toLowerCase()) ? " (mod)" : ""}
+                  </option>
+                ))}
+            </select>
           </div>
         )}
 
         <button
           type="button"
           disabled={
-            loading !== null ||
-            !tpFrom ||
-            !tpTo ||
-            onlineMods.length === 0 ||
-            sameTag(tpFrom, tpTo)
+            needsModerator || !tpTo || sameTag(targetGamertag, tpTo)
           }
           onClick={() => void send("tp")}
           className="mt-4 rounded-lg bg-sky-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700 disabled:opacity-50"
         >
           {loading === "tp" ? "Enviando…" : "Teleportar moderador → jugador"}
         </button>
+
+        <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+          <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+            TP a coordenadas
+          </h4>
+          <p className="mt-1 text-xs text-zinc-500">
+            Eje vacío = ~ (no se mueve). Pegá las tres en X:{" "}
+            <span className="font-mono">1304, 76, 4848</span> o{" "}
+            <span className="font-mono">-8532 67 -10351</span>.
+          </p>
+          <div className="mt-3">
+            <XyzCoordFields
+              idPrefix="tp-coord"
+              values={{ x: coordX, y: coordY, z: coordZ }}
+              onChange={({ x, y, z }) => {
+                setCoordX(x);
+                setCoordY(y);
+                setCoordZ(z);
+              }}
+              placeholders={{ x: "~", y: "~", z: "~" }}
+              inputClassName="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={needsModerator}
+            onClick={() => void send("tp_coords")}
+            className="mt-4 w-full rounded-lg bg-sky-700 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-800 disabled:opacity-50 sm:w-auto"
+          >
+            {loading === "tp_coords"
+              ? "Enviando…"
+              : "Teleportar a coordenadas"}
+          </button>
+        </div>
       </div>
 
       {message ? (

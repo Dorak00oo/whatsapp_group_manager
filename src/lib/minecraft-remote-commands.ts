@@ -29,6 +29,12 @@ export type RemoteCmdQueueData = {
   targetGamertag?: string | null;
   /** `tp`: gamertag destino (a quién se teletransporta el origen). */
   destinationGamertag?: string | null;
+  /** `tp` a coordenadas: eje X (`~` = no cambiar). */
+  destinationX?: string | null;
+  /** `tp` a coordenadas: eje Y (`~` = no cambiar). */
+  destinationY?: string | null;
+  /** `tp` a coordenadas: eje Z (`~` = no cambiar). */
+  destinationZ?: string | null;
   /** `allowlist_sync` / `allowlist_sync_corrected`: gamertags a dar de alta (`allowlist add`). */
   targetGamertagsAdd?: string[] | null;
   /** `allowlist_sync` / `allowlist_sync_corrected`: gamertags a dar de baja (`allowlist remove`). */
@@ -38,6 +44,36 @@ export type RemoteCmdQueueData = {
   requestedAt?: string;
   handledAt?: string | null;
 };
+
+/** Número absoluto, `~` o relativo `~10` / `~-4`. */
+const TP_COORD_RE = /^(?:~|-?\d+(?:\.\d+)?|~-?\d+(?:\.\d+)?)$/;
+
+export function normalizeTpCoord(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value !== "string") return "~";
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? "~" : trimmed;
+}
+
+export function isValidTpCoord(value: string): boolean {
+  return TP_COORD_RE.test(value);
+}
+
+export function parseTpCoords(input: {
+  x?: unknown;
+  y?: unknown;
+  z?: unknown;
+}): { x: string; y: string; z: string } | { error: string } {
+  const x = normalizeTpCoord(input.x);
+  const y = normalizeTpCoord(input.y);
+  const z = normalizeTpCoord(input.z);
+  if (!isValidTpCoord(x) || !isValidTpCoord(y) || !isValidTpCoord(z)) {
+    return {
+      error: "Cada coordenada debe ser un número, ~ o un relativo (~10, ~-4)",
+    };
+  }
+  return { x, y, z };
+}
 
 export function asRemoteCmdQueueData(value: unknown): RemoteCmdQueueData {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};

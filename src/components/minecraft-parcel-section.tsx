@@ -8,6 +8,11 @@ import {
   type ParcelConfigPayload,
 } from "@/lib/minecraft-parcel";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { tryParseCoordNumber } from "@/lib/xyz-coords";
+import {
+  XyzCoordFields,
+  type XyzCoordValues,
+} from "@/components/xyz-coord-fields";
 import { softBtnLavender, softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
 
 export type ParcelEventRow = {
@@ -41,6 +46,40 @@ type Props = {
 const POLL_MS = 4000;
 const POLL_MAX_ATTEMPTS = 30;
 
+function xyzFromParcel(
+  p: ParcelConfigPayload,
+  kind: "min" | "max",
+): XyzCoordValues {
+  if (kind === "min") {
+    return { x: String(p.minX), y: String(p.minY), z: String(p.minZ) };
+  }
+  return { x: String(p.maxX), y: String(p.maxY), z: String(p.maxZ) };
+}
+
+function applyXyzNumbers(
+  p: ParcelConfigPayload,
+  next: XyzCoordValues,
+  kind: "min" | "max",
+): ParcelConfigPayload {
+  const x = tryParseCoordNumber(next.x);
+  const y = tryParseCoordNumber(next.y);
+  const z = tryParseCoordNumber(next.z);
+  if (kind === "min") {
+    return {
+      ...p,
+      minX: x ?? p.minX,
+      minY: y ?? p.minY,
+      minZ: z ?? p.minZ,
+    };
+  }
+  return {
+    ...p,
+    maxX: x ?? p.maxX,
+    maxY: y ?? p.maxY,
+    maxZ: z ?? p.maxZ,
+  };
+}
+
 function mapApiEvents(
   raw: Array<{
     id: string;
@@ -71,6 +110,12 @@ export function MinecraftParcelSection({
   directoryByTag,
 }: Props) {
   const [parcelForm, setParcelForm] = useState(initialParcel);
+  const [minDraft, setMinDraft] = useState(() =>
+    xyzFromParcel(initialParcel, "min"),
+  );
+  const [maxDraft, setMaxDraft] = useState(() =>
+    xyzFromParcel(initialParcel, "max"),
+  );
   const [events, setEvents] = useState(initialEvents);
   const [totalEvents, setTotalEvents] = useState(initialTotal);
   const [lastBatchAt, setLastBatchAt] = useState<string | null>(null);
@@ -284,46 +329,30 @@ export function MinecraftParcelSection({
         <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
           Esquina mínima (bloque)
         </p>
-        <div className="grid grid-cols-3 gap-2">
-          {(["minX", "minY", "minZ"] as const).map((key) => (
-            <label key={key} className="block text-sm">
-              <span className="text-zinc-500">{key.slice(3)}</span>
-              <input
-                type="number"
-                className={`${softInputNeutral} mt-1 w-full`}
-                value={parcelForm[key]}
-                onChange={(e) =>
-                  setParcelForm((p) => ({
-                    ...p,
-                    [key]: Number(e.target.value),
-                  }))
-                }
-              />
-            </label>
-          ))}
-        </div>
+        <XyzCoordFields
+          idPrefix="parcel-min"
+          values={minDraft}
+          onChange={(next) => {
+            setMinDraft(next);
+            setParcelForm((p) => applyXyzNumbers(p, next, "min"));
+          }}
+          placeholders={{ x: "0", y: "0", z: "0" }}
+          inputClassName={softInputNeutral}
+        />
 
         <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
           Esquina máxima (bloque opuesto)
         </p>
-        <div className="grid grid-cols-3 gap-2">
-          {(["maxX", "maxY", "maxZ"] as const).map((key) => (
-            <label key={key} className="block text-sm">
-              <span className="text-zinc-500">{key.slice(3)}</span>
-              <input
-                type="number"
-                className={`${softInputNeutral} mt-1 w-full`}
-                value={parcelForm[key]}
-                onChange={(e) =>
-                  setParcelForm((p) => ({
-                    ...p,
-                    [key]: Number(e.target.value),
-                  }))
-                }
-              />
-            </label>
-          ))}
-        </div>
+        <XyzCoordFields
+          idPrefix="parcel-max"
+          values={maxDraft}
+          onChange={(next) => {
+            setMaxDraft(next);
+            setParcelForm((p) => applyXyzNumbers(p, next, "max"));
+          }}
+          placeholders={{ x: "0", y: "0", z: "0" }}
+          inputClassName={softInputNeutral}
+        />
 
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
           Área: {boundsLabel}
@@ -332,6 +361,8 @@ export function MinecraftParcelSection({
             const s = parcelBlockSpan(parcelForm);
             return `${s.spanX}×${s.spanY}×${s.spanZ} bloques`;
           })()}
+          {" · "}
+          Pegá las tres coords en X (`1304, 76, 4848`).
         </p>
 
         <button

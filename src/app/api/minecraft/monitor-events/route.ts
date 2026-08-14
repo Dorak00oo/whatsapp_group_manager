@@ -17,6 +17,11 @@ import {
   markMonitorBatchReceived,
 } from "@/lib/monitor-events-store";
 import { prisma } from "@/lib/prisma";
+import {
+  axisRange,
+  parseRadius,
+  tryParseCoordNumber,
+} from "@/lib/xyz-coords";
 
 export const runtime = "nodejs";
 
@@ -184,12 +189,10 @@ export async function GET(request: Request) {
   const item = url.searchParams.get("item")?.trim() ?? "";
   const from = url.searchParams.get("from")?.trim() ?? "";
   const to = url.searchParams.get("to")?.trim() ?? "";
-  const minX = url.searchParams.get("minX")?.trim() ?? "";
-  const minY = url.searchParams.get("minY")?.trim() ?? "";
-  const minZ = url.searchParams.get("minZ")?.trim() ?? "";
-  const maxX = url.searchParams.get("maxX")?.trim() ?? "";
-  const maxY = url.searchParams.get("maxY")?.trim() ?? "";
-  const maxZ = url.searchParams.get("maxZ")?.trim() ?? "";
+  const xRaw = url.searchParams.get("x")?.trim() ?? "";
+  const yRaw = url.searchParams.get("y")?.trim() ?? "";
+  const zRaw = url.searchParams.get("z")?.trim() ?? "";
+  const radiusRaw = url.searchParams.get("radius")?.trim() ?? "";
 
   const pageSizeRaw = Number(url.searchParams.get("pageSize") ?? MONITOR_PAGE_SIZE);
   const pageSize = Number.isFinite(pageSizeRaw)
@@ -229,26 +232,17 @@ export async function GET(request: Request) {
     if (Object.keys(occurredAt).length) where.occurredAt = occurredAt;
   }
 
-  const parseCoord = (raw: string): number | null => {
-    if (raw === "") return null;
-    const n = Number(raw);
-    return Number.isFinite(n) ? Math.floor(n) : null;
-  };
-
-  const applyAxisRange = (
-    field: "posX" | "posY" | "posZ",
-    aRaw: string,
-    bRaw: string,
-  ) => {
-    const a = parseCoord(aRaw);
-    const b = parseCoord(bRaw);
-    if (a == null || b == null) return;
-    where[field] = { gte: Math.min(a, b), lte: Math.max(a, b) };
-  };
-
-  applyAxisRange("posX", minX, maxX);
-  applyAxisRange("posY", minY, maxY);
-  applyAxisRange("posZ", minZ, maxZ);
+  const centerX = tryParseCoordNumber(xRaw);
+  const centerZ = tryParseCoordNumber(zRaw);
+  const radius = parseRadius(radiusRaw);
+  if (centerX != null && centerZ != null && radius != null) {
+    where.posX = axisRange(centerX, radius);
+    where.posZ = axisRange(centerZ, radius);
+    const centerY = tryParseCoordNumber(yRaw);
+    if (centerY != null) {
+      where.posY = axisRange(centerY, radius);
+    }
+  }
 
   const total = await prisma.minecraftMonitorEvent.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / pageSize));

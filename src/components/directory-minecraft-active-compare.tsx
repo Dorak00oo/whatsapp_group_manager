@@ -297,9 +297,10 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
             Comparar activos (orden alfabético)
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Lista del grupo de WhatsApp frente a jugadores activos en Minecraft.
-            Útil para detectar quién entra al servidor sin estar activo en el
-            grupo. Coincidencia por gamertag (sin distinguir mayúsculas).
+            Lista del grupo de WhatsApp frente a jugadores activos en Minecraft
+            (sin quienes ya están en blacklist). Útil para detectar quién entra
+            al servidor sin estar activo en el grupo. Coincidencia por gamertag
+            (sin distinguir mayúsculas).
             {snapshotAt ? (
               <> Datos MC del último reporte: {snapshotAt}.</>
             ) : (
@@ -355,6 +356,11 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
             <span className="rounded-full bg-sky-100 px-2.5 py-1 font-medium text-sky-900 dark:bg-sky-950/60 dark:text-sky-100">
               MC activos: {summary.minecraftCount}
             </span>
+            {summary.ignoredBlacklistedCount > 0 ? (
+              <span className="rounded-full bg-zinc-200 px-2.5 py-1 font-medium text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100">
+                En blacklist (ignorados): {summary.ignoredBlacklistedCount}
+              </span>
+            ) : null}
             {suspects.length > 0 ? (
               <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-100">
                 Revisar en MC sin WA activo: {suspects.length}
@@ -366,6 +372,32 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
               </span>
             ) : null}
           </div>
+
+          {summary.ignoredBlacklistedCount > 0 ? (
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50/90 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900/40">
+              <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">
+                {summary.ignoredBlacklistedCount}{" "}
+                {summary.ignoredBlacklistedCount === 1
+                  ? "jugador activo ya está"
+                  : "jugadores activos ya están"}{" "}
+                en blacklist: se ignoraron en esta lista
+              </p>
+              <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                Siguen contando como activos en el panel de Minecraft, pero no
+                entran en la comparación ni en candidatos a blacklist.
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {summary.ignoredBlacklisted.map((row) => (
+                  <li
+                    key={row.id}
+                    className="rounded-lg bg-white/80 px-2 py-1 text-xs text-zinc-800 ring-1 ring-zinc-200/80 dark:bg-zinc-900/80 dark:text-zinc-100 dark:ring-zinc-700/60"
+                  >
+                    <span className="font-medium">{row.gamertag}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {suspects.length > 0 ? (
             <div className="rounded-2xl border border-amber-200/90 bg-amber-50/90 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/30">
@@ -401,7 +433,7 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
             />
             <CompareColumn
               title="Minecraft (activos)"
-              subtitle="Activos según último reporte (no en lista negra)"
+              subtitle="Activos del último reporte, sin quienes ya están en blacklist"
               rows={minecraft}
               emptyText="No hay jugadores activos en Minecraft."
             />

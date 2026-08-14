@@ -20,6 +20,7 @@ import {
   type MonitorEventType,
 } from "@/lib/minecraft-monitor";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { XyzCoordFields } from "@/components/xyz-coord-fields";
 import {
   softBtnLavender,
   softBtnPrimary,
@@ -153,12 +154,10 @@ export function MinecraftMonitorSection({
   const [filterItem, setFilterItem] = useState("");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
-  const [filterMinX, setFilterMinX] = useState("");
-  const [filterMinY, setFilterMinY] = useState("");
-  const [filterMinZ, setFilterMinZ] = useState("");
-  const [filterMaxX, setFilterMaxX] = useState("");
-  const [filterMaxY, setFilterMaxY] = useState("");
-  const [filterMaxZ, setFilterMaxZ] = useState("");
+  const [filterX, setFilterX] = useState("");
+  const [filterY, setFilterY] = useState("");
+  const [filterZ, setFilterZ] = useState("");
+  const [filterRadius, setFilterRadius] = useState("");
   const [loading, setLoading] = useState(false);
 
   const filterQueryString = useMemo(() => {
@@ -168,12 +167,10 @@ export function MinecraftMonitorSection({
     if (filterItem.trim()) p.set("item", filterItem.trim());
     if (filterFrom) p.set("from", new Date(filterFrom).toISOString());
     if (filterTo) p.set("to", new Date(filterTo).toISOString());
-    if (filterMinX.trim()) p.set("minX", filterMinX.trim());
-    if (filterMinY.trim()) p.set("minY", filterMinY.trim());
-    if (filterMinZ.trim()) p.set("minZ", filterMinZ.trim());
-    if (filterMaxX.trim()) p.set("maxX", filterMaxX.trim());
-    if (filterMaxY.trim()) p.set("maxY", filterMaxY.trim());
-    if (filterMaxZ.trim()) p.set("maxZ", filterMaxZ.trim());
+    if (filterX.trim()) p.set("x", filterX.trim());
+    if (filterY.trim()) p.set("y", filterY.trim());
+    if (filterZ.trim()) p.set("z", filterZ.trim());
+    if (filterRadius.trim()) p.set("radius", filterRadius.trim());
     p.set("pageSize", String(MONITOR_PAGE_SIZE));
     return p.toString();
   }, [
@@ -182,12 +179,10 @@ export function MinecraftMonitorSection({
     filterItem,
     filterFrom,
     filterTo,
-    filterMinX,
-    filterMinY,
-    filterMinZ,
-    filterMaxX,
-    filterMaxY,
-    filterMaxZ,
+    filterX,
+    filterY,
+    filterZ,
+    filterRadius,
   ]);
 
   /** Filtros confirmados con “Aplicar”; el auto-refresh no usa el borrador del form. */
@@ -305,12 +300,10 @@ export function MinecraftMonitorSection({
     setFilterItem("");
     setFilterFrom("");
     setFilterTo("");
-    setFilterMinX("");
-    setFilterMinY("");
-    setFilterMinZ("");
-    setFilterMaxX("");
-    setFilterMaxY("");
-    setFilterMaxZ("");
+    setFilterX("");
+    setFilterY("");
+    setFilterZ("");
+    setFilterRadius("");
     void applyQuery(emptyMonitorQuery());
   }
 
@@ -590,67 +583,39 @@ export function MinecraftMonitorSection({
           </label>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <p className="mb-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-              Esquina mínima (bloque)
+        <div className="grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_10rem]">
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              Coordenada (centro)
             </p>
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  ["X", filterMinX, setFilterMinX],
-                  ["Y", filterMinY, setFilterMinY],
-                  ["Z", filterMinZ, setFilterMinZ],
-                ] as const
-              ).map(([label, value, setValue]) => (
-                <label
-                  key={`min-${label}`}
-                  className="flex flex-col gap-1 text-xs font-semibold"
-                >
-                  {label}
-                  <input
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                    className={softInputNeutral}
-                    inputMode="numeric"
-                    placeholder="—"
-                  />
-                </label>
-              ))}
-            </div>
+            <XyzCoordFields
+              idPrefix="monitor-center"
+              values={{ x: filterX, y: filterY, z: filterZ }}
+              onChange={({ x, y, z }) => {
+                setFilterX(x);
+                setFilterY(y);
+                setFilterZ(z);
+              }}
+              placeholders={{ x: "X", y: "Y", z: "Z" }}
+              inputClassName={softInputNeutral}
+            />
           </div>
-          <div>
-            <p className="mb-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-              Esquina máxima (bloque opuesto)
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  ["X", filterMaxX, setFilterMaxX],
-                  ["Y", filterMaxY, setFilterMaxY],
-                  ["Z", filterMaxZ, setFilterMaxZ],
-                ] as const
-              ).map(([label, value, setValue]) => (
-                <label
-                  key={`max-${label}`}
-                  className="flex flex-col gap-1 text-xs font-semibold"
-                >
-                  {label}
-                  <input
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                    className={softInputNeutral}
-                    inputMode="numeric"
-                    placeholder="—"
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
+          <label className="flex min-w-0 flex-col gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+            Radio (bloques)
+            <input
+              value={filterRadius}
+              onChange={(e) => setFilterRadius(e.target.value)}
+              className={softInputNeutral}
+              inputMode="numeric"
+              placeholder="100"
+            />
+          </label>
         </div>
         <p className="text-[11px] text-zinc-500">
-          Por cada eje hace falta min y max para filtrar (si van al revés, se
-          ordenan solos).
+          Pegá las tres coords en X (`1304, 76, 4848`). El radio acepta{" "}
+          <span className="font-mono">100</span> o{" "}
+          <span className="font-mono">10.000</span>. Si Y va vacío, se filtra
+          solo en XZ (todas las alturas).
         </p>
 
         <button

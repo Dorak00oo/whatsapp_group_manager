@@ -14,6 +14,7 @@ import {
   REMOTE_CMD_QUEUE_ID,
   asRemoteCmdQueueData,
   isRemoteCmdAction,
+  parseTpCoords,
   remoteCmdActionForAddon,
   remoteCmdNeedsDestination,
   remoteCmdNeedsTarget,
@@ -112,6 +113,9 @@ export async function POST(request: Request) {
     action?: unknown;
     targetGamertag?: unknown;
     destinationGamertag?: unknown;
+    destinationX?: unknown;
+    destinationY?: unknown;
+    destinationZ?: unknown;
   };
   try {
     body = await request.json();
@@ -148,18 +152,42 @@ export async function POST(request: Request) {
   }
 
   let destinationGamertag: string | null = null;
+  let destinationX: string | null = null;
+  let destinationY: string | null = null;
+  let destinationZ: string | null = null;
   if (remoteCmdNeedsDestination(action)) {
-    const d =
-      typeof body.destinationGamertag === "string"
-        ? body.destinationGamertag.trim()
-        : "";
-    if (!d) {
-      return badRequest("destinationGamertag es obligatorio para tp");
+    const hasCoordFields =
+      body.destinationX !== undefined ||
+      body.destinationY !== undefined ||
+      body.destinationZ !== undefined;
+
+    if (hasCoordFields) {
+      const parsed = parseTpCoords({
+        x: body.destinationX,
+        y: body.destinationY,
+        z: body.destinationZ,
+      });
+      if ("error" in parsed) return badRequest(parsed.error);
+      destinationX = parsed.x;
+      destinationY = parsed.y;
+      destinationZ = parsed.z;
+    } else {
+      const d =
+        typeof body.destinationGamertag === "string"
+          ? body.destinationGamertag.trim()
+          : "";
+      if (!d) {
+        return badRequest(
+          "destinationGamertag o coordenadas (destinationX/Y/Z) son obligatorios para tp",
+        );
+      }
+      if (targetGamertag && d.toLowerCase() === targetGamertag.toLowerCase()) {
+        return badRequest(
+          "Origen y destino del tp deben ser jugadores distintos",
+        );
+      }
+      destinationGamertag = d;
     }
-    if (targetGamertag && d.toLowerCase() === targetGamertag.toLowerCase()) {
-      return badRequest("Origen y destino del tp deben ser jugadores distintos");
-    }
-    destinationGamertag = d;
   }
 
   let targetGamertagsAdd: string[] | null = null;
@@ -237,6 +265,9 @@ export async function POST(request: Request) {
           action,
           targetGamertag,
           destinationGamertag,
+          destinationX,
+          destinationY,
+          destinationZ,
           targetGamertagsAdd,
           targetGamertagsRemove,
           pendingCorrectionIds,
@@ -250,6 +281,9 @@ export async function POST(request: Request) {
           action,
           targetGamertag,
           destinationGamertag,
+          destinationX,
+          destinationY,
+          destinationZ,
           targetGamertagsAdd,
           targetGamertagsRemove,
           pendingCorrectionIds,
@@ -265,6 +299,9 @@ export async function POST(request: Request) {
     action,
     targetGamertag,
     destinationGamertag,
+    destinationX,
+    destinationY,
+    destinationZ,
     targetGamertagsAdd,
     targetGamertagsRemove,
     pendingCorrectionIds,
@@ -301,6 +338,9 @@ export async function GET(request: Request) {
     action,
     targetGamertag: pending ? (data.targetGamertag ?? null) : null,
     destinationGamertag: pending ? (data.destinationGamertag ?? null) : null,
+    destinationX: pending ? (data.destinationX ?? null) : null,
+    destinationY: pending ? (data.destinationY ?? null) : null,
+    destinationZ: pending ? (data.destinationZ ?? null) : null,
     targetGamertagsAdd: pending ? (data.targetGamertagsAdd ?? null) : null,
     targetGamertagsRemove: pending ? (data.targetGamertagsRemove ?? null) : null,
     requestedAt: data.requestedAt ?? null,
@@ -350,6 +390,9 @@ export async function PUT(request: Request) {
           action: prev.action,
           targetGamertag: prev.targetGamertag ?? null,
           destinationGamertag: prev.destinationGamertag ?? null,
+          destinationX: prev.destinationX ?? null,
+          destinationY: prev.destinationY ?? null,
+          destinationZ: prev.destinationZ ?? null,
           targetGamertagsAdd: prev.targetGamertagsAdd ?? null,
           targetGamertagsRemove: prev.targetGamertagsRemove ?? null,
           pendingCorrectionIds: prev.pendingCorrectionIds ?? null,

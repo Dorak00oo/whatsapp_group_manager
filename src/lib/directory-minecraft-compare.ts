@@ -25,6 +25,9 @@ export function blacklistReconcileCandidates(
 export type ActiveCompareSummary = {
   whatsappCount: number;
   minecraftCount: number;
+  /** Activos en MC (panel) que ya están en blacklist: no entran en la lista comparada. */
+  ignoredBlacklistedCount: number;
+  ignoredBlacklisted: ActiveCompareEntry[];
   /** Activos en MC que no están activos en el grupo WA (o no existen / se salieron). */
   mcActiveNotInWhatsappActive: ActiveCompareEntry[];
   /** Activos en WA sin coincidencia activa en MC. */
@@ -85,6 +88,17 @@ export function buildActiveCompareData(
       })),
   );
 
+  const ignoredBlacklisted = sortByGamertag(
+    mcPlayers
+      .filter((p) => p.active && p.isBlacklisted)
+      .map((p) => ({
+        id: p.id,
+        gamertag: p.gamertag,
+        label: p.gamertag,
+        detail: "Ya en blacklist — ignorado en esta lista",
+      })),
+  );
+
   const mcActive = sortByGamertag(
     mcPlayers
       .filter((p) => p.active && !p.isBlacklisted)
@@ -137,6 +151,8 @@ export function buildActiveCompareData(
     summary: {
       whatsappCount: waActive.length,
       minecraftCount: mcActive.length,
+      ignoredBlacklistedCount: ignoredBlacklisted.length,
+      ignoredBlacklisted,
       mcActiveNotInWhatsappActive,
       waActiveNotInMcActive,
     },
