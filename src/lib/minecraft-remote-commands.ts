@@ -7,6 +7,7 @@ export const REMOTE_CMD_ACTIONS = [
   "tp",
   "kill_silverfish",
   "kill_withers",
+  "extinguish_fire",
   "allowlist_sync",
   "allowlist_sync_corrected",
 ] as const;
@@ -81,7 +82,12 @@ export function asRemoteCmdQueueData(value: unknown): RemoteCmdQueueData {
 }
 
 export function remoteCmdNeedsTarget(action: RemoteCmdAction): boolean {
-  return action === "spectator" || action === "survival" || action === "tp";
+  return (
+    action === "spectator" ||
+    action === "survival" ||
+    action === "tp" ||
+    action === "extinguish_fire"
+  );
 }
 
 export function remoteCmdNeedsDestination(action: RemoteCmdAction): boolean {

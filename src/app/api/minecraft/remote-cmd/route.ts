@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     typeof body.action === "string" ? body.action.trim() : "";
   if (!isRemoteCmdAction(actionRaw)) {
     return badRequest(
-      `action debe ser uno de: spectator, survival, tp, kill_silverfish, kill_withers, allowlist_sync, allowlist_sync_corrected`,
+      `action debe ser uno de: spectator, survival, tp, kill_silverfish, kill_withers, extinguish_fire, allowlist_sync, allowlist_sync_corrected`,
     );
   }
   const action: RemoteCmdAction = actionRaw;
@@ -140,7 +140,9 @@ export async function POST(request: Request) {
       return badRequest(
         action === "tp"
           ? "targetGamertag (moderador) es obligatorio para tp"
-          : "targetGamertag es obligatorio para spectator/survival",
+          : action === "extinguish_fire"
+            ? "targetGamertag (moderador) es obligatorio para apagar fuego"
+            : "targetGamertag es obligatorio para spectator/survival",
       );
     }
     if (!(await isAdminGamertag(t))) {

@@ -36,3 +36,8 @@ test("tp sigue necesitando gamertag origen", () => {
   assert.equal(remoteCmdNeedsTarget("tp"), true);
   assert.equal(remoteCmdNeedsDestination("tp"), true);
 });
+
+test("apagar fuego necesita al admin online como centro", () => {
+  assert.equal(remoteCmdNeedsTarget("extinguish_fire"), true);
+  assert.equal(remoteCmdNeedsDestination("extinguish_fire"), false);
+});

@@ -19,7 +19,8 @@ type CmdAction =
   | "tp"
   | "tp_coords"
   | "kill_silverfish"
-  | "kill_withers";
+  | "kill_withers"
+  | "extinguish_fire";
 
 const ONLINE_POLL_MS = 10_000;
 
@@ -125,7 +126,13 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
     setMessage(null);
     try {
       const body: {
-        action: "spectator" | "survival" | "tp" | "kill_silverfish" | "kill_withers";
+        action:
+          | "spectator"
+          | "survival"
+          | "tp"
+          | "kill_silverfish"
+          | "kill_withers"
+          | "extinguish_fire";
         targetGamertag?: string;
         destinationGamertag?: string;
         destinationX?: string;
@@ -139,7 +146,8 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
         action === "spectator" ||
         action === "survival" ||
         action === "tp" ||
-        action === "tp_coords"
+        action === "tp_coords" ||
+        action === "extinguish_fire"
       ) {
         if (!requireActiveModerator()) return;
         body.targetGamertag = (
@@ -186,6 +194,10 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
         const z = coordZ.trim() || "~";
         setMessage(
           `TP encolado: ${body.targetGamertag} → ${x} ${y} ${z}. El addon lo ejecuta en unos segundos.`,
+        );
+      } else if (action === "extinguish_fire") {
+        setMessage(
+          `Apagar fuego encolado alrededor de ${body.targetGamertag}. El addon lo ejecuta en unos segundos (radio 24).`,
         );
       } else {
         setMessage(
@@ -303,6 +315,22 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
             ? "Enviando…"
             : "Eliminar todos los withers"}
         </button>
+        <button
+          type="button"
+          disabled={needsModerator}
+          onClick={() => void send("extinguish_fire")}
+          className="rounded-lg bg-orange-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-orange-700 disabled:opacity-50 sm:col-span-2"
+          title="Borra fire y soul_fire en un radio de 24 alrededor del admin. Teleportalo a la casa primero."
+        >
+          {loading === "extinguish_fire"
+            ? "Enviando…"
+            : "Apagar fuego alrededor del admin"}
+        </button>
+        <p className="text-xs text-zinc-500 sm:col-span-2">
+          Para salvar una casa: teletransportá al admin al incendio y pulsá
+          apagar fuego. Quita bloques de fuego/soul_fire en radio 24 (no toca
+          lava ni cambia gamerules).
+        </p>
       </div>
 
       <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">

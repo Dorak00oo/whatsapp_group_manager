@@ -25,7 +25,7 @@ export function DashboardMainHeader() {
             ? "Administración de los usuarios"
             : "Panel";
   const subtitle = isComandos
-    ? "Órdenes al mundo Bedrock vía el addon (espectador, survival, limpieza de mobs)."
+    ? "Órdenes al mundo Bedrock vía el addon (espectador, survival, fuego, limpieza de mobs)."
     : isParcela
       ? "Quién entra y sale del terreno monitoreado, con historial y fechas."
       : isMonitoreo

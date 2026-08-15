@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import {
   formatParcelBounds,
   parcelBlockSpan,
@@ -48,6 +56,8 @@ type Props = {
 
 const POLL_MS = 4000;
 const POLL_MAX_ATTEMPTS = 30;
+/** Auto-refresh del historial mientras la pestaña está visible. */
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
 const PAGE_WINDOW = 9;
 
 /** Páginas a mostrar: siempre 1 y última; ventana centrada en `current`. */
@@ -228,6 +238,53 @@ export function MinecraftParcelSection({
     setPage(data.page);
     setLastBatchAt(data.lastBatchAt);
   }
+
+  const loadingRef = useRef(loading);
+  const syncingRef = useRef(syncing);
+  const pageRef = useRef(page);
+  loadingRef.current = loading;
+  syncingRef.current = syncing;
+  pageRef.current = page;
+
+  useEffect(() => {
+    let id: ReturnType<typeof setInterval> | undefined;
+
+    const tick = () => {
+      if (loadingRef.current || syncingRef.current) return;
+      void loadFromApi(pageRef.current).then((data) => {
+        if (data) applyLoaded(data);
+      });
+    };
+
+    const startIfVisible = () => {
+      if (typeof document === "undefined") return;
+      if (document.visibilityState !== "visible") return;
+      if (id !== undefined) return;
+      id = setInterval(tick, AUTO_REFRESH_MS);
+    };
+
+    const stop = () => {
+      if (id !== undefined) {
+        clearInterval(id);
+        id = undefined;
+      }
+    };
+
+    const onVis = () => {
+      stop();
+      if (document.visibilityState === "visible") {
+        tick();
+        startIfVisible();
+      }
+    };
+
+    startIfVisible();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [loadFromApi]);
 
   async function applyQuery(query: string) {
     setLoading(true);
@@ -448,7 +505,8 @@ export function MinecraftParcelSection({
           <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
             El addon registra entradas, salidas y cofres en el terreno. Acumula
             los eventos en el mundo y los envía a la web cada 5 minutos, o
-            antes si pedís el lote.
+            antes si pedís el lote. El historial de abajo se actualiza solo
+            cada 5 minutos y al llegar un lote nuevo.
           </p>
         </div>
 
@@ -560,8 +618,9 @@ export function MinecraftParcelSection({
           </h3>
           <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
             {totalEvents} eventos guardados en la base de datos.
-            {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""} Quien
-            no esté en el grupo WA aparece resaltado.
+            {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""} Se
+            refresca solo cada 5 min. Quien no esté en el grupo WA aparece
+            resaltado.
           </p>
         </div>
 
