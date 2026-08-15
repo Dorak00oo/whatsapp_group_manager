@@ -27,6 +27,28 @@ export const PARCEL_CONFIG_DEFAULTS: ParcelConfigPayload = {
 
 export type ParcelEventType = "enter" | "exit" | "chest_open";
 
+export const PARCEL_EVENT_TYPES: ParcelEventType[] = [
+  "enter",
+  "exit",
+  "chest_open",
+];
+
+export const PARCEL_EVENT_FILTER_OPTIONS: {
+  value: ParcelEventType;
+  label: string;
+}[] = [
+  { value: "enter", label: "Entrada" },
+  { value: "exit", label: "Salida" },
+  { value: "chest_open", label: "Cofre" },
+];
+
+export function isParcelEventType(value: string): value is ParcelEventType {
+  return (PARCEL_EVENT_TYPES as readonly string[]).includes(value);
+}
+
+/** Eventos por página en el historial del panel. */
+export const PARCEL_PAGE_SIZE = 100;
+
 export function isParcelDimension(value: string): value is ParcelDimension {
   return (PARCEL_DIMENSIONS as readonly string[]).includes(value);
 }

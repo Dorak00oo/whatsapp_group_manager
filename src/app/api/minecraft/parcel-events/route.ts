@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { type ParcelEventType } from "@/lib/minecraft-parcel";
+import {
+  isParcelEventType,
+  PARCEL_PAGE_SIZE,
+  type ParcelEventType,
+} from "@/lib/minecraft-parcel";
 import {
   getLastParcelBatchAt,
   markParcelBatchReceived,
@@ -10,7 +14,7 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 
 const MAX_EVENTS_PER_POST = 500;
-const PANEL_HISTORY_LIMIT = 250;
+const PANEL_MAX_PAGE_SIZE = 100;
 
 function unauthorized() {
   return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -23,7 +27,7 @@ function getBearerToken(request: Request): string | null {
 }
 
 function isEventType(value: string): value is ParcelEventType {
-  return value === "enter" || value === "exit" || value === "chest_open";
+  return isParcelEventType(value);
 }
 
 type ParsedEvent = {
@@ -123,23 +127,64 @@ export async function POST(request: Request) {
   });
 }
 
-/** Panel: historial permanente (lectura; sin escritura). */
-export async function GET() {
+/** Panel: historial permanente, paginado. */
+export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) return unauthorized();
 
-  const [events, total] = await Promise.all([
-    prisma.minecraftParcelEvent.findMany({
-      orderBy: { occurredAt: "desc" },
-      take: PANEL_HISTORY_LIMIT,
-    }),
-    prisma.minecraftParcelEvent.count(),
-  ]);
+  const url = new URL(request.url);
+  const pageSizeRaw = Number(
+    url.searchParams.get("pageSize") ?? PARCEL_PAGE_SIZE,
+  );
+  const pageSize = Number.isFinite(pageSizeRaw)
+    ? Math.min(PANEL_MAX_PAGE_SIZE, Math.max(1, Math.floor(pageSizeRaw)))
+    : PARCEL_PAGE_SIZE;
+  const pageRaw = Number(url.searchParams.get("page") ?? 1);
+  let page = Number.isFinite(pageRaw) ? Math.max(1, Math.floor(pageRaw)) : 1;
+
+  const gamertag = url.searchParams.get("gamertag")?.trim() ?? "";
+  const eventType = url.searchParams.get("event")?.trim() ?? "";
+  const from = url.searchParams.get("from")?.trim() ?? "";
+  const to = url.searchParams.get("to")?.trim() ?? "";
+
+  const where: Record<string, unknown> = {};
+  if (gamertag) {
+    where.gamertag = { contains: gamertag, mode: "insensitive" };
+  }
+  if (isParcelEventType(eventType)) {
+    where.eventType = eventType;
+  }
+  if (from || to) {
+    const occurredAt: { gte?: Date; lte?: Date } = {};
+    if (from) {
+      const d = new Date(from);
+      if (!Number.isNaN(d.getTime())) occurredAt.gte = d;
+    }
+    if (to) {
+      const d = new Date(to);
+      if (!Number.isNaN(d.getTime())) occurredAt.lte = d;
+    }
+    if (Object.keys(occurredAt).length) where.occurredAt = occurredAt;
+  }
+
+  const total = await prisma.minecraftParcelEvent.count({ where });
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (page > totalPages) page = totalPages;
+
+  const events = await prisma.minecraftParcelEvent.findMany({
+    where,
+    orderBy: { occurredAt: "desc" },
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+  });
 
   return NextResponse.json({
     ok: true,
     lastBatchAt: getLastParcelBatchAt(),
     total,
+    page,
+    pageSize,
+    totalPages,
     events: events.map((e) => ({
       id: e.id,
       gamertag: e.gamertag,

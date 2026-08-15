@@ -6,6 +6,7 @@ import {
   MINECRAFT_CONFIG_DEFAULTS,
   minecraftConfigToPayload,
 } from "@/lib/minecraft-config-defaults";
+import { PARCEL_PAGE_SIZE } from "@/lib/minecraft-parcel";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { prisma } from "@/lib/prisma";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
@@ -30,7 +31,7 @@ export default async function DashboardParcelaPage() {
       prisma.minecraftConfig.findUnique({ where: { id: "default" } }),
       prisma.minecraftParcelEvent.findMany({
         orderBy: { occurredAt: "desc" },
-        take: 250,
+        take: PARCEL_PAGE_SIZE,
       }),
       prisma.minecraftParcelEvent.count(),
       prisma.directoryMember.findMany({

@@ -1,10 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useCallback, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import {
   formatParcelBounds,
   parcelBlockSpan,
   PARCEL_DIMENSIONS,
+  PARCEL_EVENT_FILTER_OPTIONS,
+  PARCEL_PAGE_SIZE,
   type ParcelConfigPayload,
 } from "@/lib/minecraft-parcel";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
@@ -45,6 +48,35 @@ type Props = {
 
 const POLL_MS = 4000;
 const POLL_MAX_ATTEMPTS = 30;
+const PAGE_WINDOW = 9;
+
+/** Páginas a mostrar: siempre 1 y última; ventana centrada en `current`. */
+function buildPageItems(current: number, totalPages: number): number[] {
+  if (totalPages <= 1) return [1];
+  if (totalPages <= PAGE_WINDOW + 2) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const half = Math.floor(PAGE_WINDOW / 2);
+  let start = Math.max(2, current - half);
+  let end = Math.min(totalPages - 1, current + half);
+
+  if (end - start + 1 < PAGE_WINDOW) {
+    if (start === 2) end = Math.min(totalPages - 1, start + PAGE_WINDOW - 1);
+    else start = Math.max(2, end - PAGE_WINDOW + 1);
+  }
+
+  const pages = [1];
+  for (let p = start; p <= end; p++) pages.push(p);
+  if (pages[pages.length - 1] !== totalPages) pages.push(totalPages);
+  return pages;
+}
+
+function emptyParcelQuery() {
+  const p = new URLSearchParams();
+  p.set("pageSize", String(PARCEL_PAGE_SIZE));
+  return p.toString();
+}
 
 function xyzFromParcel(
   p: ParcelConfigPayload,
@@ -118,24 +150,51 @@ export function MinecraftParcelSection({
   );
   const [events, setEvents] = useState(initialEvents);
   const [totalEvents, setTotalEvents] = useState(initialTotal);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(
+    Math.max(1, Math.ceil(initialTotal / PARCEL_PAGE_SIZE)),
+  );
   const [lastBatchAt, setLastBatchAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const [filterGamertag, setFilterGamertag] = useState("");
+  const [filterEvent, setFilterEvent] = useState("");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+
+  const filterQueryString = useMemo(() => {
+    const p = new URLSearchParams();
+    if (filterGamertag.trim()) p.set("gamertag", filterGamertag.trim());
+    if (filterEvent) p.set("event", filterEvent);
+    if (filterFrom) p.set("from", new Date(filterFrom).toISOString());
+    if (filterTo) p.set("to", new Date(filterTo).toISOString());
+    p.set("pageSize", String(PARCEL_PAGE_SIZE));
+    return p.toString();
+  }, [filterGamertag, filterEvent, filterFrom, filterTo]);
+
+  const [appliedQuery, setAppliedQuery] = useState(emptyParcelQuery);
 
   const boundsLabel = useMemo(
     () => formatParcelBounds(parcelForm),
     [parcelForm],
   );
 
-  async function loadFromApi() {
-    const res = await fetch("/api/minecraft/parcel-events");
+  const loadFromApi = useCallback(async (pageNum: number, query = appliedQuery) => {
+    const p = new URLSearchParams(query);
+    p.set("page", String(pageNum));
+    p.set("pageSize", String(PARCEL_PAGE_SIZE));
+    const res = await fetch(`/api/minecraft/parcel-events?${p}`);
     if (!res.ok) return null;
     const data = (await res.json()) as {
       ok?: boolean;
       lastBatchAt?: string | null;
       total?: number;
+      page?: number;
+      totalPages?: number;
       events?: Array<{
         id: string;
         gamertag: string;
@@ -149,11 +208,66 @@ export function MinecraftParcelSection({
       }>;
     };
     if (!data.ok || !Array.isArray(data.events)) return null;
+    const total = data.total ?? data.events.length;
     return {
       lastBatchAt: data.lastBatchAt ?? null,
-      total: data.total ?? data.events.length,
+      total,
+      page: data.page ?? pageNum,
+      totalPages:
+        data.totalPages ?? Math.max(1, Math.ceil(total / PARCEL_PAGE_SIZE)),
       events: mapApiEvents(data.events),
     };
+  }, [appliedQuery]);
+
+  function applyLoaded(
+    data: NonNullable<Awaited<ReturnType<typeof loadFromApi>>>,
+  ) {
+    setEvents(data.events);
+    setTotalEvents(data.total);
+    setTotalPages(data.totalPages);
+    setPage(data.page);
+    setLastBatchAt(data.lastBatchAt);
+  }
+
+  async function applyQuery(query: string) {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const data = await loadFromApi(1, query);
+      if (!data) {
+        setMessage("No se pudo cargar el historial.");
+        return;
+      }
+      setAppliedQuery(query);
+      applyLoaded(data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function applyFilters() {
+    void applyQuery(filterQueryString);
+  }
+
+  function clearFilters() {
+    setFilterGamertag("");
+    setFilterEvent("");
+    setFilterFrom("");
+    setFilterTo("");
+    void applyQuery(emptyParcelQuery());
+  }
+
+  function handleFilterFormSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    applyFilters();
+  }
+
+  function handleFilterFormKeyDown(e: KeyboardEvent<HTMLFormElement>) {
+    if (e.key !== "Enter") return;
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "TEXTAREA" || tag === "BUTTON") return;
+    e.preventDefault();
+    applyFilters();
   }
 
   async function saveParcel() {
@@ -204,15 +318,13 @@ export function MinecraftParcelSection({
 
       for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
         await new Promise((r) => setTimeout(r, POLL_MS));
-        const batch = await loadFromApi();
+        const batch = await loadFromApi(1);
         if (!batch) continue;
         const batchArrived =
           (batch.lastBatchAt && batch.lastBatchAt !== beforeBatchAt) ||
           batch.total > beforeTotal;
         if (batchArrived) {
-          setEvents(batch.events);
-          setTotalEvents(batch.total);
-          setLastBatchAt(batch.lastBatchAt);
+          applyLoaded(batch);
           const added = batch.total - beforeTotal;
           setMessage(
             added > 0
@@ -237,14 +349,12 @@ export function MinecraftParcelSection({
     setSyncing(true);
     setMessage(null);
     try {
-      const batch = await loadFromApi();
+      const batch = await loadFromApi(page);
       if (!batch) {
         setMessage("No se pudo leer el historial.");
         return;
       }
-      setEvents(batch.events);
-      setTotalEvents(batch.total);
-      setLastBatchAt(batch.lastBatchAt);
+      applyLoaded(batch);
       setMessage(null);
     } catch {
       setMessage("Error de red al cargar el historial.");
@@ -254,9 +364,8 @@ export function MinecraftParcelSection({
   }
 
   async function clearParcelHistory() {
-    if (totalEvents === 0) return;
     const ok = window.confirm(
-      `¿Borrar los ${totalEvents} evento(s) del historial de parcela? Esta acción no se puede deshacer.`,
+      "¿Borrar TODO el historial de parcela (no solo los filtros actuales)? Esta acción no se puede deshacer.",
     );
     if (!ok) return;
 
@@ -271,8 +380,15 @@ export function MinecraftParcelSection({
         setMessage(data.error ?? "No se pudo limpiar el historial.");
         return;
       }
+      setFilterGamertag("");
+      setFilterEvent("");
+      setFilterFrom("");
+      setFilterTo("");
+      setAppliedQuery(emptyParcelQuery());
       setEvents([]);
       setTotalEvents(0);
+      setPage(1);
+      setTotalPages(1);
       setMessage(
         `Historial de parcela limpiado (${data.deleted ?? 0} evento(s) borrados).`,
       );
@@ -280,6 +396,24 @@ export function MinecraftParcelSection({
       setMessage("Error de red al limpiar el historial.");
     } finally {
       setClearing(false);
+    }
+  }
+
+  async function goToPage(next: number) {
+    if (next < 1 || next > totalPages || next === page) return;
+    setLoading(true);
+    setMessage(null);
+    try {
+      const data = await loadFromApi(next);
+      if (!data) {
+        setMessage("No se pudo cargar el historial.");
+        return;
+      }
+      applyLoaded(data);
+    } catch {
+      setMessage("Error de red al cargar el historial.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -291,6 +425,15 @@ export function MinecraftParcelSection({
     if (!row.active) return "En directorio pero inactivo en WA";
     return null;
   }
+
+  const pageItems = useMemo(
+    () => buildPageItems(page, totalPages),
+    [page, totalPages],
+  );
+  const filtersActive = appliedQuery !== emptyParcelQuery();
+  const pageLinkClass =
+    "text-sky-600 hover:underline disabled:pointer-events-none disabled:opacity-40 dark:text-sky-400";
+  const pageActiveClass = "font-semibold text-zinc-900 dark:text-zinc-50";
 
   return (
     <div className="flex flex-col gap-8">
@@ -420,15 +563,16 @@ export function MinecraftParcelSection({
             Entradas, salidas y cofres
           </h3>
           <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-            Últimos {events.length} de {totalEvents} eventos guardados en la base
-            de datos. Quien no esté en el grupo WA aparece resaltado.
+            {totalEvents} eventos guardados en la base de datos.
+            {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""} Quien
+            no esté en el grupo WA aparece resaltado.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={syncing}
+            disabled={syncing || loading}
             onClick={() => void requestParcelBatch()}
             className={softBtnPrimary}
           >
@@ -436,7 +580,7 @@ export function MinecraftParcelSection({
           </button>
           <button
             type="button"
-            disabled={syncing}
+            disabled={syncing || loading}
             onClick={() => void loadLastBatch()}
             className={softBtnLavender}
           >
@@ -444,7 +588,12 @@ export function MinecraftParcelSection({
           </button>
           <button
             type="button"
-            disabled={clearing || syncing || totalEvents === 0}
+            disabled={
+              clearing ||
+              syncing ||
+              loading ||
+              (totalEvents === 0 && !filtersActive)
+            }
             onClick={() => void clearParcelHistory()}
             className={softBtnPeach}
           >
@@ -458,18 +607,86 @@ export function MinecraftParcelSection({
           </p>
         ) : null}
 
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={handleFilterFormSubmit}
+          onKeyDown={handleFilterFormKeyDown}
+        >
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Jugador
+              <input
+                value={filterGamertag}
+                onChange={(e) => setFilterGamertag(e.target.value)}
+                className={softInputNeutral}
+                placeholder="Gamertag"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Evento
+              <select
+                value={filterEvent}
+                onChange={(e) => setFilterEvent(e.target.value)}
+                className={softInputNeutral}
+              >
+                <option value="">Todos</option>
+                {PARCEL_EVENT_FILTER_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Desde
+              <input
+                type="datetime-local"
+                value={filterFrom}
+                onChange={(e) => setFilterFrom(e.target.value)}
+                className={softInputNeutral}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Hasta
+              <input
+                type="datetime-local"
+                value={filterTo}
+                onChange={(e) => setFilterTo(e.target.value)}
+                className={softInputNeutral}
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className={softBtnLavender}
+            >
+              {loading ? "Filtrando…" : "Aplicar filtros"}
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={clearFilters}
+              className={softBtnLavender}
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        </form>
+
         {events.length === 0 ? (
           <p className="text-sm text-zinc-500">
-            Sin eventos cargados. Activá el monitoreo, subí el addon y pedí el
-            lote con el botón de arriba.
+            {filtersActive
+              ? "Sin eventos con estos filtros."
+              : "Sin eventos cargados. Activá el monitoreo, subí el addon y pedí el lote con el botón de arriba."}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-2xl ring-1 ring-zinc-200/80 dark:ring-zinc-800/80">
             <table className="w-full min-w-[36rem] text-left text-sm">
               <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-900/80 dark:text-zinc-400">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Fecha (MX)</th>
-                  <th className="px-3 py-2 font-medium">Fecha (CO)</th>
+                  <th className="px-3 py-2 font-medium">Hora</th>
                   <th className="px-3 py-2 font-medium">Evento</th>
                   <th className="px-3 py-2 font-medium">Gamertag</th>
                   <th className="px-3 py-2 font-medium">Posición</th>
@@ -488,11 +705,11 @@ export function MinecraftParcelSection({
                           : "border-t border-zinc-100 dark:border-zinc-800/80"
                       }
                     >
-                      <td className="whitespace-nowrap px-3 py-2 text-xs">
-                        {ev.timeMexico}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-xs">
-                        {ev.timeColombia}
+                      <td className="whitespace-nowrap px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
+                        <div>{ev.timeMexico}</div>
+                        <div className="text-[10px] opacity-70">
+                          {ev.timeColombia}
+                        </div>
                       </td>
                       <td className="px-3 py-2">
                         <span
@@ -511,7 +728,14 @@ export function MinecraftParcelSection({
                               : "Salida"}
                         </span>
                       </td>
-                      <td className="px-3 py-2 font-medium">{ev.gamertag}</td>
+                      <td className="px-3 py-2 font-medium">
+                        <Link
+                          href={`/dashboard?q=${encodeURIComponent(ev.gamertag)}`}
+                          className="underline-offset-2 hover:underline"
+                        >
+                          {ev.gamertag}
+                        </Link>
+                      </td>
                       <td className="px-3 py-2 font-mono text-xs text-zinc-500">
                         {ev.x != null && ev.y != null && ev.z != null
                           ? `${ev.x}, ${ev.y}, ${ev.z}`
@@ -527,6 +751,47 @@ export function MinecraftParcelSection({
             </table>
           </div>
         )}
+
+        {totalPages > 1 ? (
+          <nav
+            className="flex flex-wrap items-center justify-center gap-3 text-sm"
+            aria-label="Paginación del historial de parcela"
+          >
+            <button
+              type="button"
+              disabled={loading || syncing || page <= 1}
+              onClick={() => void goToPage(page - 1)}
+              className={pageLinkClass}
+            >
+              Anterior
+            </button>
+            {pageItems.map((p) =>
+              p === page ? (
+                <span key={p} className={pageActiveClass} aria-current="page">
+                  {p}
+                </span>
+              ) : (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={loading || syncing}
+                  onClick={() => void goToPage(p)}
+                  className={pageLinkClass}
+                >
+                  {p}
+                </button>
+              ),
+            )}
+            <button
+              type="button"
+              disabled={loading || syncing || page >= totalPages}
+              onClick={() => void goToPage(page + 1)}
+              className={pageLinkClass}
+            >
+              Siguiente
+            </button>
+          </nav>
+        ) : null}
       </div>
     </div>
   );
