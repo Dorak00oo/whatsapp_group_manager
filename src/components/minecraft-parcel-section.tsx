@@ -13,7 +13,7 @@ import {
   XyzCoordFields,
   type XyzCoordValues,
 } from "@/components/xyz-coord-fields";
-import { softBtnLavender, softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
+import { softBtnLavender, softBtnPeach, softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
 
 export type ParcelEventRow = {
   id: string;
@@ -121,6 +121,7 @@ export function MinecraftParcelSection({
   const [lastBatchAt, setLastBatchAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const boundsLabel = useMemo(
@@ -249,6 +250,36 @@ export function MinecraftParcelSection({
       setMessage("Error de red al cargar el historial.");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function clearParcelHistory() {
+    if (totalEvents === 0) return;
+    const ok = window.confirm(
+      `¿Borrar los ${totalEvents} evento(s) del historial de parcela? Esta acción no se puede deshacer.`,
+    );
+    if (!ok) return;
+
+    setClearing(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/minecraft/parcel-events", {
+        method: "DELETE",
+      });
+      const data = (await res.json()) as { error?: string; deleted?: number };
+      if (!res.ok) {
+        setMessage(data.error ?? "No se pudo limpiar el historial.");
+        return;
+      }
+      setEvents([]);
+      setTotalEvents(0);
+      setMessage(
+        `Historial de parcela limpiado (${data.deleted ?? 0} evento(s) borrados).`,
+      );
+    } catch {
+      setMessage("Error de red al limpiar el historial.");
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -411,7 +442,21 @@ export function MinecraftParcelSection({
           >
             Actualizar historial
           </button>
+          <button
+            type="button"
+            disabled={clearing || syncing || totalEvents === 0}
+            onClick={() => void clearParcelHistory()}
+            className={softBtnPeach}
+          >
+            {clearing ? "Limpiando…" : "Limpiar historial"}
+          </button>
         </div>
+
+        {message ? (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400" role="status">
+            {message}
+          </p>
+        ) : null}
 
         {events.length === 0 ? (
           <p className="text-sm text-zinc-500">

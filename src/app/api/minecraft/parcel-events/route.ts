@@ -153,3 +153,12 @@ export async function GET() {
     })),
   });
 }
+
+/** Panel: borra todo el historial de parcela. */
+export async function DELETE() {
+  const session = await auth();
+  if (!session?.user) return unauthorized();
+
+  const result = await prisma.minecraftParcelEvent.deleteMany();
+  return NextResponse.json({ ok: true, deleted: result.count });
+}
