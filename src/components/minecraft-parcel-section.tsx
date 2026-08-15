@@ -286,7 +286,7 @@ export function MinecraftParcelSection({
       }
       setMessage(
         parcelForm.enabled
-          ? "Parcela guardada y activa. El addon la detecta en el próximo sync (24 h)."
+          ? "Parcela guardada y activa. El addon toma la zona en el próximo sync (~5 min)."
           : "Configuración guardada (monitoreo desactivado).",
       );
     } catch {
@@ -446,13 +446,9 @@ export function MinecraftParcelSection({
             Configurar terreno
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-            El addon registra entradas, salidas y cofres en el mundo de
-            Minecraft. No envía nada a la web hasta que pedís el lote o pasan
-            24 h. En el juego podés ver coordenadas con{" "}
-            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">
-              /gamerule showcoordinates true
-            </code>
-            .
+            El addon registra entradas, salidas y cofres en el terreno. Acumula
+            los eventos en el mundo y los envía a la web cada 5 minutos, o
+            antes si pedís el lote.
           </p>
         </div>
 
