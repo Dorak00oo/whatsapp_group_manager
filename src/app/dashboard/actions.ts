@@ -29,6 +29,7 @@ import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { syncDirectoryMembersFromMinecraftTable } from "@/lib/minecraft-directory-sync";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import { parseMemberSpreadsheet } from "@/lib/spreadsheet-members";
+import type { DirectoryRosterSituation } from "@/lib/directory-situation";
 
 const STALE_SESSION_ERROR =
   "Sesión desactualizada respecto a la base de datos. Cierra sesión y vuelve a entrar.";
@@ -74,6 +75,8 @@ export async function createDirectoryMember(
         isAdmin,
         banExempt,
         permanentlyActive,
+        absentWithCause: false,
+        absentReason: null,
         activeHoldFromMc: permanentlyActive || (active && !markedLeft),
         notes: notesRaw || null,
         userId,
@@ -193,7 +196,7 @@ export async function bulkImportDirectoryMembers(
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/agregar");
-  revalidatePath("/dashboard/importar");
+  revalidatePath("/dashboard/administracion");
 
   return { ok: true, created, errors };
 }
@@ -284,47 +287,7 @@ export async function updateDirectoryMemberNotes(
 }
 
 export async function setDirectoryMemberActive(id: string, active: boolean) {
-  const session = await auth();
-  if (!session?.user) return { error: "No autorizado" };
-  const userId = await resolveDirectoryUserId(session);
-  if (!userId) return { error: STALE_SESSION_ERROR };
-
-  const before = await prisma.directoryMember.findFirst({
-    where: { id, userId },
-    select: {
-      active: true,
-      permanentlyActive: true,
-      gamertag: true,
-      allowlistSyncedAt: true,
-      allowlistRemovedAt: true,
-    },
-  });
-  if (!before) return { error: "No encontrado" };
-
-  const reactivated = active && !before.active;
-  const deactivated = !active && before.active;
-
-  await prisma.directoryMember.updateMany({
-    where: { id, userId },
-    data: {
-      active: active || before.permanentlyActive,
-      activeHoldFromMc: active || before.permanentlyActive,
-      ...(reactivated
-        ? { allowlistAddPending: true, allowlistRemovedAt: null }
-        : !active
-          ? { allowlistAddPending: false }
-          : {}),
-    },
-  });
-
-  if (reactivated) {
-    await cancelPendingAllowlistRemoval(userId, before.gamertag);
-  } else if (deactivated) {
-    await enqueueAllowlistRemovalForMember(userId, before);
-  }
-
-  revalidatePath("/dashboard");
-  return { ok: true as const };
+  return setDirectoryMemberSituation(id, active ? "normal" : "inactive");
 }
 
 export async function toggleDirectoryMemberPermanentlyActive(id: string) {
@@ -339,14 +302,69 @@ export async function toggleDirectoryMemberPermanentlyActive(id: string) {
   });
   if (!member) return { error: "No encontrado" };
 
-  const next = !member.permanentlyActive;
+  if (member.permanentlyActive) {
+    return setDirectoryMemberSituation(id, "normal");
+  }
+  return setDirectoryMemberSituation(id, "permanent");
+}
+
+export async function setDirectoryMemberSituation(
+  id: string,
+  situation: DirectoryRosterSituation,
+  absentReason?: string,
+) {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado" };
+  const userId = await resolveDirectoryUserId(session);
+  if (!userId) return { error: STALE_SESSION_ERROR };
+
+  const before = await prisma.directoryMember.findFirst({
+    where: { id, userId },
+    select: {
+      active: true,
+      permanentlyActive: true,
+      absentWithCause: true,
+      absentReason: true,
+      gamertag: true,
+      allowlistSyncedAt: true,
+      allowlistRemovedAt: true,
+    },
+  });
+  if (!before) return { error: "No encontrado" };
+
+  const reason = (absentReason ?? "").trim();
+  if (situation === "absent" && !reason) {
+    return { error: "La causa de la ausencia es obligatoria" };
+  }
+
+  const stayOnRoster =
+    situation === "normal" ||
+    situation === "permanent" ||
+    situation === "absent";
+  const reactivated = stayOnRoster && !before.active;
+  const deactivated = situation === "inactive" && before.active;
+
   await prisma.directoryMember.updateMany({
     where: { id, userId },
     data: {
-      permanentlyActive: next,
-      ...(next ? { active: true, activeHoldFromMc: true } : {}),
+      active: stayOnRoster,
+      permanentlyActive: situation === "permanent",
+      absentWithCause: situation === "absent",
+      absentReason: situation === "absent" ? reason : null,
+      activeHoldFromMc: stayOnRoster,
+      ...(reactivated
+        ? { allowlistAddPending: true, allowlistRemovedAt: null }
+        : deactivated
+          ? { allowlistAddPending: false }
+          : {}),
     },
   });
+
+  if (reactivated) {
+    await cancelPendingAllowlistRemoval(userId, before.gamertag);
+  } else if (deactivated) {
+    await enqueueAllowlistRemovalForMember(userId, before);
+  }
 
   revalidatePath("/dashboard");
   return { ok: true as const };
@@ -374,7 +392,7 @@ export async function syncDirectoryFromMinecraftPanel(): Promise<SyncFromMinecra
     const summary = await syncDirectoryMembersFromMinecraftTable(userId);
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/minecraft");
-    revalidatePath("/dashboard/importar");
+    revalidatePath("/dashboard/administracion");
     return { ok: true, ...summary };
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
@@ -426,7 +444,7 @@ export async function addDirectoryStrike(
   });
 
   revalidatePath("/dashboard");
-  revalidatePath("/dashboard/importar");
+  revalidatePath("/dashboard/administracion");
   return { ok: true };
 }
 
@@ -455,7 +473,7 @@ export async function removeDirectoryStrike(
   });
 
   revalidatePath("/dashboard");
-  revalidatePath("/dashboard/importar");
+  revalidatePath("/dashboard/administracion");
 }
 
 export async function setDirectoryMemberBan(formData: FormData) {
@@ -552,8 +570,20 @@ export async function setDirectoryMemberLeft(id: string, left: boolean) {
   await prisma.directoryMember.updateMany({
     where: { id, userId },
     data: left
-      ? { leftAt: new Date(), active: false, allowlistAddPending: false }
-      : { leftAt: null },
+      ? {
+          leftAt: new Date(),
+          active: false,
+          allowlistAddPending: false,
+          absentWithCause: false,
+          absentReason: null,
+        }
+      : {
+          leftAt: null,
+          active: true,
+          absentWithCause: false,
+          absentReason: null,
+          activeHoldFromMc: true,
+        },
   });
 
   if (left) {
@@ -614,7 +644,14 @@ export async function bulkMarkInactiveFromMinecraftLog(
           gamertag: { equals: g, mode: "insensitive" as const },
         })),
       },
-      select: { id: true, gamertag: true, active: true, leftAt: true },
+      select: {
+        id: true,
+        gamertag: true,
+        active: true,
+        leftAt: true,
+        permanentlyActive: true,
+        absentWithCause: true,
+      },
     });
 
     const byTagLower = new Map<string, typeof members>();
@@ -637,6 +674,9 @@ export async function bulkMarkInactiveFromMinecraftLog(
       for (const row of list) {
         if (row.leftAt != null) {
           skippedLeft++;
+          continue;
+        }
+        if (row.permanentlyActive || row.absentWithCause) {
           continue;
         }
         if (!row.active) {
@@ -663,7 +703,7 @@ export async function bulkMarkInactiveFromMinecraftLog(
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/agregar");
-    revalidatePath("/dashboard/importar");
+    revalidatePath("/dashboard/administracion");
 
     return {
       ok: true,

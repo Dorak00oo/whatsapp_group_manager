@@ -88,6 +88,12 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
     },
     {
       kind: "option",
+      value: "absent",
+      label: "Ausentes con causa",
+      accent: "cyan",
+    },
+    {
+      kind: "option",
       value: "left",
       label: "Los que se salieron",
       accent: "amber",

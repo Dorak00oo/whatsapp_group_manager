@@ -152,7 +152,7 @@ export async function POST(request: Request) {
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/minecraft");
-    revalidatePath("/dashboard/importar");
+    revalidatePath("/dashboard/administracion");
 
     return NextResponse.json({
       ok: true,

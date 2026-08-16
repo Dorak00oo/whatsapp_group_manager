@@ -1,4 +1,5 @@
 import { memberIsNew } from "@/lib/directory-cohort";
+import { memberRosterSituation } from "@/lib/directory-situation";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
 const base =
@@ -7,23 +8,16 @@ const base =
 type Props = { m: DirectoryMemberDTO; compact?: boolean };
 
 /**
- * Los seis roles / situaciones que pediste, visibles juntos en cada ficha.
+ * Roles / situaciones visibles juntos en cada ficha.
  * `compact`: etiquetas cortas y sin título de sección (vista lista).
  */
 export function DirectoryMemberRoleChips({ m, compact }: Props) {
   const isNew = memberIsNew(m.createdAt, m.leftAt);
+  const situation = memberRosterSituation(m);
 
   const chips: { key: string; label: string; short: string; className: string }[] =
     [];
 
-  if (m.permanentlyActive && !m.leftAt) {
-    chips.push({
-      key: "permanent",
-      label: "Activo permanente",
-      short: "Permanente",
-      className: `${base} bg-amber-200 text-amber-950 ring-amber-400/85 dark:bg-amber-950/75 dark:text-amber-100 dark:ring-amber-700/65`,
-    });
-  }
   if (m.isAdmin) {
     chips.push({
       key: "admin",
@@ -40,18 +34,34 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       className: `${base} bg-cyan-200 text-cyan-950 ring-cyan-300/80 dark:bg-cyan-900/45 dark:text-cyan-100 dark:ring-cyan-700/50`,
     });
   }
-  if (m.leftAt) {
+  if (situation === "left") {
     chips.push({
       key: "left",
       label: "Los que se salieron",
       short: "Salió",
       className: `${base} bg-amber-100 text-amber-950 ring-amber-400/90 dark:bg-amber-950/75 dark:text-amber-100 dark:ring-amber-600/70`,
     });
-  } else if (m.active) {
+  } else if (situation === "absent") {
+    chips.push({
+      key: "absent",
+      label: m.absentReason
+        ? `Ausente con causa: ${m.absentReason}`
+        : "Ausente con causa",
+      short: "Ausente",
+      className: `${base} bg-sky-200 text-sky-950 ring-sky-400/85 dark:bg-sky-950/75 dark:text-sky-100 dark:ring-sky-600/65`,
+    });
+  } else if (situation === "permanent") {
+    chips.push({
+      key: "permanent",
+      label: "Activo permanente",
+      short: "Permanente",
+      className: `${base} bg-amber-200 text-amber-950 ring-amber-400/85 dark:bg-amber-950/75 dark:text-amber-100 dark:ring-amber-700/65`,
+    });
+  } else if (situation === "normal") {
     chips.push({
       key: "roster",
-      label: "Los que estuvieron activos",
-      short: "Activo",
+      label: "Activo normal",
+      short: "Normal",
       className: `${base} bg-emerald-200 text-emerald-950 ring-emerald-500/95 dark:bg-emerald-950/85 dark:text-emerald-50 dark:ring-emerald-500`,
     });
   } else {
@@ -79,7 +89,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
     });
   }
 
-  const wrap = compact ? "mt-0" : "mt-2 flex flex-col gap-1.5";
+  const wrap = compact ? "mt-0" : "mt-2 flex flex-col gap-2";
 
   return (
     <div className={wrap}>
@@ -88,9 +98,9 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
           Roles y situación
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {chips.map((c) => (
-          <span key={c.key} className={compact ? `${c.className} py-0.5` : c.className}>
+          <span key={c.key} className={compact ? `${c.className} py-0.5` : `${c.className} px-3 py-1`}>
             {compact ? c.short : c.label}
           </span>
         ))}

@@ -5,15 +5,23 @@ import {
 } from "@/lib/minecraft-active";
 import { MINECRAFT_CONFIG_DEFAULTS } from "@/lib/minecraft-config-defaults";
 
-function directoryMayReceiveMcInactive(): { permanentlyActive: false; activeHoldFromMc: false } {
-  return { permanentlyActive: false, activeHoldFromMc: false };
+function directoryMayReceiveMcInactive(): {
+  permanentlyActive: false;
+  activeHoldFromMc: false;
+  absentWithCause: false;
+} {
+  return {
+    permanentlyActive: false,
+    activeHoldFromMc: false,
+    absentWithCause: false,
+  };
 }
 
 /**
  * Alinea `DirectoryMember.active` con el estado deseado (p. ej. activo en
  * servidor **y** no blacklist) cuando el gamertag coincide (sin distinguir
  * mayúsculas). No modifica filas con `leftAt` (se salieron del grupo).
- * Respeta `permanentlyActive` y `activeHoldFromMc` al bajar a inactivo.
+ * Respeta `permanentlyActive`, `absentWithCause` y `activeHoldFromMc` al bajar a inactivo.
  */
 export async function syncDirectoryActiveWithMinecraft(
   gamertag: string,
@@ -39,7 +47,7 @@ export async function syncDirectoryActiveWithMinecraft(
 
   if (minecraftActive) {
     await prisma.directoryMember.updateMany({
-      where: baseWhere,
+      where: { ...baseWhere, absentWithCause: false },
       data: { active: true },
     });
     return;
@@ -65,7 +73,7 @@ export type SyncDirectoryFromMinecraftSummary = {
 /**
  * Alinea el directorio con el roster de Minecraft (misma regla que Reconciliación:
  * activo en MC y sin blacklist, usando el último snapshot si existe).
- * Solo filas del panel sin `leftAt`. El activo permanente no se baja.
+ * Solo filas del panel sin `leftAt`. El activo permanente y el ausente con causa no se bajan.
  * Esta acción de panel ignora `activeHoldFromMc` (si no, casi nadie se inactiva).
  */
 export async function syncDirectoryMembersFromMinecraftTable(
@@ -104,6 +112,7 @@ export async function syncDirectoryMembersFromMinecraftTable(
       displayName: true,
       active: true,
       permanentlyActive: true,
+      absentWithCause: true,
     },
   });
 
@@ -127,6 +136,7 @@ export async function syncDirectoryMembersFromMinecraftTable(
     if (mcActive) matchedGamertags += 1;
 
     const shouldBeActive = m.permanentlyActive || mcActive;
+    if (m.absentWithCause) continue;
     if (m.active === shouldBeActive) continue;
     if (shouldBeActive) {
       toActivate.push(m.id);

@@ -77,7 +77,7 @@ export function directoryMemberWhere(
       parts.push({ banExempt: true });
       break;
     case "roster":
-      parts.push({ active: true, leftAt: null });
+      parts.push({ active: true, leftAt: null, absentWithCause: false });
       break;
     case "new": {
       const cutoff = new Date(now);
@@ -86,7 +86,10 @@ export function directoryMemberWhere(
       break;
     }
     case "inactive":
-      parts.push({ active: false, leftAt: null });
+      parts.push({ active: false, leftAt: null, absentWithCause: false });
+      break;
+    case "absent":
+      parts.push({ absentWithCause: true, leftAt: null });
       break;
     case "left":
       parts.push({ leftAt: { not: null } });
@@ -103,6 +106,7 @@ export function directoryMemberWhere(
         { displayName: { contains: q, mode: "insensitive" } },
         { phone: { contains: q } },
         { notes: { contains: q, mode: "insensitive" } },
+        { absentReason: { contains: q, mode: "insensitive" } },
         { bannedReason: { contains: q, mode: "insensitive" } },
         {
           strikes: {

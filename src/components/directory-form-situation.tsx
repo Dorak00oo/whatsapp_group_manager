@@ -45,7 +45,7 @@ export function DirectoryFormSituation() {
 
       <FormSwitch
         name="active"
-        label="Los que estuvieron activos (sigue en roster y participa)"
+        label="Activo normal (sigue en roster; Minecraft puede pasar a inactivo)"
         checked={left ? false : active}
         onCheckedChange={(next) => {
           if (!left) setActive(next);
@@ -57,7 +57,7 @@ export function DirectoryFormSituation() {
       {!left ? (
         <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
           Si lo apagas, la persona queda en «Los inactivos» (sigue en la lista,
-          sin participar).
+          sin participar). El alta usa activo normal por defecto, no permanente.
         </p>
       ) : (
         <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">

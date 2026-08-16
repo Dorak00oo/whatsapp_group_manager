@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node tools/dev.mjs",
-    "dev:next": "next dev -p 3002",
+    "dev:next": "next dev --webpack -p 3000",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",

@@ -11,7 +11,7 @@ export function DashboardMainHeader() {
   const isMinecraft = pathname.startsWith("/dashboard/minecraft");
   const isParcela = pathname.startsWith("/dashboard/parcela");
   const isMonitoreo = pathname.startsWith("/dashboard/monitoreo");
-  const isImportar = pathname.startsWith("/dashboard/importar");
+  const isAdministracion = pathname.startsWith("/dashboard/administracion");
 
   const title = isComandos
     ? "Comandos rápidos"
@@ -21,7 +21,7 @@ export function DashboardMainHeader() {
         ? "Monitoreo"
         : isMinecraft
           ? "Jugadores de Minecraft"
-          : isImportar
+          : isAdministracion
             ? "Administración de los usuarios"
             : "Panel";
   const subtitle = isComandos
@@ -32,7 +32,7 @@ export function DashboardMainHeader() {
         ? "Bloques, fuego, lava, TNT y withers en Overworld — filtros por jugador, ítem, hora y coordenadas."
         : isMinecraft
           ? "Estado de actividad de jugadores del servidor de Minecraft."
-          : isImportar
+          : isAdministracion
             ? "Administración de jugadores, allowlist, auditoría de gamertags y comparación con Minecraft."
             : "Directorio de personas, filtros, importación y monitoreo Minecraft.";
 

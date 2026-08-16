@@ -103,6 +103,8 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
     "border-l-[5px] border-l-slate-700 border-solid dark:border-l-slate-400";
   const neonAmber =
     "border-l-[5px] border-l-amber-700 border-solid dark:border-l-amber-500";
+  const neonSky =
+    "border-l-[5px] border-l-sky-700 border-solid dark:border-l-sky-400";
   const neonRed =
     "border-l-[5px] border-l-red-800 border-solid dark:border-l-red-600";
 
@@ -110,9 +112,11 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
     ? `bg-red-100 dark:bg-red-950/65 ${neonRed}`
     : m.leftAt
       ? `bg-amber-50 dark:bg-amber-950/40 ${neonAmber}`
-      : m.active
-        ? `bg-emerald-100 dark:bg-emerald-950/55 ${neonEmerald}`
-        : `bg-slate-100 dark:bg-slate-900/55 ${neonAsh}`;
+      : m.absentWithCause
+        ? `bg-sky-100 dark:bg-sky-950/50 ${neonSky}`
+        : m.active
+          ? `bg-emerald-100 dark:bg-emerald-950/55 ${neonEmerald}`
+          : `bg-slate-100 dark:bg-slate-900/55 ${neonAsh}`;
 
   function openEditor() {
     setFormKey((k) => k + 1);

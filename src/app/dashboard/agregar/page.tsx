@@ -19,7 +19,7 @@ export default function DashboardAgregarPage() {
           strikes y baneos desde la lista. Para administración del allowlist y
           strikes usa{" "}
           <Link
-            href="/dashboard/importar"
+            href="/dashboard/administracion"
             className="font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
           >
             Administración de jugadores

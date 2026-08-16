@@ -167,7 +167,7 @@ function useNavActive() {
   const pathname = usePathname();
   const list = pathname === "/dashboard";
   const add = pathname.startsWith("/dashboard/agregar");
-  const bulk = pathname.startsWith("/dashboard/importar");
+  const bulk = pathname.startsWith("/dashboard/administracion");
   const minecraft = pathname.startsWith("/dashboard/minecraft");
   const comandos = pathname.startsWith("/dashboard/comandos");
   const parcela = pathname.startsWith("/dashboard/parcela");
@@ -214,7 +214,7 @@ export function DashboardSidebarNav() {
         <IconUserPlus className={iconSidebar} />
       </Link>
       <Link
-        href="/dashboard/importar"
+        href="/dashboard/administracion"
         className={`${linkBaseSidebar} ${activeCls(bulk)}`}
         title="Administración de jugadores"
         aria-current={bulk ? "page" : undefined}
@@ -283,7 +283,7 @@ export function DashboardMobileTabNav() {
         <span className="text-[10px] font-medium leading-none">Agregar</span>
       </Link>
       <Link
-        href="/dashboard/importar"
+        href="/dashboard/administracion"
         className={`${tabBase} ${activeTabCls(bulk)}`}
         aria-current={bulk ? "page" : undefined}
       >

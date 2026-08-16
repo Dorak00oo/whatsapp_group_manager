@@ -107,6 +107,8 @@ export default async function DashboardPage({
     phoneCountry: m.phoneCountry,
     active: m.active,
     permanentlyActive: m.permanentlyActive,
+    absentWithCause: m.absentWithCause,
+    absentReason: m.absentReason,
     isAdmin: m.isAdmin,
     banExempt: m.banExempt,
     leftAt: m.leftAt?.toISOString() ?? null,

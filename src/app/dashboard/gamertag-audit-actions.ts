@@ -80,7 +80,7 @@ export async function approveGamertagAuditSuggestion(
     ]);
 
     revalidatePath("/dashboard");
-    revalidatePath("/dashboard/importar");
+    revalidatePath("/dashboard/administracion");
     return { ok: true, newGamertag: suggestion.suggestedGamertag };
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
@@ -111,7 +111,7 @@ export async function rejectGamertagAuditSuggestion(
       return { error: "La sugerencia no existe o ya fue resuelta." };
     }
 
-    revalidatePath("/dashboard/importar");
+    revalidatePath("/dashboard/administracion");
     return { ok: true };
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {

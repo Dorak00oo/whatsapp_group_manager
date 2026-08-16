@@ -2,30 +2,18 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
-  addDirectoryStrikeFromForm,
   deleteDirectoryMember,
-  setDirectoryMemberActive,
   setDirectoryMemberBan,
   setDirectoryMemberLeft,
   toggleDirectoryMemberBanExempt,
   toggleDirectoryMemberIsAdmin,
-  toggleDirectoryMemberPermanentlyActive,
   updateDirectoryMemberNotes,
 } from "@/app/dashboard/actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
+import { DirectoryMemberSituationPicker } from "@/components/directory-member-situation-picker";
 import { getCallingCodeOptions } from "@/lib/phone-calling-codes";
 import { splitPhoneForDirectoryForm } from "@/lib/phone-normalize";
-import {
-  formatStrikeDisplay,
-  formatStrikeKindLabel,
-  MAX_DIRECTORY_STRIKES,
-  memberHasStrikeWithoutReason,
-  parseStrikeKind,
-  STRIKE_KIND_DEFINITIVE,
-  STRIKE_KIND_PENDING,
-  type StrikeKind,
-} from "@/lib/directory-strikes";
 import { softBtnMint, softInputNeutral, softSelectNeutral } from "@/lib/soft-ui";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
@@ -51,7 +39,6 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
     null,
   );
   const [confirm, setConfirm] = useState<"delete" | "left" | null>(null);
-  const [strikeKind, setStrikeKind] = useState<StrikeKind>(STRIKE_KIND_PENDING);
   const confirmRef = useRef(confirm);
   const country = regionLabel(m.phoneCountry);
   const phoneCountryOptions = useMemo(() => getCallingCodeOptions("es"), []);
@@ -102,16 +89,10 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
     });
   }
 
-  function onToggleActive() {
-    startTransition(async () => {
-      await setDirectoryMemberActive(m.id, !m.active);
-    });
-  }
-
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-8 lg:p-10">
       <button
         type="button"
         className="absolute inset-0 bg-zinc-950/55 backdrop-blur-[2px] transition-opacity dark:bg-black/65"
@@ -122,22 +103,22 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
         role="dialog"
         aria-modal
         aria-labelledby={`member-edit-title-${m.id}`}
-        className="relative z-10 flex max-h-[min(100dvh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[1.75rem] bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200/90 sm:max-h-[min(90vh,720px)] sm:rounded-[1.75rem] sm:pb-0 dark:bg-zinc-900 dark:shadow-none dark:ring-zinc-700/60"
+        className="relative z-10 flex max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[1.75rem] bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200/90 sm:max-h-[min(94vh,1100px)] sm:min-h-[min(82vh,760px)] sm:rounded-[1.75rem] sm:pb-0 dark:bg-zinc-900 dark:shadow-none dark:ring-zinc-700/60"
       >
-        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800 sm:px-5 sm:py-4">
+        <header className="flex shrink-0 items-start justify-between gap-6 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800 sm:px-10 sm:py-7">
           <div className="min-w-0">
             <h2
               id={`member-edit-title-${m.id}`}
-              className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50"
+              className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50"
             >
               Editar — {m.gamertag}
             </h2>
             {m.displayName ? (
-              <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-300">
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
                 Nombre: {m.displayName}
               </p>
             ) : null}
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
               {country ? `${country} · ` : null}
               <a
                 href={`tel:${m.phone.replace(/\s/g, "")}`}
@@ -154,17 +135,22 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg border border-zinc-200 px-2.5 py-1 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
           >
             Cerrar
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8 sm:px-10 sm:py-10">
           <DirectoryMemberRoleChips m={m} />
+          <DirectoryMemberSituationPicker
+            m={m}
+            pending={pending}
+            startTransition={startTransition}
+          />
 
           {m.leftAt ? (
-            <p className="mt-3 text-xs text-slate-600 dark:text-slate-400">
+            <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
               Salida registrada:{" "}
               <time dateTime={m.leftAt} suppressHydrationWarning>
                 {new Date(m.leftAt).toLocaleString("es")}
@@ -173,115 +159,53 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
           ) : null}
 
           {m.banned && m.bannedReason ? (
-            <p className="mt-3 text-sm text-red-700 dark:text-red-300">
+            <p className="mt-4 text-sm text-red-700 dark:text-red-300">
               <span className="font-medium">Motivo del ban:</span> {m.bannedReason}
             </p>
           ) : null}
 
           {m.banExempt ? (
-            <p className="mt-3 text-xs text-cyan-800 dark:text-cyan-200">
+            <p className="mt-4 text-sm text-cyan-800 dark:text-cyan-200">
               Persona protegida: el ban no aplica (puedes quitar protección para
               banear si corresponde).
             </p>
           ) : null}
 
-          {m.strikes.length > 0 ? (
-            <div className="mt-4">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                Historial de strikes
-              </p>
-              <ul className="max-h-40 space-y-1.5 overflow-y-auto rounded-lg border border-amber-200/80 bg-amber-50/40 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
-                {m.strikes.map((s) => (
-                  <li
-                    key={s.id}
-                    className="text-xs text-zinc-700 dark:text-zinc-300"
-                  >
-                    <span className="text-zinc-400 dark:text-zinc-500">
-                      {new Date(s.createdAt).toLocaleString("es")} —{" "}
-                    </span>
-                    {formatStrikeDisplay(parseStrikeKind(s.kind), s.reason)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          <form action={addDirectoryStrikeFromForm} className="mt-4 flex flex-col gap-2">
-            <input type="hidden" name="memberId" value={m.id} />
-            <input type="hidden" name="kind" value={strikeKind} />
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={m.strikes.length >= MAX_DIRECTORY_STRIKES}
-                onClick={() => setStrikeKind(STRIKE_KIND_PENDING)}
-                className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-50 ${
-                  strikeKind === STRIKE_KIND_PENDING
-                    ? "border-amber-400 bg-amber-100 text-amber-950 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-100"
-                    : "border-zinc-300 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
-                }`}
-              >
-                ? Pendiente
-              </button>
-              <button
-                type="button"
-                disabled={m.strikes.length >= MAX_DIRECTORY_STRIKES}
-                onClick={() => setStrikeKind(STRIKE_KIND_DEFINITIVE)}
-                className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-50 ${
-                  strikeKind === STRIKE_KIND_DEFINITIVE
-                    ? "border-red-400 bg-red-100 text-red-950 dark:border-red-700 dark:bg-red-950/50 dark:text-red-100"
-                    : "border-zinc-300 bg-white text-zinc-600 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300"
-                }`}
-              >
-                X Definitivo
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-            <input
-              name="reason"
-              placeholder="Causa (opcional)"
-              disabled={m.strikes.length >= MAX_DIRECTORY_STRIKES}
-              className="min-w-[12rem] flex-1 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-            />
-            <button
-              type="submit"
-              disabled={pending || m.strikes.length >= MAX_DIRECTORY_STRIKES}
-              className="rounded-lg border border-amber-400/80 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 dark:hover:bg-amber-950/60"
-            >
-              Añadir strike ({m.strikes.length}/{MAX_DIRECTORY_STRIKES})
-            </button>
-            </div>
-          </form>
-          {m.strikes.length >= MAX_DIRECTORY_STRIKES ? (
-            <p className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">
-              Máximo {MAX_DIRECTORY_STRIKES} strikes por jugador.
-            </p>
-          ) : memberHasStrikeWithoutReason(m.strikes) ? (
-            <p className="mt-1 text-[10px] text-zinc-500 dark:text-zinc-400">
-              Ya hay un strike sin causa escrita; el siguiente necesita
-              descripción.
-            </p>
-          ) : null}
-
           <form
             action={profileAction}
-            className="mt-5 flex flex-col gap-3"
+            className="mt-10 flex flex-col gap-6"
           >
             <input type="hidden" name="memberId" value={m.id} />
-            <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Gamertag{" "}
-              <span className="font-normal text-zinc-500 dark:text-zinc-400">
-                (principal)
-              </span>
-              <input
-                name="gamertag"
-                required
-                autoComplete="nickname"
-                defaultValue={m.gamertag}
-                placeholder="Ej. CabraTNT, minero_feliz"
-                className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-              />
-            </label>
-            <div className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
+              <label className="flex min-w-0 flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Gamertag{" "}
+                <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                  (principal)
+                </span>
+                <input
+                  name="gamertag"
+                  required
+                  autoComplete="nickname"
+                  defaultValue={m.gamertag}
+                  placeholder="Ej. CabraTNT, minero_feliz"
+                  className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+              </label>
+              <label className="flex min-w-0 flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Nombre{" "}
+                <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                  (opcional, WhatsApp)
+                </span>
+                <input
+                  name="displayName"
+                  type="text"
+                  defaultValue={m.displayName ?? ""}
+                  placeholder="Ej. cómo se presenta en WhatsApp"
+                  className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+              </label>
+            </div>
+            <div className="flex flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
               <span>Celular</span>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                 <label className="sr-only" htmlFor={`edit-phone-country-${m.id}`}>
@@ -312,25 +236,15 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                 />
               </div>
             </div>
-            <label className="flex flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Nombre (opcional, distinto del gamertag)
-              <input
-                name="displayName"
-                type="text"
-                defaultValue={m.displayName ?? ""}
-                placeholder="Ej. cómo se presenta en la comunidad"
-                className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-              />
-            </label>
             <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
               Nota
             </label>
             <textarea
               name="notes"
-              rows={3}
+              rows={5}
               defaultValue={m.notes ?? ""}
               placeholder="Sin nota…"
-              className="resize-y rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+              className="resize-y rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
             />
             {profileState?.error ? (
               <p className="text-xs text-red-600 dark:text-red-400">
@@ -346,7 +260,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
             </button>
           </form>
 
-          <div className="mt-5 border-t border-zinc-200 pt-5 dark:border-zinc-800">
+          <div className="mt-10 border-t border-zinc-200 pt-8 dark:border-zinc-800">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               Ban
             </p>
@@ -389,11 +303,11 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
             )}
           </div>
 
-          <div className="mt-5 border-t border-zinc-200 pt-5 dark:border-zinc-800">
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          <div className="mt-10 border-t border-zinc-200 pt-8 dark:border-zinc-800">
+            <p className="mb-4 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               Acciones rápidas
             </p>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3 sm:grid sm:grid-cols-2">
               <button
                 type="button"
                 disabled={pending}
@@ -402,7 +316,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                     await toggleDirectoryMemberIsAdmin(m.id);
                   })
                 }
-                className="w-full rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-left text-sm font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-200 dark:hover:bg-violet-950/50 sm:w-auto sm:min-w-[12rem]"
+                className="w-full rounded-lg border border-violet-200 bg-violet-50/80 px-4 py-3 text-left text-sm font-medium text-violet-900 hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-200 dark:hover:bg-violet-950/50"
               >
                 {m.isAdmin ? "Quitar admin" : "Marcar admin"}
               </button>
@@ -414,23 +328,9 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                     await toggleDirectoryMemberBanExempt(m.id);
                   })
                 }
-                className="w-full rounded-lg border border-cyan-200 bg-cyan-50/80 px-3 py-2 text-left text-sm font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200 dark:hover:bg-cyan-950/50 sm:w-auto sm:min-w-[12rem]"
+                className="w-full rounded-lg border border-cyan-200 bg-cyan-50/80 px-4 py-3 text-left text-sm font-medium text-cyan-900 hover:bg-cyan-100 disabled:opacity-50 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200 dark:hover:bg-cyan-950/50"
               >
                 {m.banExempt ? "Quitar protección" : "Proteger (sin ban)"}
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await toggleDirectoryMemberPermanentlyActive(m.id);
-                  })
-                }
-                className="w-full rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-left text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/50 sm:w-auto sm:min-w-[12rem]"
-              >
-                {m.permanentlyActive
-                  ? "Quitar activo permanente"
-                  : "Activo permanente"}
               </button>
               {m.leftAt ? (
                 <button
@@ -441,7 +341,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                       await setDirectoryMemberLeft(m.id, false);
                     })
                   }
-                  className="w-full rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-left text-sm font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50 sm:w-auto sm:min-w-[12rem]"
+                  className="w-full rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-left text-sm font-medium text-emerald-900 hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200 dark:hover:bg-emerald-950/50"
                 >
                   Volvió a la comunidad
                 </button>
@@ -450,7 +350,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                   type="button"
                   disabled={pending}
                   onClick={() => setConfirm("left")}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-900/60 sm:w-auto sm:min-w-[12rem]"
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-200 dark:hover:bg-slate-900/60"
                 >
                   Se salió
                 </button>
@@ -458,16 +358,8 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
               <button
                 type="button"
                 disabled={pending}
-                onClick={onToggleActive}
-                className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-900/40 dark:text-zinc-200 dark:hover:bg-zinc-800 sm:w-auto sm:min-w-[12rem]"
-              >
-                {m.active ? "Marcar inactivo" : "Marcar activo"}
-              </button>
-              <button
-                type="button"
-                disabled={pending}
                 onClick={() => setConfirm("delete")}
-                className="w-full rounded-lg border border-red-200 bg-red-50/80 px-3 py-2 text-left text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200 dark:hover:bg-red-950/50 sm:w-auto sm:min-w-[12rem]"
+                className="w-full rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-left text-sm font-medium text-red-800 hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200 dark:hover:bg-red-950/50"
               >
                 Eliminar
               </button>

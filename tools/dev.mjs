@@ -78,7 +78,7 @@ async function ensureTunnel() {
 }
 
 function runNextDev() {
-  const child = spawn("npx", ["next", "dev", "-p", "3002"], {
+  const child = spawn("npx", ["next", "dev", "--webpack", "-p", "3000"], {
     cwd: root,
     stdio: "inherit",
     shell: true,

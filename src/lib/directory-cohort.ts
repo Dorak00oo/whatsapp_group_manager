@@ -21,6 +21,7 @@ export type DirectoryCohort =
   | "roster"
   | "new"
   | "inactive"
+  | "absent"
   | "left";
 
 export function parseDirectoryCohort(
@@ -32,6 +33,7 @@ export function parseDirectoryCohort(
     case "roster":
     case "new":
     case "inactive":
+    case "absent":
     case "left":
       return raw;
     default:

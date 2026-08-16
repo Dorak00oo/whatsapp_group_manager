@@ -34,6 +34,12 @@ model DirectoryMember {
    */
   permanentlyActive Boolean                  @default(false) @map("permanently_active")
   /**
+   * Ausente con causa: sigue en comunidad y en allowlist, distinto de activo
+   * normal y de activo permanente. El sync de Minecraft no le cambia la situación.
+   */
+  absentWithCause Boolean                    @default(false) @map("absent_with_cause")
+  absentReason     String?                   @map("absent_reason")
+  /**
    * Tras marcar activo a mano, el sync de Minecraft no vuelve a poner inactivo
    * hasta que lo marques inactivo otra vez (salvo activo permanente).
    */
