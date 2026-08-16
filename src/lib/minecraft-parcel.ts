@@ -25,6 +25,142 @@ export const PARCEL_CONFIG_DEFAULTS: ParcelConfigPayload = {
   maxZ: 15,
 };
 
+/** Id estable de la parcela original (migración + fallback del addon). */
+export const PRIMARY_PARCEL_ID = "primary";
+
+/** Parcelas extra además de la original. */
+export const MAX_EXTRA_PARCELS = 5;
+
+export type ParcelRecordPayload = ParcelConfigPayload & {
+  id: string;
+  isPrimary: boolean;
+};
+
+export function canDeleteParcel(isPrimary: boolean): boolean {
+  return !isPrimary;
+}
+
+export function canAddExtraParcel(extraCount: number): boolean {
+  return extraCount < MAX_EXTRA_PARCELS;
+}
+
+export function resolveEventParcelId(
+  raw: unknown,
+  knownIds: Set<string>,
+): string {
+  const id = typeof raw === "string" ? raw.trim() : "";
+  if (id && knownIds.has(id)) return id;
+  if (knownIds.has(PRIMARY_PARCEL_ID)) return PRIMARY_PARCEL_ID;
+  const first = knownIds.values().next().value;
+  return typeof first === "string" ? first : PRIMARY_PARCEL_ID;
+}
+
+/** Extra nueva: apagada, caja por defecto. `extraIndex` 1 → "Parcela 2". */
+export function extraParcelCreatePayload(extraIndex: number): ParcelRecordPayload {
+  const n = Math.max(1, Math.floor(extraIndex));
+  return {
+    id: crypto.randomUUID(),
+    isPrimary: false,
+    enabled: false,
+    name: `Parcela ${n + 1}`,
+    dimension: PARCEL_CONFIG_DEFAULTS.dimension,
+    minX: PARCEL_CONFIG_DEFAULTS.minX,
+    minY: PARCEL_CONFIG_DEFAULTS.minY,
+    minZ: PARCEL_CONFIG_DEFAULTS.minZ,
+    maxX: PARCEL_CONFIG_DEFAULTS.maxX,
+    maxY: PARCEL_CONFIG_DEFAULTS.maxY,
+    maxZ: PARCEL_CONFIG_DEFAULTS.maxZ,
+  };
+}
+
+export type ParcelRow = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  dimension: string;
+  minX: number;
+  minY: number;
+  minZ: number;
+  maxX: number;
+  maxY: number;
+  maxZ: number;
+  isPrimary: boolean;
+};
+
+export function parcelRecordFromRow(row: ParcelRow): ParcelRecordPayload {
+  const corners = normalizeParcelCorners({
+    enabled: row.enabled,
+    name: row.name.trim() || PARCEL_CONFIG_DEFAULTS.name,
+    dimension: isParcelDimension(row.dimension)
+      ? row.dimension
+      : PARCEL_CONFIG_DEFAULTS.dimension,
+    minX: row.minX,
+    minY: row.minY,
+    minZ: row.minZ,
+    maxX: row.maxX,
+    maxY: row.maxY,
+    maxZ: row.maxZ,
+  });
+  return {
+    ...corners,
+    id: row.id,
+    isPrimary: row.isPrimary,
+  };
+}
+
+export function parcelRowUpdateFromPayload(
+  parcel: Partial<ParcelConfigPayload>,
+): Partial<
+  Pick<
+    ParcelRow,
+    | "name"
+    | "enabled"
+    | "dimension"
+    | "minX"
+    | "minY"
+    | "minZ"
+    | "maxX"
+    | "maxY"
+    | "maxZ"
+  >
+> {
+  const merged = normalizeParcelCorners({
+    ...PARCEL_CONFIG_DEFAULTS,
+    ...parcel,
+    enabled: parcel.enabled ?? PARCEL_CONFIG_DEFAULTS.enabled,
+    name: parcel.name?.trim() || PARCEL_CONFIG_DEFAULTS.name,
+    dimension:
+      parcel.dimension && isParcelDimension(parcel.dimension)
+        ? parcel.dimension
+        : PARCEL_CONFIG_DEFAULTS.dimension,
+  });
+  const out: ReturnType<typeof parcelRowUpdateFromPayload> = {};
+  if (typeof parcel.enabled === "boolean") out.enabled = parcel.enabled;
+  if (typeof parcel.name === "string") {
+    const n = parcel.name.trim();
+    if (n) out.name = n.slice(0, 80);
+  }
+  if (parcel.dimension && isParcelDimension(parcel.dimension)) {
+    out.dimension = parcel.dimension;
+  }
+  if (
+    parcel.minX !== undefined ||
+    parcel.minY !== undefined ||
+    parcel.minZ !== undefined ||
+    parcel.maxX !== undefined ||
+    parcel.maxY !== undefined ||
+    parcel.maxZ !== undefined
+  ) {
+    out.minX = merged.minX;
+    out.minY = merged.minY;
+    out.minZ = merged.minZ;
+    out.maxX = merged.maxX;
+    out.maxY = merged.maxY;
+    out.maxZ = merged.maxZ;
+  }
+  return out;
+}
+
 export type ParcelEventType = "enter" | "exit" | "chest_open";
 
 export const PARCEL_EVENT_TYPES: ParcelEventType[] = [

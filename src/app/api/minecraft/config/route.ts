@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { sanitizeBannedItemsList } from "@/lib/minecraft-banned-items";
 import {
   MINECRAFT_CONFIG_DEFAULTS,
   type MinecraftConfigUpdateInput,
-  minecraftConfigToPayload,
 } from "@/lib/minecraft-config-defaults";
 import {
   DEFAULT_MONITOR_EXCLUDE,
   normalizeBlockId,
 } from "@/lib/minecraft-monitor";
-import { parcelPrismaUpdateFromPayload, type ParcelConfigPayload } from "@/lib/minecraft-parcel";
+import {
+  parcelPrismaUpdateFromPayload,
+  parcelRowUpdateFromPayload,
+  type ParcelConfigPayload,
+} from "@/lib/minecraft-parcel";
+import {
+  ensurePrimaryParcel,
+  fullMinecraftConfigPayload,
+} from "@/lib/minecraft-parcels-db";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -31,6 +39,7 @@ type ConfigBody = {
   snapshotRetentionDays?: number;
   snapshotKeepMinimum?: number;
   monitorExclude?: string[];
+  bannedItems?: string[];
   parcel?: {
     enabled?: boolean;
     name?: string;
@@ -89,13 +98,14 @@ export async function GET(request: Request) {
           parcelMaxY: MINECRAFT_CONFIG_DEFAULTS.parcel.maxY,
           parcelMaxZ: MINECRAFT_CONFIG_DEFAULTS.parcel.maxZ,
           monitorExcludeJson: JSON.stringify(DEFAULT_MONITOR_EXCLUDE),
+          bannedItemsJson: "[]",
         },
       });
     }
 
     return NextResponse.json({
       ok: true,
-      config: minecraftConfigToPayload(config),
+      config: await fullMinecraftConfigPayload(config),
     });
   } catch (error) {
     console.error("[Minecraft Config API] Error:", error);
@@ -170,6 +180,12 @@ export async function POST(request: Request) {
       updateData.monitorExcludeJson = monitorExcludeJson;
     }
 
+    if (Array.isArray(body.bannedItems)) {
+      updateData.bannedItemsJson = JSON.stringify(
+        sanitizeBannedItemsList(body.bannedItems),
+      );
+    }
+
     const config = await prisma.minecraftConfig.upsert({
       where: { id: "default" },
       update: { ...updateData, ...parcelFields },
@@ -197,13 +213,27 @@ export async function POST(request: Request) {
         monitorExcludeJson:
           monitorExcludeJson ??
           JSON.stringify(DEFAULT_MONITOR_EXCLUDE),
+        bannedItemsJson: updateData.bannedItemsJson ?? "[]",
         ...parcelFields,
       },
     });
 
+    if (body.parcel && typeof body.parcel === "object") {
+      const parcels = await ensurePrimaryParcel();
+      const primary = parcels.find((p) => p.isPrimary) ?? parcels[0];
+      if (primary) {
+        await prisma.minecraftParcel.update({
+          where: { id: primary.id },
+          data: parcelRowUpdateFromPayload(
+            body.parcel as Partial<ParcelConfigPayload>,
+          ),
+        });
+      }
+    }
+
     return NextResponse.json({
       ok: true,
-      config: minecraftConfigToPayload(config),
+      config: await fullMinecraftConfigPayload(config),
     });
   } catch (error) {
     console.error("[Minecraft Config API] Error:", error);

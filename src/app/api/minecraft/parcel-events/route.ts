@@ -3,12 +3,14 @@ import { auth } from "@/auth";
 import {
   isParcelEventType,
   PARCEL_PAGE_SIZE,
+  resolveEventParcelId,
   type ParcelEventType,
 } from "@/lib/minecraft-parcel";
 import {
   getLastParcelBatchAt,
   markParcelBatchReceived,
 } from "@/lib/parcel-events-store";
+import { ensurePrimaryParcel, knownParcelIdSet } from "@/lib/minecraft-parcels-db";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -39,6 +41,7 @@ type ParsedEvent = {
   posZ: number | null;
   dimension: string | null;
   blockType: string | null;
+  parcelIdRaw: unknown;
 };
 
 function parseAddonEvent(raw: unknown): ParsedEvent | null {
@@ -65,6 +68,7 @@ function parseAddonEvent(raw: unknown): ParsedEvent | null {
       typeof e.dimension === "string" ? e.dimension.trim().slice(0, 40) : null,
     blockType:
       typeof e.blockType === "string" ? e.blockType.trim().slice(0, 64) : null,
+    parcelIdRaw: e.parcelId,
   };
 }
 
@@ -105,6 +109,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, saved: 0, total });
   }
 
+  await ensurePrimaryParcel();
+  const knownIds = await knownParcelIdSet();
+
   const result = await prisma.minecraftParcelEvent.createMany({
     data: rows.map((r) => ({
       gamertag: r.gamertag,
@@ -115,6 +122,7 @@ export async function POST(request: Request) {
       posZ: r.posZ,
       dimension: r.dimension,
       blockType: r.blockType,
+      parcelId: resolveEventParcelId(r.parcelIdRaw, knownIds),
     })),
   });
 
@@ -146,8 +154,10 @@ export async function GET(request: Request) {
   const eventType = url.searchParams.get("event")?.trim() ?? "";
   const from = url.searchParams.get("from")?.trim() ?? "";
   const to = url.searchParams.get("to")?.trim() ?? "";
+  const parcelId = url.searchParams.get("parcelId")?.trim() ?? "";
 
   const where: Record<string, unknown> = {};
+  if (parcelId) where.parcelId = parcelId;
   if (gamertag) {
     where.gamertag = { contains: gamertag, mode: "insensitive" };
   }
@@ -199,11 +209,22 @@ export async function GET(request: Request) {
   });
 }
 
-/** Panel: borra todo el historial de parcela. */
-export async function DELETE() {
+/** Panel: borra el historial de una parcela (`parcelId` obligatorio). */
+export async function DELETE(request: Request) {
   const session = await auth();
   if (!session?.user) return unauthorized();
 
-  const result = await prisma.minecraftParcelEvent.deleteMany();
+  const url = new URL(request.url);
+  const parcelId = url.searchParams.get("parcelId")?.trim() ?? "";
+  if (!parcelId) {
+    return NextResponse.json(
+      { error: "parcelId es obligatorio para limpiar historial" },
+      { status: 400 },
+    );
+  }
+
+  const result = await prisma.minecraftParcelEvent.deleteMany({
+    where: { parcelId },
+  });
   return NextResponse.json({ ok: true, deleted: result.count });
 }

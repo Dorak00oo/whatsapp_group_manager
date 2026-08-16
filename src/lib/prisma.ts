@@ -40,13 +40,15 @@ function isCurrentPrismaClient(c: PrismaClient | undefined): boolean {
     minecraftSyncQueue?: { findUnique?: unknown };
     minecraftPlayer?: { findMany?: unknown };
     minecraftConfig?: { findUnique?: unknown };
+    minecraftParcel?: { findMany?: unknown };
   };
   return (
     c != null &&
     typeof x.directoryMember?.findMany === "function" &&
     typeof x.minecraftSyncQueue?.findUnique === "function" &&
     typeof x.minecraftPlayer?.findMany === "function" &&
-    typeof x.minecraftConfig?.findUnique === "function"
+    typeof x.minecraftConfig?.findUnique === "function" &&
+    typeof x.minecraftParcel?.findMany === "function"
   );
 }
 

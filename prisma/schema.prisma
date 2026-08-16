@@ -154,9 +154,37 @@ model MinecraftConfig {
    * null = usar lista por defecto del código.
    */
   monitorExcludeJson    String?  @map("monitor_exclude_json") @db.Text
+  /**
+   * JSON array de ids de ítem/bloque baneados (sin prefijo minecraft:).
+   * null o [] = no banear nada.
+   */
+  bannedItemsJson       String?  @map("banned_items_json") @db.Text
   updatedAt             DateTime @updatedAt @map("updated_at")
 
   @@map("minecraft_config")
+}
+
+/**
+ * Zonas monitoreadas (entrada/salida/cofre). La fila `primary` es la parcela original.
+ */
+model MinecraftParcel {
+  id         String                 @id
+  name       String                 @default("Parcela")
+  enabled    Boolean                @default(false)
+  dimension  String                 @default("overworld")
+  minX       Int                    @default(0) @map("min_x")
+  minY       Int                    @default(64) @map("min_y")
+  minZ       Int                    @default(0) @map("min_z")
+  maxX       Int                    @default(15) @map("max_x")
+  maxY       Int                    @default(79) @map("max_y")
+  maxZ       Int                    @default(15) @map("max_z")
+  isPrimary  Boolean                @default(false) @map("is_primary")
+  events     MinecraftParcelEvent[]
+  createdAt  DateTime               @default(now()) @map("created_at")
+  updatedAt  DateTime               @updatedAt @map("updated_at")
+
+  @@index([isPrimary])
+  @@map("minecraft_parcels")
 }
 
 /**
@@ -217,19 +245,22 @@ model MinecraftMonitorAlert {
  * Entrada o salida de un jugador en la parcela monitoreada
  */
 model MinecraftParcelEvent {
-  id         String   @id @default(cuid())
+  id         String           @id @default(cuid())
   gamertag   String
-  eventType  String   @map("event_type")
-  occurredAt DateTime @map("occurred_at")
-  posX       Int?     @map("pos_x")
-  posY       Int?     @map("pos_y")
-  posZ       Int?     @map("pos_z")
+  eventType  String           @map("event_type")
+  occurredAt DateTime         @map("occurred_at")
+  posX       Int?             @map("pos_x")
+  posY       Int?             @map("pos_y")
+  posZ       Int?             @map("pos_z")
   dimension  String?
-  blockType  String?  @map("block_type")
-  createdAt  DateTime @default(now()) @map("created_at")
+  blockType  String?          @map("block_type")
+  parcelId   String           @map("parcel_id")
+  parcel     MinecraftParcel  @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  createdAt  DateTime         @default(now()) @map("created_at")
 
   @@index([occurredAt(sort: Desc)])
   @@index([gamertag])
+  @@index([parcelId])
   @@map("minecraft_parcel_events")
 }
 

@@ -27,7 +27,7 @@ export function DashboardMainHeader() {
   const subtitle = isComandos
     ? "Órdenes al mundo Bedrock vía el addon (espectador, survival, fuego, limpieza de mobs)."
     : isParcela
-      ? "Quién entra y sale del terreno monitoreado, con historial y fechas."
+      ? "Zonas monitoreadas: entradas, salidas y cofres, con historial."
       : isMonitoreo
         ? "Bloques, fuego, lava, TNT y withers en Overworld — filtros por jugador, ítem, hora y coordenadas."
         : isMinecraft

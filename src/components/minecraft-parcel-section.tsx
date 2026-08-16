@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -16,6 +17,7 @@ import {
   PARCEL_DIMENSIONS,
   PARCEL_EVENT_FILTER_OPTIONS,
   PARCEL_PAGE_SIZE,
+  canDeleteParcel,
   type ParcelConfigPayload,
 } from "@/lib/minecraft-parcel";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
@@ -48,6 +50,8 @@ type DirectoryLookup = {
 };
 
 type Props = {
+  parcelId: string;
+  isPrimary: boolean;
   parcel: ParcelConfigPayload;
   events: ParcelEventRow[];
   totalEvents: number;
@@ -82,9 +86,10 @@ function buildPageItems(current: number, totalPages: number): number[] {
   return pages;
 }
 
-function emptyParcelQuery() {
+function emptyParcelQuery(parcelId: string) {
   const p = new URLSearchParams();
   p.set("pageSize", String(PARCEL_PAGE_SIZE));
+  p.set("parcelId", parcelId);
   return p.toString();
 }
 
@@ -146,11 +151,14 @@ function mapApiEvents(
 }
 
 export function MinecraftParcelSection({
+  parcelId,
+  isPrimary,
   parcel: initialParcel,
   events: initialEvents,
   totalEvents: initialTotal,
   directoryByTag,
 }: Props) {
+  const router = useRouter();
   const [parcelForm, setParcelForm] = useState(initialParcel);
   const [minDraft, setMinDraft] = useState(() =>
     xyzFromParcel(initialParcel, "min"),
@@ -168,6 +176,7 @@ export function MinecraftParcelSection({
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -183,10 +192,13 @@ export function MinecraftParcelSection({
     if (filterFrom) p.set("from", new Date(filterFrom).toISOString());
     if (filterTo) p.set("to", new Date(filterTo).toISOString());
     p.set("pageSize", String(PARCEL_PAGE_SIZE));
+    p.set("parcelId", parcelId);
     return p.toString();
-  }, [filterGamertag, filterEvent, filterFrom, filterTo]);
+  }, [filterGamertag, filterEvent, filterFrom, filterTo, parcelId]);
 
-  const [appliedQuery, setAppliedQuery] = useState(emptyParcelQuery);
+  const [appliedQuery, setAppliedQuery] = useState(() =>
+    emptyParcelQuery(parcelId),
+  );
 
   const boundsLabel = useMemo(
     () => formatParcelBounds(parcelForm),
@@ -311,7 +323,7 @@ export function MinecraftParcelSection({
     setFilterEvent("");
     setFilterFrom("");
     setFilterTo("");
-    void applyQuery(emptyParcelQuery());
+    void applyQuery(emptyParcelQuery(parcelId));
   }
 
   function handleFilterFormSubmit(e: FormEvent<HTMLFormElement>) {
@@ -331,10 +343,10 @@ export function MinecraftParcelSection({
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/minecraft/config", {
-        method: "POST",
+      const res = await fetch(`/api/minecraft/parcels/${parcelId}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parcel: parcelForm }),
+        body: JSON.stringify(parcelForm),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -422,16 +434,19 @@ export function MinecraftParcelSection({
 
   async function clearParcelHistory() {
     const ok = window.confirm(
-      "¿Borrar TODO el historial de parcela (no solo los filtros actuales)? Esta acción no se puede deshacer.",
+            "¿Borrar el historial de ESTA parcela (no las demás)? Esta acción no se puede deshacer.",
     );
     if (!ok) return;
 
     setClearing(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/minecraft/parcel-events", {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/minecraft/parcel-events?parcelId=${encodeURIComponent(parcelId)}`,
+        {
+          method: "DELETE",
+        },
+      );
       const data = (await res.json()) as { error?: string; deleted?: number };
       if (!res.ok) {
         setMessage(data.error ?? "No se pudo limpiar el historial.");
@@ -441,7 +456,7 @@ export function MinecraftParcelSection({
       setFilterEvent("");
       setFilterFrom("");
       setFilterTo("");
-      setAppliedQuery(emptyParcelQuery());
+      setAppliedQuery(emptyParcelQuery(parcelId));
       setEvents([]);
       setTotalEvents(0);
       setPage(1);
@@ -474,6 +489,32 @@ export function MinecraftParcelSection({
     }
   }
 
+  async function deleteThisParcel() {
+    if (!canDeleteParcel(isPrimary)) return;
+    const ok = window.confirm(
+      `¿Borrar “${parcelForm.name}” y todo su historial? No se puede deshacer.`,
+    );
+    if (!ok) return;
+    setDeleting(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/minecraft/parcels/${parcelId}`, {
+        method: "DELETE",
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setMessage(data.error ?? "No se pudo borrar");
+        return;
+      }
+      router.push("/dashboard/parcela");
+      router.refresh();
+    } catch {
+      setMessage("Error de red al borrar.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   function directoryHint(tag: string): string | null {
     const key = tag.trim().toLowerCase();
     const row = directoryByTag[key];
@@ -487,13 +528,33 @@ export function MinecraftParcelSection({
     () => buildPageItems(page, totalPages),
     [page, totalPages],
   );
-  const filtersActive = appliedQuery !== emptyParcelQuery();
+  const filtersActive = appliedQuery !== emptyParcelQuery(parcelId);
   const pageLinkClass =
     "text-sky-600 hover:underline disabled:pointer-events-none disabled:opacity-40 dark:text-sky-400";
   const pageActiveClass = "font-semibold text-zinc-900 dark:text-zinc-50";
 
   return (
     <div className="flex flex-col gap-8">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link
+          href="/dashboard/parcela"
+          className={`${softBtnLavender} inline-flex items-center`}
+        >
+          Todas las parcelas
+        </Link>
+        {canDeleteParcel(isPrimary) ? (
+          <button
+            type="button"
+            disabled={deleting || saving}
+            onClick={() => void deleteThisParcel()}
+            className={softBtnPeach}
+          >
+            {deleting ? "Borrando…" : "Borrar esta parcela"}
+          </button>
+        ) : (
+          <p className="text-xs text-zinc-500">Parcela original (no se borra)</p>
+        )}
+      </div>
       <div className={`${softPanel} gap-4`}>
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-800 dark:text-zinc-200">
