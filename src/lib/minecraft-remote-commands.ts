@@ -8,6 +8,7 @@ export const REMOTE_CMD_ACTIONS = [
   "kill_silverfish",
   "kill_withers",
   "extinguish_fire",
+  "sync_config",
   "allowlist_sync",
   "allowlist_sync_corrected",
 ] as const;

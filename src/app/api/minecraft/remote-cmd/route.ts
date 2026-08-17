@@ -11,6 +11,7 @@ import {
 } from "@/lib/allowlist-removal";
 import { DIRECTORY_NEW_MEMBER_DAYS } from "@/lib/directory-cohort";
 import {
+  REMOTE_CMD_ACTIONS,
   REMOTE_CMD_QUEUE_ID,
   asRemoteCmdQueueData,
   isRemoteCmdAction,
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
     typeof body.action === "string" ? body.action.trim() : "";
   if (!isRemoteCmdAction(actionRaw)) {
     return badRequest(
-      `action debe ser uno de: spectator, survival, tp, kill_silverfish, kill_withers, extinguish_fire, allowlist_sync, allowlist_sync_corrected`,
+      `action debe ser uno de: ${REMOTE_CMD_ACTIONS.join(", ")}`,
     );
   }
   const action: RemoteCmdAction = actionRaw;

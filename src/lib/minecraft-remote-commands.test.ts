@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  isRemoteCmdAction,
   parseTpCoords,
   remoteCmdNeedsDestination,
   remoteCmdNeedsTarget,
@@ -40,4 +41,10 @@ test("tp sigue necesitando gamertag origen", () => {
 test("apagar fuego necesita al admin online como centro", () => {
   assert.equal(remoteCmdNeedsTarget("extinguish_fire"), true);
   assert.equal(remoteCmdNeedsDestination("extinguish_fire"), false);
+});
+
+test("sync_config aplica la lista baneada sin jugador destino", () => {
+  assert.equal(isRemoteCmdAction("sync_config"), true);
+  assert.equal(remoteCmdNeedsTarget("sync_config"), false);
+  assert.equal(remoteCmdNeedsDestination("sync_config"), false);
 });
