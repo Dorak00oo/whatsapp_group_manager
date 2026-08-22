@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  MobileListItem,
+  ResponsiveDataList,
+} from "@/components/responsive-data-list";
 
 /** Refresco del panel: intervalo alto para reducir consultas Neon (CU-h) cuando la pestaña está abierta mucho tiempo. */
 const DASHBOARD_REFRESH_MS = 60_000;
@@ -627,44 +631,39 @@ function PlayersRosterTable({
 }) {
   return (
     <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Gamertag
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Estado
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Última conexión
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Días inactivo
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Listas
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {players.length === 0 ? (
+      <ResponsiveDataList
+        isEmpty={players.length === 0}
+        empty={
+          search
+            ? "No se encontraron jugadores con ese gamertag"
+            : "No hay jugadores registrados"
+        }
+        table={
+          <table className="w-full">
+            <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
               <tr>
-                <td
-                  colSpan={6}
-                  className="px-4 py-8 text-center text-sm text-zinc-500"
-                >
-                  {search
-                    ? "No se encontraron jugadores con ese gamertag"
-                    : "No hay jugadores registrados"}
-                </td>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Gamertag
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Estado
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Última conexión
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Días inactivo
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Listas
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Acciones
+                </th>
               </tr>
-            ) : (
-              players.map((player) => (
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {players.map((player) => (
                 <tr
                   key={player.id}
                   className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
@@ -682,71 +681,47 @@ function PlayersRosterTable({
                     {formatDaysInactive(player.daysInactive)}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      {player.isBlacklisted && (
-                        <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800 dark:bg-red-900 dark:text-red-200">
-                          Blacklist
-                        </span>
-                      )}
-                      {player.isWhitelisted && (
-                        <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                          Whitelist
-                        </span>
-                      )}
-                    </div>
+                    <ListBadges player={player} />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      {!player.isBlacklisted ? (
-                        <button
-                          onClick={() => onAction(player.gamertag, "blacklist")}
-                          disabled={loading === player.gamertag}
-                          className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-                          title="Agregar a blacklist"
-                        >
-                          🚫 Ban
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            onAction(player.gamertag, "remove_blacklist")
-                          }
-                          disabled={loading === player.gamertag}
-                          className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-                          title="Quitar de blacklist"
-                        >
-                          ✅ Unban
-                        </button>
-                      )}
-                      {!player.isWhitelisted ? (
-                        <button
-                          onClick={() => onAction(player.gamertag, "whitelist")}
-                          disabled={loading === player.gamertag}
-                          className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                          title="Agregar a whitelist"
-                        >
-                          ⭐ WL
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            onAction(player.gamertag, "remove_whitelist")
-                          }
-                          disabled={loading === player.gamertag}
-                          className="rounded bg-zinc-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
-                          title="Quitar de whitelist"
-                        >
-                          ❌ Remove WL
-                        </button>
-                      )}
-                    </div>
+                    <PlayerListActions
+                      player={player}
+                      loading={loading}
+                      onAction={onAction}
+                      compact
+                    />
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        }
+        cards={players.map((player) => (
+          <MobileListItem key={player.id}>
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 break-words text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                {player.gamertag}
+              </p>
+              <StatusBadge active={player.active} />
+            </div>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              {formatLastSeen(player.lastSeen)}
+              {" · "}
+              {formatDaysInactive(player.daysInactive)}
+            </p>
+            <div className="mt-2">
+              <ListBadges player={player} />
+            </div>
+            <div className="mt-3">
+              <PlayerListActions
+                player={player}
+                loading={loading}
+                onAction={onAction}
+              />
+            </div>
+          </MobileListItem>
+        ))}
+      />
 
       {players.length > 0 && (
         <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/50">
@@ -792,38 +767,33 @@ function AccessListPanel({
           <span className="font-normal opacity-75">({total})</span>
         </h3>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Gamertag
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Estado
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Última conexión
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {players.length === 0 ? (
+      <ResponsiveDataList
+        isEmpty={players.length === 0}
+        empty={
+          search.trim()
+            ? "No se encontraron jugadores con ese gamertag"
+            : emptyLabel
+        }
+        table={
+          <table className="w-full">
+            <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
               <tr>
-                <td
-                  colSpan={4}
-                  className="px-4 py-8 text-center text-sm text-zinc-500"
-                >
-                  {search.trim()
-                    ? "No se encontraron jugadores con ese gamertag"
-                    : emptyLabel}
-                </td>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Gamertag
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Estado
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Última conexión
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Acciones
+                </th>
               </tr>
-            ) : (
-              players.map((player) => (
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {players.map((player) => (
                 <tr
                   key={`${variant}:${player.id}`}
                   className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
@@ -863,11 +833,45 @@ function AccessListPanel({
                     )}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        }
+        cards={players.map((player) => (
+          <MobileListItem key={`${variant}:${player.id}`}>
+            <div className="flex items-start justify-between gap-2">
+              <p className="min-w-0 break-words text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                {player.gamertag}
+              </p>
+              <StatusBadge active={player.active} />
+            </div>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              {formatLastSeen(player.lastSeen)}
+            </p>
+            <div className="mt-3">
+              {variant === "whitelist" ? (
+                <button
+                  onClick={() => onAction(player.gamertag, "remove_whitelist")}
+                  disabled={loading === player.gamertag}
+                  className="flex min-h-11 w-full items-center justify-center rounded-lg bg-zinc-600 px-3 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
+                  title="Quitar de whitelist"
+                >
+                  ❌ Remove WL
+                </button>
+              ) : (
+                <button
+                  onClick={() => onAction(player.gamertag, "remove_blacklist")}
+                  disabled={loading === player.gamertag}
+                  className="flex min-h-11 w-full items-center justify-center rounded-lg bg-green-600 px-3 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                  title="Quitar de blacklist"
+                >
+                  ✅ Unban
+                </button>
+              )}
+            </div>
+          </MobileListItem>
+        ))}
+      />
       {players.length > 0 && search.trim() && (
         <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-800/50">
           <p className="text-xs text-zinc-500">
@@ -876,6 +880,83 @@ function AccessListPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function ListBadges({ player }: { player: MinecraftPlayer }) {
+  if (!player.isBlacklisted && !player.isWhitelisted) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {player.isBlacklisted && (
+        <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800 dark:bg-red-900 dark:text-red-200">
+          Blacklist
+        </span>
+      )}
+      {player.isWhitelisted && (
+        <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+          Whitelist
+        </span>
+      )}
+    </div>
+  );
+}
+
+function PlayerListActions({
+  player,
+  loading,
+  onAction,
+  compact = false,
+}: {
+  player: MinecraftPlayer;
+  loading: string | null;
+  onAction: (gamertag: string, action: PlayerAction) => void;
+  compact?: boolean;
+}) {
+  const btn = compact
+    ? "rounded px-2 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50"
+    : "flex min-h-11 flex-1 items-center justify-center rounded-lg px-3 text-sm font-medium text-white transition-colors disabled:opacity-50";
+
+  return (
+    <div className={compact ? "flex gap-1" : "flex gap-2"}>
+      {!player.isBlacklisted ? (
+        <button
+          onClick={() => onAction(player.gamertag, "blacklist")}
+          disabled={loading === player.gamertag}
+          className={`${btn} bg-red-600 hover:bg-red-700`}
+          title="Agregar a blacklist"
+        >
+          🚫 Ban
+        </button>
+      ) : (
+        <button
+          onClick={() => onAction(player.gamertag, "remove_blacklist")}
+          disabled={loading === player.gamertag}
+          className={`${btn} bg-green-600 hover:bg-green-700`}
+          title="Quitar de blacklist"
+        >
+          ✅ Unban
+        </button>
+      )}
+      {!player.isWhitelisted ? (
+        <button
+          onClick={() => onAction(player.gamertag, "whitelist")}
+          disabled={loading === player.gamertag}
+          className={`${btn} bg-blue-600 hover:bg-blue-700`}
+          title="Agregar a whitelist"
+        >
+          ⭐ WL
+        </button>
+      ) : (
+        <button
+          onClick={() => onAction(player.gamertag, "remove_whitelist")}
+          disabled={loading === player.gamertag}
+          className={`${btn} bg-zinc-600 hover:bg-zinc-700`}
+          title="Quitar de whitelist"
+        >
+          ❌ Remove WL
+        </button>
+      )}
+    </div>
   );
 }
 

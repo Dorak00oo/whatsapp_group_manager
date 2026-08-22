@@ -27,6 +27,11 @@ import {
   type XyzCoordValues,
 } from "@/components/xyz-coord-fields";
 import { softBtnLavender, softBtnPeach, softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
+import {
+  formatXyz,
+  MobileListItem,
+  ResponsiveDataList,
+} from "@/components/responsive-data-list";
 
 export type ParcelEventRow = {
   id: string;
@@ -798,73 +803,97 @@ export function MinecraftParcelSection({
               : "Sin eventos cargados. Activá el monitoreo, subí el addon y pedí el lote con el botón de arriba."}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl ring-1 ring-zinc-200/80 dark:ring-zinc-800/80">
-            <table className="w-full min-w-[36rem] text-left text-sm">
-              <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-900/80 dark:text-zinc-400">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Hora</th>
-                  <th className="px-3 py-2 font-medium">Evento</th>
-                  <th className="px-3 py-2 font-medium">Gamertag</th>
-                  <th className="px-3 py-2 font-medium">Posición</th>
-                  <th className="px-3 py-2 font-medium">WA</th>
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((ev) => {
-                  const hint = directoryHint(ev.gamertag);
-                  return (
-                    <tr
-                      key={ev.id}
-                      className={
-                        hint
-                          ? "border-t border-amber-200/80 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20"
-                          : "border-t border-zinc-100 dark:border-zinc-800/80"
-                      }
-                    >
-                      <td className="whitespace-nowrap px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
-                        <div>{ev.timeMexico}</div>
-                        <div className="text-[10px] opacity-70">
-                          {ev.timeColombia}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <span
+          <div className="overflow-hidden rounded-2xl ring-1 ring-zinc-200/80 dark:ring-zinc-800/80">
+            <ResponsiveDataList
+              isEmpty={false}
+              table={
+                <table className="w-full min-w-[36rem] text-left text-sm">
+                  <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-900/80 dark:text-zinc-400">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">Hora</th>
+                      <th className="px-3 py-2 font-medium">Evento</th>
+                      <th className="px-3 py-2 font-medium">Gamertag</th>
+                      <th className="px-3 py-2 font-medium">Posición</th>
+                      <th className="px-3 py-2 font-medium">WA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {events.map((ev) => {
+                      const hint = directoryHint(ev.gamertag);
+                      return (
+                        <tr
+                          key={ev.id}
                           className={
-                            ev.event === "enter"
-                              ? "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100"
-                              : ev.event === "chest_open"
-                                ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-100"
-                                : "rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100"
+                            hint
+                              ? "border-t border-amber-200/80 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20"
+                              : "border-t border-zinc-100 dark:border-zinc-800/80"
                           }
                         >
-                          {ev.event === "enter"
-                            ? "Entrada"
-                            : ev.event === "chest_open"
-                              ? `Cofre${ev.blockType ? ` (${ev.blockType})` : ""}`
-                              : "Salida"}
+                          <td className="whitespace-nowrap px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
+                            <div>{ev.timeMexico}</div>
+                            <div className="text-[10px] opacity-70">
+                              {ev.timeColombia}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <ParcelEventBadge event={ev} />
+                          </td>
+                          <td className="px-3 py-2 font-medium">
+                            <Link
+                              href={`/dashboard?q=${encodeURIComponent(ev.gamertag)}`}
+                              className="underline-offset-2 hover:underline"
+                            >
+                              {ev.gamertag}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs text-zinc-500">
+                            {formatXyz(ev.x, ev.y, ev.z)}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
+                            {hint ?? "En grupo (activo)"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              }
+              cards={events.map((ev) => {
+                const hint = directoryHint(ev.gamertag);
+                return (
+                  <MobileListItem
+                    key={ev.id}
+                    className={
+                      hint
+                        ? "bg-amber-50/50 dark:bg-amber-950/20"
+                        : undefined
+                    }
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <ParcelEventBadge event={ev} />
+                      <span className="shrink-0 text-right text-xs text-zinc-600 dark:text-zinc-400">
+                        <span className="block">{ev.timeMexico}</span>
+                        <span className="block text-[11px] opacity-70">
+                          {ev.timeColombia}
                         </span>
-                      </td>
-                      <td className="px-3 py-2 font-medium">
-                        <Link
-                          href={`/dashboard?q=${encodeURIComponent(ev.gamertag)}`}
-                          className="underline-offset-2 hover:underline"
-                        >
-                          {ev.gamertag}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-zinc-500">
-                        {ev.x != null && ev.y != null && ev.z != null
-                          ? `${ev.x}, ${ev.y}, ${ev.z}`
-                          : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
-                        {hint ?? "En grupo (activo)"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </span>
+                    </div>
+                    <Link
+                      href={`/dashboard?q=${encodeURIComponent(ev.gamertag)}`}
+                      className="mt-2 block text-base font-semibold text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
+                    >
+                      {ev.gamertag}
+                    </Link>
+                    <p className="mt-1 font-mono text-sm text-zinc-600 dark:text-zinc-400">
+                      {formatXyz(ev.x, ev.y, ev.z)}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                      {hint ?? "En grupo (activo)"}
+                    </p>
+                  </MobileListItem>
+                );
+              })}
+            />
           </div>
         )}
 
@@ -877,32 +906,37 @@ export function MinecraftParcelSection({
               type="button"
               disabled={loading || syncing || page <= 1}
               onClick={() => void goToPage(page - 1)}
-              className={pageLinkClass}
+              className={`${pageLinkClass} min-h-11 px-2`}
             >
               Anterior
             </button>
-            {pageItems.map((p) =>
-              p === page ? (
-                <span key={p} className={pageActiveClass} aria-current="page">
-                  {p}
-                </span>
-              ) : (
-                <button
-                  key={p}
-                  type="button"
-                  disabled={loading || syncing}
-                  onClick={() => void goToPage(p)}
-                  className={pageLinkClass}
-                >
-                  {p}
-                </button>
-              ),
-            )}
+            <span className="text-zinc-600 md:hidden dark:text-zinc-400">
+              {page} / {totalPages}
+            </span>
+            <span className="hidden md:contents">
+              {pageItems.map((p) =>
+                p === page ? (
+                  <span key={p} className={pageActiveClass} aria-current="page">
+                    {p}
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    disabled={loading || syncing}
+                    onClick={() => void goToPage(p)}
+                    className={pageLinkClass}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+            </span>
             <button
               type="button"
               disabled={loading || syncing || page >= totalPages}
               onClick={() => void goToPage(page + 1)}
-              className={pageLinkClass}
+              className={`${pageLinkClass} min-h-11 px-2`}
             >
               Siguiente
             </button>
@@ -911,4 +945,20 @@ export function MinecraftParcelSection({
       </div>
     </div>
   );
+}
+
+function ParcelEventBadge({ event }: { event: ParcelEventRow }) {
+  const className =
+    event.event === "enter"
+      ? "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100"
+      : event.event === "chest_open"
+        ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-100"
+        : "rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100";
+  const label =
+    event.event === "enter"
+      ? "Entrada"
+      : event.event === "chest_open"
+        ? `Cofre${event.blockType ? ` (${event.blockType})` : ""}`
+        : "Salida";
+  return <span className={className}>{label}</span>;
 }

@@ -27,6 +27,11 @@ import {
   softInputNeutral,
   softPanel,
 } from "@/lib/soft-ui";
+import {
+  formatXyz,
+  MobileListItem,
+  ResponsiveDataList,
+} from "@/components/responsive-data-list";
 
 export type MonitorEventRow = {
   id: string;
@@ -482,7 +487,7 @@ export function MinecraftMonitorSection({
                   type="button"
                   disabled={dismissingId === a.id}
                   onClick={() => void dismissAlert(a.id)}
-                  className="rounded-md border border-red-300/80 px-2.5 py-1 text-xs font-medium text-red-800 hover:bg-red-100/80 disabled:opacity-50 dark:border-red-800 dark:text-red-100 dark:hover:bg-red-950/60"
+                  className="min-h-11 rounded-md border border-red-300/80 px-3 py-1 text-sm font-medium text-red-800 hover:bg-red-100/80 disabled:opacity-50 dark:border-red-800 dark:text-red-100 dark:hover:bg-red-950/60"
                 >
                   {dismissingId === a.id ? "…" : "Descartar"}
                 </button>
@@ -631,83 +636,90 @@ export function MinecraftMonitorSection({
           <p className="text-xs text-zinc-600 dark:text-zinc-400">{message}</p>
         ) : null}
 
-        <div className="overflow-x-auto rounded-xl border border-zinc-200/80 dark:border-zinc-700/80">
-          <table className="min-w-full text-left text-xs">
-            <thead className="bg-zinc-100/80 text-[10px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-900/60">
-              <tr>
-                <th className="px-3 py-2">Hora</th>
-                <th className="px-3 py-2">Jugador</th>
-                <th className="px-3 py-2">Acción</th>
-                <th className="px-3 py-2">Bloque / ítem</th>
-                <th className="px-3 py-2">Coords</th>
-                <th className="px-3 py-2">Fuego</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-3 py-8 text-center text-zinc-500"
-                  >
-                    Sin eventos con estos filtros.
-                  </td>
-                </tr>
-              ) : (
-                events.map((e) => (
-                  <tr
-                    key={e.id}
-                    className="border-t border-zinc-200/70 dark:border-zinc-800/70"
-                  >
-                    <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
-                      <div>{e.timeMexico}</div>
-                      <div className="text-[10px] opacity-70">
-                        {e.timeColombia}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Link
-                        href={`/dashboard?q=${encodeURIComponent(e.gamertag)}`}
-                        className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
-                      >
-                        {e.gamertag}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={
-                          e.priority === "critical"
-                            ? "font-semibold text-red-700 dark:text-red-300"
-                            : e.priority === "high"
-                              ? "font-medium text-amber-800 dark:text-amber-200"
-                              : ""
-                        }
-                      >
-                        {eventLabel(e.event)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">
-                      {e.event === "animal_kill"
-                        ? animalLabel(e.blockType || e.itemType || "")
-                        : e.blockType || e.itemType || "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
-                      {e.x != null && e.y != null && e.z != null
-                        ? `${e.x}, ${e.y}, ${e.z}`
-                        : "—"}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-[10px] text-zinc-500">
-                      {e.relatedFireId
-                        ? `← ${e.relatedFireId.slice(0, 8)}`
-                        : e.fireId
-                          ? e.fireId.slice(0, 8)
-                          : "—"}
-                    </td>
+        <div className="overflow-hidden rounded-xl border border-zinc-200/80 dark:border-zinc-700/80">
+          <ResponsiveDataList
+            isEmpty={events.length === 0}
+            empty="Sin eventos con estos filtros."
+            table={
+              <table className="min-w-full text-left text-xs">
+                <thead className="bg-zinc-100/80 text-[10px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-900/60">
+                  <tr>
+                    <th className="px-3 py-2">Hora</th>
+                    <th className="px-3 py-2">Jugador</th>
+                    <th className="px-3 py-2">Acción</th>
+                    <th className="px-3 py-2">Bloque / ítem</th>
+                    <th className="px-3 py-2">Coords</th>
+                    <th className="px-3 py-2">Fuego</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {events.map((e) => (
+                    <tr
+                      key={e.id}
+                      className="border-t border-zinc-200/70 dark:border-zinc-800/70"
+                    >
+                      <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                        <div>{e.timeMexico}</div>
+                        <div className="text-[10px] opacity-70">
+                          {e.timeColombia}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <Link
+                          href={`/dashboard?q=${encodeURIComponent(e.gamertag)}`}
+                          className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
+                        >
+                          {e.gamertag}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2">
+                        <MonitorActionLabel event={e} />
+                      </td>
+                      <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">
+                        <MonitorItemLabel event={e} />
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
+                        {formatXyz(e.x, e.y, e.z)}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[10px] text-zinc-500">
+                        <MonitorFireLabel event={e} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            cards={events.map((e) => (
+              <MobileListItem key={e.id}>
+                <div className="flex items-start justify-between gap-2">
+                  <MonitorActionLabel event={e} />
+                  <span className="shrink-0 text-right text-xs text-zinc-600 dark:text-zinc-400">
+                    <span className="block">{e.timeMexico}</span>
+                    <span className="block text-[11px] opacity-70">
+                      {e.timeColombia}
+                    </span>
+                  </span>
+                </div>
+                <Link
+                  href={`/dashboard?q=${encodeURIComponent(e.gamertag)}`}
+                  className="mt-2 block text-base font-semibold text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
+                >
+                  {e.gamertag}
+                </Link>
+                <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
+                  <MonitorItemLabel event={e} />
+                </p>
+                <p className="mt-1 font-mono text-sm text-zinc-600 dark:text-zinc-400">
+                  {formatXyz(e.x, e.y, e.z)}
+                </p>
+                {e.relatedFireId || e.fireId ? (
+                  <p className="mt-1 font-mono text-xs text-zinc-500">
+                    Fuego: <MonitorFireLabel event={e} />
+                  </p>
+                ) : null}
+              </MobileListItem>
+            ))}
+          />
         </div>
 
         {totalPages > 1 ? (
@@ -719,32 +731,37 @@ export function MinecraftMonitorSection({
               type="button"
               disabled={loading || page <= 1}
               onClick={() => void goToPage(page - 1)}
-              className={pageLinkClass}
+              className={`${pageLinkClass} min-h-11 px-2`}
             >
               Anterior
             </button>
-            {pageItems.map((p) =>
-              p === page ? (
-                <span key={p} className={pageActiveClass} aria-current="page">
-                  {p}
-                </span>
-              ) : (
-                <button
-                  key={p}
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void goToPage(p)}
-                  className={pageLinkClass}
-                >
-                  {p}
-                </button>
-              ),
-            )}
+            <span className="text-zinc-600 md:hidden dark:text-zinc-400">
+              {page} / {totalPages}
+            </span>
+            <span className="hidden md:contents">
+              {pageItems.map((p) =>
+                p === page ? (
+                  <span key={p} className={pageActiveClass} aria-current="page">
+                    {p}
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void goToPage(p)}
+                    className={pageLinkClass}
+                  >
+                    {p}
+                  </button>
+                ),
+              )}
+            </span>
             <button
               type="button"
               disabled={loading || page >= totalPages}
               onClick={() => void goToPage(page + 1)}
-              className={pageLinkClass}
+              className={`${pageLinkClass} min-h-11 px-2`}
             >
               Siguiente
             </button>
@@ -777,4 +794,33 @@ export function MinecraftMonitorSection({
       </div>
     </div>
   );
+}
+
+function MonitorActionLabel({ event }: { event: MonitorEventRow }) {
+  return (
+    <span
+      className={
+        event.priority === "critical"
+          ? "font-semibold text-red-700 dark:text-red-300"
+          : event.priority === "high"
+            ? "font-medium text-amber-800 dark:text-amber-200"
+            : "text-zinc-800 dark:text-zinc-200"
+      }
+    >
+      {eventLabel(event.event)}
+    </span>
+  );
+}
+
+function MonitorItemLabel({ event }: { event: MonitorEventRow }) {
+  if (event.event === "animal_kill") {
+    return <>{animalLabel(event.blockType || event.itemType || "")}</>;
+  }
+  return <>{event.blockType || event.itemType || "—"}</>;
+}
+
+function MonitorFireLabel({ event }: { event: MonitorEventRow }) {
+  if (event.relatedFireId) return <>← {event.relatedFireId.slice(0, 8)}</>;
+  if (event.fireId) return <>{event.fireId.slice(0, 8)}</>;
+  return <>—</>;
 }

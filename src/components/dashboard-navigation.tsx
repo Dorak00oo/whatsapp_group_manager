@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { scrollOverflowSides } from "@/lib/scroll-overflow-sides";
 
 const iconSm = "size-5";
 const iconSidebar = "size-[18px]";
@@ -258,54 +260,194 @@ export function DashboardSidebarNav() {
 }
 
 const tabBase =
-  "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 transition-colors active:bg-zinc-200/60 dark:active:bg-zinc-800/60";
+  "flex min-h-12 w-[3.15rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg px-0.5 py-1 transition-colors active:bg-zinc-200/60 dark:active:bg-zinc-800/60";
 
-/** Navegación fija inferior (solo móvil): icono + etiqueta; el menú «Más» va aparte en el layout. */
+const SCROLL_STEP_PX = 140;
+
+function ChevronLeftIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+function ScrollSideHint({
+  side,
+  onClick,
+}: {
+  side: "left" | "right";
+  onClick: () => void;
+}) {
+  const isLeft = side === "left";
+  return (
+    <>
+      <div
+        className={`pointer-events-none absolute inset-y-0 z-[1] w-11 ${
+          isLeft
+            ? "left-0 bg-gradient-to-r from-background from-35% to-transparent"
+            : "right-0 bg-gradient-to-l from-background from-35% to-transparent"
+        }`}
+        aria-hidden
+      />
+      <button
+        type="button"
+        onClick={onClick}
+        className={`absolute top-1/2 z-[2] flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-900/85 text-white shadow-sm dark:bg-zinc-100/90 dark:text-zinc-900 ${
+          isLeft ? "left-0.5" : "right-0.5"
+        }`}
+        aria-label={
+          isLeft ? "Ver secciones anteriores" : "Ver más secciones"
+        }
+      >
+        {isLeft ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+      </button>
+    </>
+  );
+}
+
+/** Navegación superior móvil: todas las secciones, scroll horizontal. */
 export function DashboardMobileTabNav() {
-  const { list, add, bulk, minecraft, comandos, parcela } = useNavActive();
+  const pathname = usePathname();
+  const { list, add, bulk, minecraft, comandos, parcela, monitoreo } =
+    useNavActive();
+  const scrollerRef = useRef<HTMLElement>(null);
+  const [overflow, setOverflow] = useState({ left: false, right: false });
+
+  const measureOverflow = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    setOverflow(
+      scrollOverflowSides(el.scrollLeft, el.clientWidth, el.scrollWidth),
+    );
+  }, []);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    measureOverflow();
+    el.addEventListener("scroll", measureOverflow, { passive: true });
+    const ro = new ResizeObserver(measureOverflow);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", measureOverflow);
+      ro.disconnect();
+    };
+  }, [measureOverflow]);
+
+  useEffect(() => {
+    const current = scrollerRef.current?.querySelector<HTMLElement>(
+      '[aria-current="page"]',
+    );
+    current?.scrollIntoView({ inline: "nearest", block: "nearest" });
+    measureOverflow();
+  }, [pathname, measureOverflow]);
+
+  const scrollByDir = (dir: -1 | 1) => {
+    scrollerRef.current?.scrollBy({
+      left: dir * SCROLL_STEP_PX,
+      behavior: "smooth",
+    });
+  };
 
   return (
-    <nav className="flex w-full min-w-0 items-stretch justify-between gap-0.5">
-      <Link
-        href="/dashboard"
-        className={`${tabBase} ${activeTabCls(list)}`}
-        aria-current={list ? "page" : undefined}
+    <div className="relative min-w-0 w-full">
+      {overflow.left ? (
+        <ScrollSideHint side="left" onClick={() => scrollByDir(-1)} />
+      ) : null}
+      {overflow.right ? (
+        <ScrollSideHint side="right" onClick={() => scrollByDir(1)} />
+      ) : null}
+      <nav
+        ref={scrollerRef}
+        className="flex w-full min-w-0 items-stretch gap-0.5 overflow-x-auto overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        aria-label="Secciones del panel"
       >
-        <IconList className="size-[1.125rem] shrink-0" />
-        <span className="text-[10px] font-medium leading-none">Lista</span>
-      </Link>
-      <Link
-        href="/dashboard/agregar"
-        className={`${tabBase} ${activeTabCls(add)}`}
-        aria-current={add ? "page" : undefined}
-      >
-        <IconUserPlus className="size-[1.125rem] shrink-0" />
-        <span className="text-[10px] font-medium leading-none">Agregar</span>
-      </Link>
-      <Link
-        href="/dashboard/administracion"
-        className={`${tabBase} ${activeTabCls(bulk)}`}
-        aria-current={bulk ? "page" : undefined}
-      >
-        <IconAdmin className="size-[1.125rem] shrink-0" />
-        <span className="text-[10px] font-medium leading-none">Admin</span>
-      </Link>
-      <Link
-        href="/dashboard/minecraft"
-        className={`${tabBase} ${activeTabCls(minecraft)}`}
-        aria-current={minecraft ? "page" : undefined}
-      >
-        <IconMinecraft className="size-[1.125rem] shrink-0" />
-        <span className="text-[10px] font-medium leading-none">MC</span>
-      </Link>
-      <Link
-        href="/dashboard/comandos"
-        className={`${tabBase} ${activeTabCls(comandos)}`}
-        aria-current={comandos ? "page" : undefined}
-      >
-        <IconCommands className="size-[1.125rem] shrink-0" />
-        <span className="text-[10px] font-medium leading-none">Cmd</span>
-      </Link>
-    </nav>
+        <Link
+          href="/dashboard"
+          className={`${tabBase} ${activeTabCls(list)}`}
+          aria-current={list ? "page" : undefined}
+        >
+          <IconList className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">Lista</span>
+        </Link>
+        <Link
+          href="/dashboard/agregar"
+          className={`${tabBase} ${activeTabCls(add)}`}
+          aria-current={add ? "page" : undefined}
+        >
+          <IconUserPlus className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">Agregar</span>
+        </Link>
+        <Link
+          href="/dashboard/administracion"
+          className={`${tabBase} ${activeTabCls(bulk)}`}
+          aria-current={bulk ? "page" : undefined}
+        >
+          <IconAdmin className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">Admin</span>
+        </Link>
+        <Link
+          href="/dashboard/minecraft"
+          className={`${tabBase} ${activeTabCls(minecraft)}`}
+          aria-current={minecraft ? "page" : undefined}
+        >
+          <IconMinecraft className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">MC</span>
+        </Link>
+        <Link
+          href="/dashboard/parcela"
+          className={`${tabBase} ${activeTabCls(parcela)}`}
+          aria-current={parcela ? "page" : undefined}
+        >
+          <IconParcel className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">Parcela</span>
+        </Link>
+        <Link
+          href="/dashboard/monitoreo"
+          className={`${tabBase} ${activeTabCls(monitoreo)}`}
+          aria-current={monitoreo ? "page" : undefined}
+        >
+          <IconMonitor className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">Monitor</span>
+        </Link>
+        <Link
+          href="/dashboard/comandos"
+          className={`${tabBase} ${activeTabCls(comandos)}`}
+          aria-current={comandos ? "page" : undefined}
+        >
+          <IconCommands className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">Cmd</span>
+        </Link>
+      </nav>
+    </div>
   );
 }
