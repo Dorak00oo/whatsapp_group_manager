@@ -110,3 +110,21 @@ export function buildRosterFromSnapshot<T extends DbPlayerRow>(
     (a, b) => b.lastSeen.getTime() - a.lastSeen.getTime(),
   );
 }
+
+type AccessListPlayer = {
+  isBlacklisted: boolean;
+  isWhitelisted: boolean;
+  lastSeen: Date;
+};
+
+/** Listas de acceso desde el roster completo de la BD (no solo el último snapshot). */
+export function playersOnAccessLists<T extends AccessListPlayer>(
+  players: T[],
+): { blacklist: T[]; whitelist: T[] } {
+  const byLastSeenDesc = (a: T, b: T) =>
+    b.lastSeen.getTime() - a.lastSeen.getTime();
+  return {
+    blacklist: players.filter((p) => p.isBlacklisted).sort(byLastSeenDesc),
+    whitelist: players.filter((p) => p.isWhitelisted).sort(byLastSeenDesc),
+  };
+}

@@ -27,14 +27,22 @@ type Config = {
 
 type Props = {
   players: MinecraftPlayer[];
+  blacklistPlayers: MinecraftPlayer[];
+  whitelistPlayers: MinecraftPlayer[];
   activePlayers: number;
   inactivePlayers: number;
-  blacklisted: number;
-  whitelisted: number;
   config: Config;
+  summary: {
+    total: number;
+    active: number;
+    inactive: number;
+    blacklisted: number;
+    lastUpdate: { mexico: string; colombia: string } | null;
+  } | null;
 };
 
-type FilterType = "all" | "active" | "inactive" | "blacklisted" | "whitelisted";
+type FilterType = "all" | "active" | "inactive";
+type PageTab = "players" | "lists";
 
 function compareMinecraftPlayers(
   a: MinecraftPlayer,
@@ -52,11 +60,12 @@ function compareMinecraftPlayers(
 
 export function MinecraftPlayersSection({
   players,
+  blacklistPlayers,
+  whitelistPlayers,
   activePlayers,
   inactivePlayers,
-  blacklisted,
-  whitelisted,
   config,
+  summary,
 }: Props) {
   const router = useRouter();
   useEffect(() => {
@@ -92,6 +101,7 @@ export function MinecraftPlayersSection({
   }, [router]);
 
   const [filter, setFilter] = useState<FilterType>("all");
+  const [pageTab, setPageTab] = useState<PageTab>("players");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -189,11 +199,10 @@ export function MinecraftPlayersSection({
       "Sync all solicitado. El addon lo aplicará en la próxima revisión (~30 s).",
     );
 
+  const searchNeedle = search.trim().toLowerCase();
   const filtered = players
     .filter((p) => {
-      const matchesSearch = p.gamertag
-        .toLowerCase()
-        .includes(search.toLowerCase());
+      const matchesSearch = p.gamertag.toLowerCase().includes(searchNeedle);
 
       if (!matchesSearch) return false;
 
@@ -202,18 +211,115 @@ export function MinecraftPlayersSection({
           return p.active;
         case "inactive":
           return !p.active;
-        case "blacklisted":
-          return p.isBlacklisted;
-        case "whitelisted":
-          return p.isWhitelisted;
         default:
           return true;
       }
     })
     .sort((a, b) => compareMinecraftPlayers(a, b, filter));
 
+  const visibleWhitelist = whitelistPlayers.filter((p) =>
+    p.gamertag.toLowerCase().includes(searchNeedle),
+  );
+  const visibleBlacklist = blacklistPlayers.filter((p) =>
+    p.gamertag.toLowerCase().includes(searchNeedle),
+  );
+
   return (
     <div className="space-y-4">
+      <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div
+          className={`flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between ${summary ? "mb-2" : ""}`}
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+              Resumen del servidor
+            </h3>
+            <div
+              role="tablist"
+              aria-label="Vistas de jugadores"
+              className="flex flex-wrap gap-2"
+            >
+              <TabButton
+                active={pageTab === "players"}
+                onClick={() => setPageTab("players")}
+                count={players.length}
+                variant="success"
+              >
+                Jugadores
+              </TabButton>
+              <TabButton
+                active={pageTab === "lists"}
+                onClick={() => setPageTab("lists")}
+                count={whitelistPlayers.length + blacklistPlayers.length}
+                variant="accent"
+              >
+                Listas
+              </TabButton>
+            </div>
+          </div>
+          {summary?.lastUpdate && (
+            <div className="max-w-[min(100%,20rem)] text-right text-xs leading-relaxed text-zinc-500">
+              <p className="font-medium text-zinc-600 dark:text-zinc-400">
+                Última actualización
+              </p>
+              <p>
+                <span className="text-zinc-400 dark:text-zinc-500">
+                  México:{" "}
+                </span>
+                {summary.lastUpdate.mexico}
+              </p>
+              <p>
+                <span className="text-zinc-400 dark:text-zinc-500">
+                  Colombia:{" "}
+                </span>
+                {summary.lastUpdate.colombia}
+              </p>
+            </div>
+          )}
+        </div>
+        {summary && (
+          <>
+            <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
+              Mismos totales que el addon en su último envío. La pestaña
+              Jugadores lista solo ese roster; Listas muestra toda la blacklist
+              y whitelist de la base.
+            </p>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <div className="rounded-md bg-zinc-50 p-3 dark:bg-zinc-800">
+                <p className="text-xs text-zinc-500">Total (último reporte)</p>
+                <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+                  {summary.total}
+                </p>
+              </div>
+              <div className="rounded-md bg-green-50 p-3 dark:bg-green-950">
+                <p className="text-xs text-green-700 dark:text-green-400">
+                  Activos
+                </p>
+                <p className="text-2xl font-bold text-green-900 dark:text-green-50">
+                  {summary.active}
+                </p>
+              </div>
+              <div className="rounded-md bg-amber-50 p-3 dark:bg-amber-950">
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Inactivos
+                </p>
+                <p className="text-2xl font-bold text-amber-900 dark:text-amber-50">
+                  {summary.inactive}
+                </p>
+              </div>
+              <div className="rounded-md bg-red-50 p-3 dark:bg-red-950">
+                <p className="text-xs text-red-700 dark:text-red-400">
+                  Blacklist
+                </p>
+                <p className="text-2xl font-bold text-red-900 dark:text-red-50">
+                  {summary.blacklisted}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <button
@@ -231,49 +337,6 @@ export function MinecraftPlayersSection({
             {loading === "syncall" ? "Solicitando..." : "🔄 Sync all"}
           </button>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <FilterButton
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-            count={players.length}
-            title="Jugadores del último reporte del servidor"
-          >
-            Todos
-          </FilterButton>
-          <FilterButton
-            active={filter === "active"}
-            onClick={() => setFilter("active")}
-            count={activePlayers}
-            variant="success"
-          >
-            Activos
-          </FilterButton>
-          <FilterButton
-            active={filter === "inactive"}
-            onClick={() => setFilter("inactive")}
-            count={inactivePlayers}
-            variant="warning"
-          >
-            Inactivos
-          </FilterButton>
-          <FilterButton
-            active={filter === "blacklisted"}
-            onClick={() => setFilter("blacklisted")}
-            count={blacklisted}
-            variant="danger"
-          >
-            Blacklist
-          </FilterButton>
-          <FilterButton
-            active={filter === "whitelisted"}
-            onClick={() => setFilter("whitelisted")}
-            count={whitelisted}
-            variant="info"
-          >
-            Whitelist
-          </FilterButton>
-        </div>
-
         <input
           type="text"
           placeholder="Buscar gamertag..."
@@ -283,163 +346,71 @@ export function MinecraftPlayersSection({
         />
       </div>
 
-      <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  Gamertag
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  Estado
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  Última conexión
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  Días inactivo
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  Listas
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-8 text-center text-sm text-zinc-500"
-                  >
-                    {search
-                      ? "No se encontraron jugadores con ese gamertag"
-                      : "No hay jugadores registrados"}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((player) => (
-                  <tr
-                    key={player.id}
-                    className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                  >
-                    <td className="px-4 py-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                      {player.gamertag}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                          player.active
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                            : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                        }`}
-                      >
-                        {player.active ? "Activo" : "Inactivo"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-                      {new Date(player.lastSeen).toLocaleString("es-ES", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-                      {player.daysInactive === 0
-                        ? "Hoy"
-                        : `${player.daysInactive} día${player.daysInactive !== 1 ? "s" : ""}`}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        {player.isBlacklisted && (
-                          <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800 dark:bg-red-900 dark:text-red-200">
-                            Blacklist
-                          </span>
-                        )}
-                        {player.isWhitelisted && (
-                          <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                            Whitelist
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        {!player.isBlacklisted ? (
-                          <button
-                            onClick={() =>
-                              handlePlayerAction(player.gamertag, "blacklist")
-                            }
-                            disabled={loading === player.gamertag}
-                            className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-                            title="Agregar a blacklist"
-                          >
-                            🚫 Ban
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() =>
-                              handlePlayerAction(
-                                player.gamertag,
-                                "remove_blacklist"
-                              )
-                            }
-                            disabled={loading === player.gamertag}
-                            className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-                            title="Quitar de blacklist"
-                          >
-                            ✅ Unban
-                          </button>
-                        )}
-                        {!player.isWhitelisted ? (
-                          <button
-                            onClick={() =>
-                              handlePlayerAction(player.gamertag, "whitelist")
-                            }
-                            disabled={loading === player.gamertag}
-                            className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                            title="Agregar a whitelist"
-                          >
-                            ⭐ WL
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() =>
-                              handlePlayerAction(
-                                player.gamertag,
-                                "remove_whitelist"
-                              )
-                            }
-                            disabled={loading === player.gamertag}
-                            className="rounded bg-zinc-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
-                            title="Quitar de whitelist"
-                          >
-                            ❌ Remove WL
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {filtered.length > 0 && (
-          <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/50">
-            <p className="text-sm text-zinc-500">
-              Mostrando {filtered.length} de {players.length} jugador
-              {players.length !== 1 ? "es" : ""}
-            </p>
+      {pageTab === "players" ? (
+        <div role="tabpanel" id="minecraft-players-panel" className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <FilterButton
+              active={filter === "all"}
+              onClick={() => setFilter("all")}
+              count={players.length}
+              title="Jugadores del último reporte del servidor"
+            >
+              Todos
+            </FilterButton>
+            <FilterButton
+              active={filter === "active"}
+              onClick={() => setFilter("active")}
+              count={activePlayers}
+              variant="success"
+            >
+              Activos
+            </FilterButton>
+            <FilterButton
+              active={filter === "inactive"}
+              onClick={() => setFilter("inactive")}
+              count={inactivePlayers}
+              variant="warning"
+            >
+              Inactivos
+            </FilterButton>
           </div>
-        )}
-      </div>
+
+          <PlayersRosterTable
+            players={filtered}
+            total={players.length}
+            search={search}
+            loading={loading}
+            onAction={handlePlayerAction}
+          />
+        </div>
+      ) : (
+        <div
+          role="tabpanel"
+          id="minecraft-lists-panel"
+          className="grid grid-cols-1 gap-4 md:grid-cols-2"
+        >
+          <AccessListPanel
+            title="Whitelist"
+            emptyLabel="No hay jugadores en whitelist"
+            players={visibleWhitelist}
+            total={whitelistPlayers.length}
+            search={search}
+            variant="whitelist"
+            loading={loading}
+            onAction={handlePlayerAction}
+          />
+          <AccessListPanel
+            title="Blacklist"
+            emptyLabel="No hay jugadores en blacklist"
+            players={visibleBlacklist}
+            total={blacklistPlayers.length}
+            search={search}
+            variant="blacklist"
+            loading={loading}
+            onAction={handlePlayerAction}
+          />
+        </div>
+      )}
 
       {/* Modal de configuración */}
       {showConfigModal && (
@@ -581,6 +552,344 @@ export function MinecraftPlayersSection({
         </div>
       )}
     </div>
+  );
+}
+
+type PlayerAction =
+  | "blacklist"
+  | "whitelist"
+  | "remove_blacklist"
+  | "remove_whitelist";
+
+function formatLastSeen(iso: string) {
+  return new Date(iso).toLocaleString("es-ES", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDaysInactive(days: number) {
+  return days === 0
+    ? "Hoy"
+    : `${days} día${days !== 1 ? "s" : ""}`;
+}
+
+function TabButton({
+  active,
+  onClick,
+  count,
+  variant,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  count: number;
+  variant: "success" | "accent";
+  children: React.ReactNode;
+}) {
+  const variants = {
+    success: active
+      ? "bg-green-600 text-white shadow-sm"
+      : "bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800",
+    accent: active
+      ? "bg-violet-600 text-white shadow-sm"
+      : "bg-violet-100 text-violet-800 hover:bg-violet-200 dark:bg-violet-900 dark:text-violet-200 dark:hover:bg-violet-800",
+  };
+
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${variants[variant]}`}
+    >
+      {children} <span className="ml-1 opacity-75">({count})</span>
+    </button>
+  );
+}
+
+function PlayersRosterTable({
+  players,
+  total,
+  search,
+  loading,
+  onAction,
+}: {
+  players: MinecraftPlayer[];
+  total: number;
+  search: string;
+  loading: string | null;
+  onAction: (gamertag: string, action: PlayerAction) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Gamertag
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Estado
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Última conexión
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Días inactivo
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Listas
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            {players.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className="px-4 py-8 text-center text-sm text-zinc-500"
+                >
+                  {search
+                    ? "No se encontraron jugadores con ese gamertag"
+                    : "No hay jugadores registrados"}
+                </td>
+              </tr>
+            ) : (
+              players.map((player) => (
+                <tr
+                  key={player.id}
+                  className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                >
+                  <td className="px-4 py-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    {player.gamertag}
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge active={player.active} />
+                  </td>
+                  <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+                    {formatLastSeen(player.lastSeen)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+                    {formatDaysInactive(player.daysInactive)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1">
+                      {player.isBlacklisted && (
+                        <span className="inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800 dark:bg-red-900 dark:text-red-200">
+                          Blacklist
+                        </span>
+                      )}
+                      {player.isWhitelisted && (
+                        <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                          Whitelist
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1">
+                      {!player.isBlacklisted ? (
+                        <button
+                          onClick={() => onAction(player.gamertag, "blacklist")}
+                          disabled={loading === player.gamertag}
+                          className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                          title="Agregar a blacklist"
+                        >
+                          🚫 Ban
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            onAction(player.gamertag, "remove_blacklist")
+                          }
+                          disabled={loading === player.gamertag}
+                          className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                          title="Quitar de blacklist"
+                        >
+                          ✅ Unban
+                        </button>
+                      )}
+                      {!player.isWhitelisted ? (
+                        <button
+                          onClick={() => onAction(player.gamertag, "whitelist")}
+                          disabled={loading === player.gamertag}
+                          className="rounded bg-blue-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                          title="Agregar a whitelist"
+                        >
+                          ⭐ WL
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            onAction(player.gamertag, "remove_whitelist")
+                          }
+                          disabled={loading === player.gamertag}
+                          className="rounded bg-zinc-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
+                          title="Quitar de whitelist"
+                        >
+                          ❌ Remove WL
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {players.length > 0 && (
+        <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-800/50">
+          <p className="text-sm text-zinc-500">
+            Mostrando {players.length} de {total} jugador
+            {total !== 1 ? "es" : ""}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AccessListPanel({
+  title,
+  emptyLabel,
+  players,
+  total,
+  search,
+  variant,
+  loading,
+  onAction,
+}: {
+  title: string;
+  emptyLabel: string;
+  players: MinecraftPlayer[];
+  total: number;
+  search: string;
+  variant: "whitelist" | "blacklist";
+  loading: string | null;
+  onAction: (gamertag: string, action: PlayerAction) => void;
+}) {
+  const headerClass =
+    variant === "whitelist"
+      ? "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100"
+      : "border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950 dark:text-red-100";
+
+  return (
+    <section className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className={`border-b px-4 py-3 ${headerClass}`}>
+        <h3 className="text-sm font-semibold">
+          {title}{" "}
+          <span className="font-normal opacity-75">({total})</span>
+        </h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-800/50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Gamertag
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Estado
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Última conexión
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            {players.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={4}
+                  className="px-4 py-8 text-center text-sm text-zinc-500"
+                >
+                  {search.trim()
+                    ? "No se encontraron jugadores con ese gamertag"
+                    : emptyLabel}
+                </td>
+              </tr>
+            ) : (
+              players.map((player) => (
+                <tr
+                  key={`${variant}:${player.id}`}
+                  className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                >
+                  <td className="px-4 py-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    {player.gamertag}
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusBadge active={player.active} />
+                  </td>
+                  <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
+                    {formatLastSeen(player.lastSeen)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {variant === "whitelist" ? (
+                      <button
+                        onClick={() =>
+                          onAction(player.gamertag, "remove_whitelist")
+                        }
+                        disabled={loading === player.gamertag}
+                        className="rounded bg-zinc-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
+                        title="Quitar de whitelist"
+                      >
+                        ❌ Remove WL
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          onAction(player.gamertag, "remove_blacklist")
+                        }
+                        disabled={loading === player.gamertag}
+                        className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                        title="Quitar de blacklist"
+                      >
+                        ✅ Unban
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      {players.length > 0 && search.trim() && (
+        <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-800/50">
+          <p className="text-xs text-zinc-500">
+            Mostrando {players.length} de {total}
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StatusBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+        active
+          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+          : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+      }`}
+    >
+      {active ? "Activo" : "Inactivo"}
+    </span>
   );
 }
 

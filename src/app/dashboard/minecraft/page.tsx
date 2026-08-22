@@ -4,12 +4,12 @@ import { MinecraftPlayersSection } from "@/components/minecraft-players-section"
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
 import {
   buildRosterFromSnapshot,
+  playersOnAccessLists,
   snapshotStatusByGamertag,
 } from "@/lib/minecraft-active";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import {
   MINECRAFT_CONFIG_DEFAULTS,
-  minecraftConfigToPayload,
 } from "@/lib/minecraft-config-defaults";
 import { prisma } from "@/lib/prisma";
 
@@ -54,10 +54,17 @@ export default async function MinecraftPage() {
     daysInactiveThreshold,
   );
 
+  const rosterByTag = new Map(
+    displayPlayers.map((p) => [p.gamertag.toLowerCase(), p] as const),
+  );
+  const withLiveStats = players.map(
+    (p) => rosterByTag.get(p.gamertag.toLowerCase()) ?? p,
+  );
+  const accessLists = playersOnAccessLists(withLiveStats);
+
   const activeCount = displayPlayers.filter((p) => p.active).length;
   const inactiveCount = displayPlayers.filter((p) => !p.active).length;
-  const blacklistedCount = displayPlayers.filter((p) => p.isBlacklisted).length;
-  const whitelistedCount = displayPlayers.filter((p) => p.isWhitelisted).length;
+  const blacklistedCount = accessLists.blacklist.length;
 
   const summaryTotal =
     lastSnapshot?.totalPlayers ?? displayPlayers.length;
@@ -81,88 +88,23 @@ export default async function MinecraftPage() {
         </p>
       </div>
 
-      {lastSnapshot && (
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-              Resumen del servidor
-            </h3>
-            <div className="max-w-[min(100%,20rem)] text-right text-xs leading-relaxed text-zinc-500">
-              <p className="font-medium text-zinc-600 dark:text-zinc-400">
-                Última actualización
-              </p>
-              {lastUpdateZones && (
-                <>
-                  <p>
-                    <span className="text-zinc-400 dark:text-zinc-500">
-                      México:{" "}
-                    </span>
-                    {lastUpdateZones.mexico}
-                  </p>
-                  <p>
-                    <span className="text-zinc-400 dark:text-zinc-500">
-                      Colombia:{" "}
-                    </span>
-                    {lastUpdateZones.colombia}
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-          <p className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
-            Mismos totales que el addon en su último envío. La tabla lista solo
-            ese roster (no el histórico antiguo del panel).
-          </p>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div className="rounded-md bg-zinc-50 p-3 dark:bg-zinc-800">
-              <p className="text-xs text-zinc-500">Total (último reporte)</p>
-              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                {summaryTotal}
-              </p>
-            </div>
-            <div className="rounded-md bg-green-50 p-3 dark:bg-green-950">
-              <p className="text-xs text-green-700 dark:text-green-400">
-                Activos
-              </p>
-              <p className="text-2xl font-bold text-green-900 dark:text-green-50">
-                {summaryActive}
-              </p>
-            </div>
-            <div className="rounded-md bg-amber-50 p-3 dark:bg-amber-950">
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                Inactivos
-              </p>
-              <p className="text-2xl font-bold text-amber-900 dark:text-amber-50">
-                {summaryInactive}
-              </p>
-            </div>
-            <div className="rounded-md bg-red-50 p-3 dark:bg-red-950">
-              <p className="text-xs text-red-700 dark:text-red-400">
-                Blacklist
-              </p>
-              <p className="text-2xl font-bold text-red-900 dark:text-red-50">
-                {blacklistedCount}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <MinecraftPlayersSection
-        players={displayPlayers.map((p) => ({
-          id: p.id,
-          gamertag: p.gamertag,
-          lastSeen: p.lastSeen.toISOString(),
-          active: p.active,
-          daysInactive: p.daysInactive,
-          isBlacklisted: p.isBlacklisted,
-          isWhitelisted: p.isWhitelisted,
-          createdAt: p.createdAt.toISOString(),
-        }))}
+        players={displayPlayers.map(toClientMinecraftPlayer)}
+        blacklistPlayers={accessLists.blacklist.map(toClientMinecraftPlayer)}
+        whitelistPlayers={accessLists.whitelist.map(toClientMinecraftPlayer)}
         activePlayers={activeCount}
         inactivePlayers={inactiveCount}
-        blacklisted={blacklistedCount}
-        whitelisted={whitelistedCount}
+        summary={
+          lastSnapshot
+            ? {
+                total: summaryTotal,
+                active: summaryActive,
+                inactive: summaryInactive,
+                blacklisted: blacklistedCount,
+                lastUpdate: lastUpdateZones,
+              }
+            : null
+        }
         config={
           config
             ? {
@@ -185,4 +127,26 @@ export default async function MinecraftPage() {
       />
     </section>
   );
+}
+
+function toClientMinecraftPlayer(p: {
+  id: string;
+  gamertag: string;
+  lastSeen: Date;
+  active: boolean;
+  daysInactive: number;
+  isBlacklisted: boolean;
+  isWhitelisted: boolean;
+  createdAt: Date;
+}) {
+  return {
+    id: p.id,
+    gamertag: p.gamertag,
+    lastSeen: p.lastSeen.toISOString(),
+    active: p.active,
+    daysInactive: p.daysInactive,
+    isBlacklisted: p.isBlacklisted,
+    isWhitelisted: p.isWhitelisted,
+    createdAt: p.createdAt.toISOString(),
+  };
 }
