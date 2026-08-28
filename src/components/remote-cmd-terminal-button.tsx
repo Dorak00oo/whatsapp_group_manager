@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { LogScrollViewport } from "@/components/log-scroll-viewport";
 
 type Phase = "idle" | "running" | "done" | "error";
 
@@ -57,7 +58,6 @@ export function RemoteCmdTerminalButton({
   const [allLines, setAllLines] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const terminalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -70,10 +70,6 @@ export function RemoteCmdTerminalButton({
     }, LINE_REVEAL_MS);
     return () => clearTimeout(t);
   }, [phase, visibleCount, allLines.length]);
-
-  useEffect(() => {
-    terminalRef.current?.scrollTo({ top: terminalRef.current.scrollHeight });
-  }, [visibleCount]);
 
   async function run() {
     setError(null);
@@ -131,9 +127,10 @@ export function RemoteCmdTerminalButton({
       ) : null}
 
       {phase === "running" || phase === "done" ? (
-        <div
-          ref={terminalRef}
-          className="max-h-48 w-full max-w-sm overflow-y-auto rounded-2xl bg-zinc-950 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-emerald-300 shadow-inner"
+        <LogScrollViewport
+          followToken={visibleCount}
+          wrapClassName="w-full max-w-sm"
+          className="max-h-48 w-full overflow-y-auto rounded-2xl bg-zinc-950 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-emerald-300 shadow-inner"
           role="log"
           aria-live="polite"
         >
@@ -145,7 +142,7 @@ export function RemoteCmdTerminalButton({
           {isTyping ? (
             <span className="inline-block h-3 w-1.5 animate-pulse bg-emerald-300 align-middle" />
           ) : null}
-        </div>
+        </LogScrollViewport>
       ) : null}
     </div>
   );

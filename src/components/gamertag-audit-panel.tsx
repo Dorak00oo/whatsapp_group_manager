@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { LogScrollViewport } from "@/components/log-scroll-viewport";
 import {
   approveGamertagAuditSuggestion,
   rejectGamertagAuditSuggestion,
@@ -121,7 +122,6 @@ export function GamertagAuditPanel() {
     PendingGamertagAuditSuggestion[]
   >([]);
   const [error, setError] = useState<string | null>(null);
-  const terminalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -134,10 +134,6 @@ export function GamertagAuditPanel() {
     }, LINE_REVEAL_MS);
     return () => clearTimeout(t);
   }, [phase, visibleCount, allLines.length]);
-
-  useEffect(() => {
-    terminalRef.current?.scrollTo({ top: terminalRef.current.scrollHeight });
-  }, [visibleCount]);
 
   async function start() {
     setError(null);
@@ -207,8 +203,9 @@ export function GamertagAuditPanel() {
       ) : null}
 
       {phase !== "idle" ? (
-        <div
-          ref={terminalRef}
+        <LogScrollViewport
+          followToken={visibleCount}
+          wrapClassName="w-full"
           className="max-h-64 overflow-y-auto rounded-2xl bg-zinc-950 px-4 py-3 font-mono text-[11px] leading-relaxed text-emerald-300 shadow-inner"
           role="log"
           aria-live="polite"
@@ -221,7 +218,7 @@ export function GamertagAuditPanel() {
           {isTyping ? (
             <span className="inline-block h-3 w-1.5 animate-pulse bg-emerald-300 align-middle" />
           ) : null}
-        </div>
+        </LogScrollViewport>
       ) : null}
 
       {phase === "done" ? (

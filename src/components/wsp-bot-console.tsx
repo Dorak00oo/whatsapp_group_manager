@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { LogScrollViewport } from "@/components/log-scroll-viewport";
 import {
   classifyBotStatus,
   type WspBotConsoleView,
@@ -44,9 +45,8 @@ function formatLogTime(iso: string) {
 export function WspBotConsole() {
   const [view, setView] = useState<WspBotConsoleView | null>(null);
   const [phone, setPhone] = useState("");
-  const [busy, setBusy] = useState<"code" | "unlink" | null>(null);
+  const [busy, setBusy] = useState<"code" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const logBoxRef = useRef<HTMLPreElement | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -78,13 +78,6 @@ export function WspBotConsole() {
 
   const logs: WspBotLogLine[] = view && view.ok ? view.logs : [];
 
-  useEffect(() => {
-    const box = logBoxRef.current;
-    if (!box) return;
-    const distance = box.scrollHeight - box.scrollTop - box.clientHeight;
-    if (distance < 80) box.scrollTop = box.scrollHeight;
-  }, [logs.length]);
-
   async function requestCode() {
     setBusy("code");
     setMessage(null);
@@ -110,36 +103,6 @@ export function WspBotConsole() {
       await refresh();
     } catch {
       setMessage("Error de red al pedir el código.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function unlink() {
-    if (
-      !window.confirm(
-        "Esto desvincula el WhatsApp y borra la sesión. Vas a tener que escanear un QR nuevo. ¿Seguís?",
-      )
-    ) {
-      return;
-    }
-    setBusy("unlink");
-    setMessage(null);
-    try {
-      const res = await fetch("/api/wsp-bot/console", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "unlink" }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setMessage(data.error ?? "No se pudo desvincular");
-        return;
-      }
-      setMessage("Sesión borrada. El bot se reinicia; el QR aparece en unos segundos.");
-      setTimeout(() => void refresh(), 1500);
-    } catch {
-      setMessage("Error de red al desvincular.");
     } finally {
       setBusy(null);
     }
@@ -260,27 +223,19 @@ export function WspBotConsole() {
       </div>
 
       <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-            Logs
-          </h3>
-          <button
-            type="button"
-            disabled={busy !== null || kind === "offline"}
-            onClick={() => void unlink()}
-            className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/40"
-          >
-            {busy === "unlink" ? "Desvinculando…" : "Desvincular sesión"}
-          </button>
-        </div>
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          Logs
+        </h3>
         {message ? (
           <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-300" role="status">
             {message}
           </p>
         ) : null}
-        <pre
-          ref={logBoxRef}
-          className="mt-3 max-h-[min(52rem,80vh)] min-h-[28rem] overflow-auto rounded-md bg-zinc-950 p-3 font-mono text-[11px] leading-5 text-zinc-200"
+        <LogScrollViewport
+          as="pre"
+          followToken={logs.length}
+          wrapClassName="mt-3"
+          className="max-h-[min(52rem,80vh)] min-h-[28rem] overflow-auto rounded-md bg-zinc-950 p-3 font-mono text-[11px] leading-5 text-zinc-200"
         >
           {logs.length === 0
             ? "Sin líneas todavía."
@@ -298,7 +253,7 @@ export function WspBotConsole() {
                   {formatLogTime(line.ts)}  {line.message}
                 </span>
               ))}
-        </pre>
+        </LogScrollViewport>
       </div>
     </div>
   );
