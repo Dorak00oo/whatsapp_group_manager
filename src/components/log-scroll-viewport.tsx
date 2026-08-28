@@ -108,7 +108,7 @@ export function LogScrollViewport({
         <button
           type="button"
           onClick={jumpToEnd}
-          className="absolute bottom-2 right-2 flex size-8 items-center justify-center rounded-full bg-zinc-100/95 text-zinc-900 shadow-md ring-1 ring-zinc-950/10 transition hover:bg-white"
+          className="absolute bottom-2 right-8 flex size-8 items-center justify-center rounded-none bg-white text-zinc-900 ring-1 ring-zinc-950/15 transition hover:bg-zinc-100 dark:bg-zinc-950 dark:text-white dark:ring-white/20 dark:hover:bg-zinc-900"
           aria-label="Ir al último log"
           title="Ir al último log"
         >
