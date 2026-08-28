@@ -65,7 +65,7 @@ async function proxyGet(): Promise<Response> {
     const body: WspBotConsoleView = {
       ok: false,
       offline: true,
-      error: `Bot no responde en ${url}. Usá Prender en esta página (Coolify).`,
+      error: `El bot no responde en ${url}. Si se cayó, Coolify lo reinicia solo; recargá en unos segundos.`,
       process: processInfo,
     };
     return Response.json(body, {

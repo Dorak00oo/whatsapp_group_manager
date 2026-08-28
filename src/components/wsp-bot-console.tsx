@@ -44,9 +44,7 @@ function formatLogTime(iso: string) {
 export function WspBotConsole() {
   const [view, setView] = useState<WspBotConsoleView | null>(null);
   const [phone, setPhone] = useState("");
-  const [busy, setBusy] = useState<
-    "code" | "unlink" | "start" | "stop" | "restart" | null
-  >(null);
+  const [busy, setBusy] = useState<"code" | "unlink" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const logBoxRef = useRef<HTMLPreElement | null>(null);
 
@@ -117,38 +115,6 @@ export function WspBotConsole() {
     }
   }
 
-  async function control(action: "start" | "stop" | "restart") {
-    const labels = {
-      start: "Encendiendo el bot…",
-      stop: "Apagando el bot…",
-      restart: "Reiniciando el bot…",
-    };
-    setBusy(action);
-    setMessage(labels[action]);
-    try {
-      const res = await fetch("/api/wsp-bot/console", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      const data = (await res.json()) as { error?: string; message?: string };
-      if (!res.ok) {
-        setMessage(data.error ?? "No se pudo cambiar el estado del bot");
-        return;
-      }
-      setMessage(data.message ?? "Listo.");
-      await refresh();
-      if (action !== "stop") {
-        setTimeout(() => void refresh(), 1500);
-        setTimeout(() => void refresh(), 4000);
-      }
-    } catch {
-      setMessage("Error de red al controlar el bot.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function unlink() {
     if (
       !window.confirm(
@@ -205,33 +171,6 @@ export function WspBotConsole() {
             PID {view.process.pid}
           </span>
         ) : null}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={busy !== null || kind !== "offline"}
-          onClick={() => void control("start")}
-          className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
-        >
-          {busy === "start" ? "Prendiendo…" : "Prender"}
-        </button>
-        <button
-          type="button"
-          disabled={busy !== null || kind === "offline"}
-          onClick={() => void control("stop")}
-          className="rounded-lg bg-zinc-800 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-900 disabled:opacity-50 dark:bg-zinc-700 dark:hover:bg-zinc-600"
-        >
-          {busy === "stop" ? "Apagando…" : "Apagar"}
-        </button>
-        <button
-          type="button"
-          disabled={busy !== null}
-          onClick={() => void control("restart")}
-          className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
-        >
-          {busy === "restart" ? "Reiniciando…" : "Reiniciar"}
-        </button>
       </div>
 
       {view && !view.ok ? (

@@ -8,8 +8,8 @@ export default function DashboardBotPage() {
           Bot de WhatsApp
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          QR o código de 8 dígitos para vincular el número. Prender y Apagar
-          controlan el bot en Coolify, no un Node de este PC.
+          QR o código de 8 dígitos para vincular el número. Si el bot se cae,
+          Coolify lo reinicia solo.
         </p>
       </div>
       <WspBotConsole />
