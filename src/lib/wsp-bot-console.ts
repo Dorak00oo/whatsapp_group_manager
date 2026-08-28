@@ -22,7 +22,6 @@ export type WspBotConsoleOnline = {
   pairingUpdatedAt: string | null;
   hasQr: boolean;
   qrDataUrl?: string | null;
-  mediaRoot?: string | null;
   logs: WspBotLogLine[];
   process?: WspBotProcessInfo;
 };

@@ -179,28 +179,6 @@ export function WspBotConsole() {
         </p>
       ) : null}
 
-      <p className="text-sm text-zinc-500">
-        Fotos y videos (también “ver una sola vez”) se guardan en Nextcloud,
-        cuenta <code className="font-mono text-xs">drk000</code>, carpeta{" "}
-        <code className="font-mono text-xs">WhatsApp/</code>
-        {online?.mediaRoot ? (
-          <>
-            {" "}
-            (el bot las ve en{" "}
-            <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-xs text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200">
-              {online.mediaRoot}
-            </code>
-            ).
-          </>
-        ) : (
-          "."
-        )}{" "}
-        Grupos →{" "}
-        <code className="font-mono text-xs">WhatsApp/grupos/…</code>
-        . Privados →{" "}
-        <code className="font-mono text-xs">WhatsApp/privados/…</code>.
-      </p>
-
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
