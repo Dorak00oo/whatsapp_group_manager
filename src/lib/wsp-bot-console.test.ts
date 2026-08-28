@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   classifyBotStatus,
+  coolifyApiUrl,
   isLoopbackControlUrl,
   usesCoolifyBotControl,
   type WspBotConsoleView,
@@ -64,7 +65,21 @@ test("Prender/Apagar van a Coolify si hay UUID y token", () => {
   );
 });
 
-test("127.0.0.1 es consola local; el hostname del contenedor no", () => {
-  assert.equal(isLoopbackControlUrl("http://127.0.0.1:3010"), true);
-  assert.equal(isLoopbackControlUrl("http://rp15pvuvs8b5lqeappbjibg3:3010"), false);
+test("https://bot.drk000.dev no es consola loopback", () => {
+  assert.equal(isLoopbackControlUrl("https://bot.drk000.dev"), false);
+});
+
+test("la API de Coolify no usa el FQDN del panel WSP", () => {
+  assert.equal(
+    coolifyApiUrl({ WSP_COOLIFY_API_URL: "https://coolify.drk000.dev" }),
+    "https://coolify.drk000.dev",
+  );
+  assert.equal(
+    coolifyApiUrl({ COOLIFY_URL: "https://wsp.drk000.dev" }),
+    "http://coolify:8080",
+  );
+  assert.equal(
+    coolifyApiUrl({ COOLIFY_URL: "http://coolify:8080" }),
+    "http://coolify:8080",
+  );
 });

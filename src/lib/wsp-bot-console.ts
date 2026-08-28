@@ -45,7 +45,7 @@ export function classifyBotStatus(view: WspBotConsoleView): WspBotStatusKind {
 }
 
 export function wspBotControlUrl(): string {
-  return (process.env.WSP_BOT_CONTROL_URL || "http://127.0.0.1:3010").replace(
+  return (process.env.WSP_BOT_CONTROL_URL || "https://bot.drk000.dev").replace(
     /\/+$/,
     "",
   );
@@ -54,7 +54,16 @@ export function wspBotControlUrl(): string {
 export function coolifyApiUrl(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  return (env.COOLIFY_URL || "http://coolify:8080").replace(/\/+$/, "");
+  const explicit = (
+    env.WSP_COOLIFY_API_URL ||
+    env.COOLIFY_API_URL ||
+    ""
+  ).trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const url = env.COOLIFY_URL?.trim() || "";
+  // Coolify also injects COOLIFY_URL as this app's public URL (wsp.drk000.dev).
+  if (url && /coolify/i.test(url)) return url.replace(/\/+$/, "");
+  return "http://coolify:8080";
 }
 
 export function coolifyApiToken(

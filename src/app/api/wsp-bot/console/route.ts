@@ -37,7 +37,7 @@ async function proxyGet(): Promise<Response> {
     const res = await fetch(`${url}/console`, {
       headers: botAuthHeaders(),
       cache: "no-store",
-      signal: AbortSignal.timeout(2500),
+      signal: AbortSignal.timeout(8000),
     });
     const text = await res.text();
     if (!res.ok) {
@@ -65,7 +65,7 @@ async function proxyGet(): Promise<Response> {
     const body: WspBotConsoleView = {
       ok: false,
       offline: true,
-      error: `Bot no responde en ${url}. Usá Prender en esta página (Coolify) o, en local, npm start en x:\\WspBot.`,
+      error: `Bot no responde en ${url}. Usá Prender en esta página (Coolify).`,
       process: processInfo,
     };
     return Response.json(body, {
