@@ -16,6 +16,7 @@ import {
   getLastMonitorBatchAt,
   markMonitorBatchReceived,
 } from "@/lib/monitor-events-store";
+import { parsePurgeLimit } from "@/lib/history-purge";
 import { prisma } from "@/lib/prisma";
 import {
   axisRange,
@@ -104,7 +105,7 @@ async function purgeOldMonitorEvents() {
   });
 }
 
-/** Addon: lote → createMany + purga 21d. */
+/** Addon: lote → createMany + purga de eventos más viejos que MONITOR_RETENTION_DAYS. */
 export async function POST(request: Request) {
   const secret = process.env.MINECRAFT_API_KEY?.trim();
   if (!secret) {
@@ -280,5 +281,32 @@ export async function GET(request: Request) {
       fireId: e.fireId,
       relatedFireId: e.relatedFireId,
     })),
+  });
+}
+
+/** Panel: borra un lote del historial de monitoreo. */
+export async function DELETE(request: Request) {
+  const session = await auth();
+  if (!session?.user) return unauthorized();
+
+  const url = new URL(request.url);
+  const limit = parsePurgeLimit(url.searchParams.get("limit"));
+
+  const rows = await prisma.minecraftMonitorEvent.findMany({
+    select: { id: true },
+    take: limit,
+  });
+  if (rows.length === 0) {
+    return NextResponse.json({ ok: true, deleted: 0, remaining: 0 });
+  }
+
+  await prisma.minecraftMonitorEvent.deleteMany({
+    where: { id: { in: rows.map((r) => r.id) } },
+  });
+  const remaining = await prisma.minecraftMonitorEvent.count();
+  return NextResponse.json({
+    ok: true,
+    deleted: rows.length,
+    remaining,
   });
 }

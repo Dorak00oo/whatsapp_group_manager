@@ -77,8 +77,8 @@ export default async function DashboardParcelaDetailPage({ params }: Ctx) {
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
             El addon acumula eventos en el mundo y guarda un lote cada 5
-            minutos (o cuando lo pedís). Esta página se refresca sola cada 5
-            minutos y también cuando llega un lote pedido.
+            minutos (o cuando lo pedís). Historial 6 meses. Esta página se
+            refresca sola cada 5 minutos y también cuando llega un lote pedido.
           </p>
         </div>
         <MinecraftParcelSection

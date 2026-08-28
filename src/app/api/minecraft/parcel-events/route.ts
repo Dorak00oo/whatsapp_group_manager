@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import {
   isParcelEventType,
   PARCEL_PAGE_SIZE,
+  PARCEL_RETENTION_DAYS,
   resolveEventParcelId,
   type ParcelEventType,
 } from "@/lib/minecraft-parcel";
@@ -10,6 +11,7 @@ import {
   getLastParcelBatchAt,
   markParcelBatchReceived,
 } from "@/lib/parcel-events-store";
+import { parsePurgeLimit } from "@/lib/history-purge";
 import { ensurePrimaryParcel, knownParcelIdSet } from "@/lib/minecraft-parcels-db";
 import { prisma } from "@/lib/prisma";
 
@@ -72,7 +74,16 @@ function parseAddonEvent(raw: unknown): ParsedEvent | null {
   };
 }
 
-/** Addon: un lote → una sola escritura en BD (createMany). */
+async function purgeOldParcelEvents() {
+  const cutoff = new Date(
+    Date.now() - PARCEL_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+  );
+  await prisma.minecraftParcelEvent.deleteMany({
+    where: { occurredAt: { lt: cutoff } },
+  });
+}
+
+/** Addon: lote → createMany + purga de eventos más viejos que PARCEL_RETENTION_DAYS. */
 export async function POST(request: Request) {
   const secret = process.env.MINECRAFT_API_KEY?.trim();
   if (!secret) {
@@ -103,6 +114,7 @@ export async function POST(request: Request) {
   }
 
   markParcelBatchReceived();
+  await purgeOldParcelEvents();
 
   if (rows.length === 0) {
     const total = await prisma.minecraftParcelEvent.count();
@@ -135,7 +147,7 @@ export async function POST(request: Request) {
   });
 }
 
-/** Panel: historial permanente, paginado. */
+/** Panel: historial con filtros opcionales (retención 6 meses). */
 export async function GET(request: Request) {
   const session = await auth();
   if (!session?.user) return unauthorized();
@@ -149,6 +161,8 @@ export async function GET(request: Request) {
     : PARCEL_PAGE_SIZE;
   const pageRaw = Number(url.searchParams.get("page") ?? 1);
   let page = Number.isFinite(pageRaw) ? Math.max(1, Math.floor(pageRaw)) : 1;
+
+  await purgeOldParcelEvents();
 
   const gamertag = url.searchParams.get("gamertag")?.trim() ?? "";
   const eventType = url.searchParams.get("event")?.trim() ?? "";
@@ -209,7 +223,7 @@ export async function GET(request: Request) {
   });
 }
 
-/** Panel: borra el historial de una parcela (`parcelId` obligatorio). */
+/** Panel: borra el historial de una parcela (`parcelId` obligatorio). Lote si hay `limit`. */
 export async function DELETE(request: Request) {
   const session = await auth();
   if (!session?.user) return unauthorized();
@@ -223,8 +237,34 @@ export async function DELETE(request: Request) {
     );
   }
 
-  const result = await prisma.minecraftParcelEvent.deleteMany({
-    where: { parcelId },
+  const where = { parcelId };
+  const limitRaw = url.searchParams.get("limit");
+  if (limitRaw == null) {
+    const result = await prisma.minecraftParcelEvent.deleteMany({ where });
+    return NextResponse.json({
+      ok: true,
+      deleted: result.count,
+      remaining: 0,
+    });
+  }
+
+  const limit = parsePurgeLimit(limitRaw);
+  const rows = await prisma.minecraftParcelEvent.findMany({
+    where,
+    select: { id: true },
+    take: limit,
   });
-  return NextResponse.json({ ok: true, deleted: result.count });
+  if (rows.length === 0) {
+    return NextResponse.json({ ok: true, deleted: 0, remaining: 0 });
+  }
+
+  await prisma.minecraftParcelEvent.deleteMany({
+    where: { id: { in: rows.map((r) => r.id) } },
+  });
+  const remaining = await prisma.minecraftParcelEvent.count({ where });
+  return NextResponse.json({
+    ok: true,
+    deleted: rows.length,
+    remaining,
+  });
 }

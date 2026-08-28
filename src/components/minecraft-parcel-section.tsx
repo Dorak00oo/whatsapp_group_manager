@@ -22,11 +22,21 @@ import {
 } from "@/lib/minecraft-parcel";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
 import { tryParseCoordNumber } from "@/lib/xyz-coords";
+import { HistoryPurgeDialog } from "@/components/history-purge-dialog";
+import { HistoryPurgeProgress } from "@/components/history-purge-progress";
+import { useHistoryPurge } from "@/components/use-history-purge";
 import {
   XyzCoordFields,
   type XyzCoordValues,
 } from "@/components/xyz-coord-fields";
-import { softBtnLavender, softBtnPeach, softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
+import {
+  softBtnDanger,
+  softBtnLavender,
+  softBtnPeach,
+  softBtnPrimary,
+  softInputNeutral,
+  softPanel,
+} from "@/lib/soft-ui";
 import {
   formatXyz,
   MobileListItem,
@@ -180,10 +190,22 @@ export function MinecraftParcelSection({
   const [lastBatchAt, setLastBatchAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [clearing, setClearing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const purgeUrl = `/api/minecraft/parcel-events?parcelId=${encodeURIComponent(parcelId)}`;
+  const purge = useHistoryPurge(purgeUrl, () => {
+    setFilterGamertag("");
+    setFilterEvent("");
+    setFilterFrom("");
+    setFilterTo("");
+    setAppliedQuery(emptyParcelQuery(parcelId));
+    setEvents([]);
+    setTotalEvents(0);
+    setPage(1);
+    setTotalPages(1);
+    setMessage("Historial de parcela borrado.");
+  });
 
   const [filterGamertag, setFilterGamertag] = useState("");
   const [filterEvent, setFilterEvent] = useState("");
@@ -262,12 +284,14 @@ export function MinecraftParcelSection({
   loadingRef.current = loading;
   syncingRef.current = syncing;
   pageRef.current = page;
+  purge.purgingRef.current = purge.purging;
 
   useEffect(() => {
     let id: ReturnType<typeof setInterval> | undefined;
 
     const tick = () => {
-      if (loadingRef.current || syncingRef.current) return;
+      if (loadingRef.current || syncingRef.current || purge.purgingRef.current)
+        return;
       void loadFromApi(pageRef.current).then((data) => {
         if (data) applyLoaded(data);
       });
@@ -434,45 +458,6 @@ export function MinecraftParcelSection({
       setMessage("Error de red al cargar el historial.");
     } finally {
       setSyncing(false);
-    }
-  }
-
-  async function clearParcelHistory() {
-    const ok = window.confirm(
-            "¿Borrar el historial de ESTA parcela (no las demás)? Esta acción no se puede deshacer.",
-    );
-    if (!ok) return;
-
-    setClearing(true);
-    setMessage(null);
-    try {
-      const res = await fetch(
-        `/api/minecraft/parcel-events?parcelId=${encodeURIComponent(parcelId)}`,
-        {
-          method: "DELETE",
-        },
-      );
-      const data = (await res.json()) as { error?: string; deleted?: number };
-      if (!res.ok) {
-        setMessage(data.error ?? "No se pudo limpiar el historial.");
-        return;
-      }
-      setFilterGamertag("");
-      setFilterEvent("");
-      setFilterFrom("");
-      setFilterTo("");
-      setAppliedQuery(emptyParcelQuery(parcelId));
-      setEvents([]);
-      setTotalEvents(0);
-      setPage(1);
-      setTotalPages(1);
-      setMessage(
-        `Historial de parcela limpiado (${data.deleted ?? 0} evento(s) borrados).`,
-      );
-    } catch {
-      setMessage("Error de red al limpiar el historial.");
-    } finally {
-      setClearing(false);
     }
   }
 
@@ -683,7 +668,7 @@ export function MinecraftParcelSection({
             Entradas, salidas y cofres
           </h3>
           <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-            {totalEvents} eventos guardados en la base de datos.
+            {totalEvents} eventos (retención 6 meses).
             {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""} Se
             refresca solo cada 5 min. Quien no esté en el grupo WA aparece
             resaltado.
@@ -693,7 +678,7 @@ export function MinecraftParcelSection({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={syncing || loading}
+            disabled={syncing || loading || purge.purging}
             onClick={() => void requestParcelBatch()}
             className={softBtnPrimary}
           >
@@ -701,7 +686,7 @@ export function MinecraftParcelSection({
           </button>
           <button
             type="button"
-            disabled={syncing || loading}
+            disabled={syncing || loading || purge.purging}
             onClick={() => void loadLastBatch()}
             className={softBtnLavender}
           >
@@ -710,15 +695,15 @@ export function MinecraftParcelSection({
           <button
             type="button"
             disabled={
-              clearing ||
+              purge.purging ||
               syncing ||
               loading ||
-              (totalEvents === 0 && !filtersActive)
+              totalEvents === 0
             }
-            onClick={() => void clearParcelHistory()}
-            className={softBtnPeach}
+            onClick={() => purge.setConfirmOpen(true)}
+            className={softBtnDanger}
           >
-            {clearing ? "Limpiando…" : "Limpiar historial"}
+            Borrar historial
           </button>
         </div>
 
@@ -780,7 +765,7 @@ export function MinecraftParcelSection({
           <div className="flex flex-wrap gap-2">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || purge.purging}
               className={softBtnLavender}
             >
               {loading ? "Filtrando…" : "Aplicar filtros"}
@@ -796,6 +781,16 @@ export function MinecraftParcelSection({
           </div>
         </form>
 
+        {purge.purging && purge.tick ? (
+          <HistoryPurgeProgress
+            deleted={purge.tick.deleted}
+            remaining={purge.tick.remaining}
+            total={purge.tick.total}
+            error={purge.error}
+            onRetry={purge.retry}
+          />
+        ) : (
+          <>
         {events.length === 0 ? (
           <p className="text-sm text-zinc-500">
             {filtersActive
@@ -942,7 +937,18 @@ export function MinecraftParcelSection({
             </button>
           </nav>
         ) : null}
+          </>
+        )}
       </div>
+
+      <HistoryPurgeDialog
+        open={purge.confirmOpen}
+        title="Borrar historial de esta parcela"
+        description="Solo esta zona. Las demás parcelas no se tocan."
+        eventCount={totalEvents}
+        onCancel={() => purge.setConfirmOpen(false)}
+        onConfirmed={() => void purge.start(totalEvents)}
+      />
     </div>
   );
 }

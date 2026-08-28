@@ -31,3 +31,6 @@ export const softBtnLavender =
 
 export const softBtnPeach =
   "rounded-2xl bg-amber-200 px-4 py-2.5 text-sm font-medium text-zinc-900 shadow-sm transition hover:bg-amber-300 disabled:opacity-60 dark:bg-amber-800/70 dark:text-amber-50 dark:hover:bg-amber-700/70";
+
+export const softBtnDanger =
+  "rounded-2xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60 dark:bg-red-700 dark:hover:bg-red-600";

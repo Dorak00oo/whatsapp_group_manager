@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   MAX_EXTRA_PARCELS,
+  PARCEL_RETENTION_DAYS,
   PRIMARY_PARCEL_ID,
   canAddExtraParcel,
   canDeleteParcel,
@@ -12,6 +13,10 @@ import {
 test("la parcela original no se puede borrar", () => {
   assert.equal(canDeleteParcel(true), false);
   assert.equal(canDeleteParcel(false), true);
+});
+
+test("historial de parcela se conserva 6 meses", () => {
+  assert.equal(PARCEL_RETENTION_DAYS, 180);
 });
 
 test("tope de 5 parcelas extra", () => {

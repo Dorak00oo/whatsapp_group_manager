@@ -189,7 +189,7 @@ model MinecraftParcel {
 
 /**
  * Eventos de monitoreo Overworld: place/break, fuego, TNT, quema atribuida.
- * Retención: 7 días (purga en POST/GET).
+ * Retención: 6 meses / 180 días (purga en POST/GET).
  */
 model MinecraftMonitorEvent {
   id            String   @id @default(cuid())
@@ -242,7 +242,8 @@ model MinecraftMonitorAlert {
 }
 
 /**
- * Entrada o salida de un jugador en la parcela monitoreada
+ * Entrada, salida o cofre en una parcela monitoreada.
+ * Retención: 6 meses / 180 días (purga en POST/GET).
  */
 model MinecraftParcelEvent {
   id         String           @id @default(cuid())

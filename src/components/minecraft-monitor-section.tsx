@@ -20,8 +20,12 @@ import {
   type MonitorEventType,
 } from "@/lib/minecraft-monitor";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { HistoryPurgeDialog } from "@/components/history-purge-dialog";
+import { HistoryPurgeProgress } from "@/components/history-purge-progress";
+import { useHistoryPurge } from "@/components/use-history-purge";
 import { XyzCoordFields } from "@/components/xyz-coord-fields";
 import {
+  softBtnDanger,
   softBtnLavender,
   softBtnPrimary,
   softInputNeutral,
@@ -164,6 +168,13 @@ export function MinecraftMonitorSection({
   const [filterZ, setFilterZ] = useState("");
   const [filterRadius, setFilterRadius] = useState("");
   const [loading, setLoading] = useState(false);
+  const purge = useHistoryPurge("/api/minecraft/monitor-events", () => {
+    setEvents([]);
+    setTotalEvents(0);
+    setPage(1);
+    setTotalPages(1);
+    setMessage("Historial de monitoreo borrado.");
+  });
 
   const filterQueryString = useMemo(() => {
     const p = new URLSearchParams();
@@ -238,12 +249,14 @@ export function MinecraftMonitorSection({
   loadingRef.current = loading;
   syncingRef.current = syncing;
   pageRef.current = page;
+  purge.purgingRef.current = purge.purging;
 
   useEffect(() => {
     let id: ReturnType<typeof setInterval> | undefined;
 
     const tick = () => {
-      if (loadingRef.current || syncingRef.current) return;
+      if (loadingRef.current || syncingRef.current || purge.purgingRef.current)
+        return;
       void loadPage(pageRef.current).then((data) => {
         if (data) applyLoaded(data);
       });
@@ -504,7 +517,7 @@ export function MinecraftMonitorSection({
               Historial de monitoreo
             </h3>
             <p className="mt-0.5 text-xs text-zinc-500">
-              {totalEvents} eventos (retención 7 días). Actualización automática
+              {totalEvents} eventos (retención 6 meses). Actualización automática
               cada 20 s; el addon envía cada ~30 s.
               {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""}
             </p>
@@ -512,7 +525,7 @@ export function MinecraftMonitorSection({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={syncing}
+              disabled={syncing || purge.purging}
               onClick={() => void requestBatch()}
               className={softBtnPrimary}
             >
@@ -520,11 +533,19 @@ export function MinecraftMonitorSection({
             </button>
             <button
               type="button"
-              disabled={loading}
+              disabled={loading || purge.purging}
               onClick={clearFilters}
               className={softBtnLavender}
             >
               Limpiar filtros
+            </button>
+            <button
+              type="button"
+              disabled={loading || syncing || purge.purging || totalEvents === 0}
+              onClick={() => purge.setConfirmOpen(true)}
+              className={softBtnDanger}
+            >
+              Borrar historial
             </button>
           </div>
         </div>
@@ -625,7 +646,7 @@ export function MinecraftMonitorSection({
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || purge.purging}
           className={softBtnLavender}
         >
           {loading ? "Filtrando…" : "Aplicar filtros"}
@@ -636,6 +657,16 @@ export function MinecraftMonitorSection({
           <p className="text-xs text-zinc-600 dark:text-zinc-400">{message}</p>
         ) : null}
 
+        {purge.purging && purge.tick ? (
+          <HistoryPurgeProgress
+            deleted={purge.tick.deleted}
+            remaining={purge.tick.remaining}
+            total={purge.tick.total}
+            error={purge.error}
+            onRetry={purge.retry}
+          />
+        ) : (
+          <>
         <div className="overflow-hidden rounded-xl border border-zinc-200/80 dark:border-zinc-700/80">
           <ResponsiveDataList
             isEmpty={events.length === 0}
@@ -767,6 +798,8 @@ export function MinecraftMonitorSection({
             </button>
           </nav>
         ) : null}
+          </>
+        )}
       </div>
 
       <div className={`${softPanel} gap-3`}>
@@ -792,6 +825,15 @@ export function MinecraftMonitorSection({
           {savingExclude ? "Guardando…" : "Guardar excluidos"}
         </button>
       </div>
+
+      <HistoryPurgeDialog
+        open={purge.confirmOpen}
+        title="Borrar historial de monitoreo"
+        description="Se borra todo el Overworld (bloques, fuego, TNT, wither, animales). Las alertas no se tocan."
+        eventCount={totalEvents}
+        onCancel={() => purge.setConfirmOpen(false)}
+        onConfirmed={() => void purge.start(totalEvents)}
+      />
     </div>
   );
 }

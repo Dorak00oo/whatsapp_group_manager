@@ -57,7 +57,7 @@ export default async function DashboardMonitoreoPage() {
           <p className="mt-1 text-sm text-zinc-500">
             Bloques colocados/rotos, fuego, lava, TNT, wither y animales
             domésticos/colección en Overworld. El addon envía lotes cada 30 s (o
-            al pedirlos). Historial 7 días. Alertas 5 días (o hasta
+            al pedirlos). Historial 6 meses. Alertas 5 días (o hasta
             descartarlas).
           </p>
         </div>

@@ -1,4 +1,5 @@
-export const MONITOR_RETENTION_DAYS = 7;
+/** Ventana rodante: se purga lo más viejo en cada POST/GET. ~6 meses. */
+export const MONITOR_RETENTION_DAYS = 180;
 
 export type MonitorEventType =
   | "block_break"

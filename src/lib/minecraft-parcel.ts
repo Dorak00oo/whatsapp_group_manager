@@ -185,6 +185,9 @@ export function isParcelEventType(value: string): value is ParcelEventType {
 /** Eventos por página en el historial del panel. */
 export const PARCEL_PAGE_SIZE = 100;
 
+/** Ventana rodante: se purga lo más viejo en cada POST/GET. ~6 meses. */
+export const PARCEL_RETENTION_DAYS = 180;
+
 export function isParcelDimension(value: string): value is ParcelDimension {
   return (PARCEL_DIMENSIONS as readonly string[]).includes(value);
 }

@@ -51,7 +51,7 @@ export default async function DashboardParcelaPage() {
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
             Elegí una zona o añadí otra para monitorear. El addon acumula
-            eventos y guarda un lote cada 5 minutos.
+            eventos y guarda un lote cada 5 minutos. Historial 6 meses.
           </p>
         </div>
         <MinecraftParcelHub
