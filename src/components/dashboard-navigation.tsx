@@ -165,6 +165,30 @@ function IconMinecraft({ className }: { className?: string }) {
   );
 }
 
+function IconBot({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className ?? iconSm}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="5" y="8" width="14" height="10" rx="3" />
+      <path d="M12 8V4" />
+      <circle cx="9" cy="13" r="1" fill="currentColor" />
+      <circle cx="15" cy="13" r="1" fill="currentColor" />
+      <path d="M9 18v2" />
+      <path d="M15 18v2" />
+    </svg>
+  );
+}
+
 function useNavActive() {
   const pathname = usePathname();
   const list = pathname === "/dashboard";
@@ -174,7 +198,8 @@ function useNavActive() {
   const comandos = pathname.startsWith("/dashboard/comandos");
   const parcela = pathname.startsWith("/dashboard/parcela");
   const monitoreo = pathname.startsWith("/dashboard/monitoreo");
-  return { list, add, bulk, minecraft, comandos, parcela, monitoreo };
+  const bot = pathname.startsWith("/dashboard/bot");
+  return { list, add, bulk, minecraft, comandos, parcela, monitoreo, bot };
 }
 
 function activeCls(on: boolean) {
@@ -191,7 +216,7 @@ function activeTabCls(on: boolean) {
 
 /** Barra lateral: iconos pequeños (md+). */
 export function DashboardSidebarNav() {
-  const { list, add, bulk, minecraft, comandos, parcela, monitoreo } =
+  const { list, add, bulk, minecraft, comandos, parcela, monitoreo, bot } =
     useNavActive();
 
   return (
@@ -246,6 +271,14 @@ export function DashboardSidebarNav() {
         aria-current={monitoreo ? "page" : undefined}
       >
         <IconMonitor className={iconSidebar} />
+      </Link>
+      <Link
+        href="/dashboard/bot"
+        className={`${linkBaseSidebar} ${activeCls(bot)}`}
+        title="Bot de WhatsApp"
+        aria-current={bot ? "page" : undefined}
+      >
+        <IconBot className={iconSidebar} />
       </Link>
       <Link
         href="/dashboard/comandos"
@@ -337,7 +370,7 @@ function ScrollSideHint({
 /** Navegación superior móvil: todas las secciones, scroll horizontal. */
 export function DashboardMobileTabNav() {
   const pathname = usePathname();
-  const { list, add, bulk, minecraft, comandos, parcela, monitoreo } =
+  const { list, add, bulk, minecraft, comandos, parcela, monitoreo, bot } =
     useNavActive();
   const scrollerRef = useRef<HTMLElement>(null);
   const [overflow, setOverflow] = useState({ left: false, right: false });
@@ -438,6 +471,14 @@ export function DashboardMobileTabNav() {
         >
           <IconMonitor className="size-[1.125rem] shrink-0" />
           <span className="text-[10px] font-medium leading-none">Monitor</span>
+        </Link>
+        <Link
+          href="/dashboard/bot"
+          className={`${tabBase} ${activeTabCls(bot)}`}
+          aria-current={bot ? "page" : undefined}
+        >
+          <IconBot className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">Bot</span>
         </Link>
         <Link
           href="/dashboard/comandos"

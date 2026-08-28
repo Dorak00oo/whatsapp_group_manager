@@ -12,29 +12,34 @@ export function DashboardMainHeader() {
   const isParcela = pathname.startsWith("/dashboard/parcela");
   const isMonitoreo = pathname.startsWith("/dashboard/monitoreo");
   const isAdministracion = pathname.startsWith("/dashboard/administracion");
+  const isBot = pathname.startsWith("/dashboard/bot");
 
-  const title = isComandos
-    ? "Comandos rápidos"
-    : isParcela
-      ? "Parcela"
-      : isMonitoreo
-        ? "Monitoreo"
-        : isMinecraft
-          ? "Jugadores de Minecraft"
-          : isAdministracion
-            ? "Administración de los usuarios"
-            : "Panel";
-  const subtitle = isComandos
-    ? "Órdenes al mundo Bedrock vía el addon (espectador, survival, fuego, limpieza de mobs)."
-    : isParcela
-      ? "Zonas monitoreadas: entradas, salidas y cofres, con historial."
-      : isMonitoreo
-        ? "Bloques, fuego, lava, TNT y withers en Overworld — filtros por jugador, ítem, hora y coordenadas."
-        : isMinecraft
-          ? "Estado de actividad de jugadores del servidor de Minecraft."
-          : isAdministracion
-            ? "Administración de jugadores, allowlist, auditoría de gamertags y comparación con Minecraft."
-            : "Directorio de personas, filtros, importación y monitoreo Minecraft.";
+  const title = isBot
+    ? "Bot de WhatsApp"
+    : isComandos
+      ? "Comandos rápidos"
+      : isParcela
+        ? "Parcela"
+        : isMonitoreo
+          ? "Monitoreo"
+          : isMinecraft
+            ? "Jugadores de Minecraft"
+            : isAdministracion
+              ? "Administración de los usuarios"
+              : "Panel";
+  const subtitle = isBot
+    ? "QR o código de 8 dígitos para vincular el número, y logs del bot Yuki."
+    : isComandos
+      ? "Órdenes al mundo Bedrock vía el addon (espectador, survival, fuego, limpieza de mobs)."
+      : isParcela
+        ? "Zonas monitoreadas: entradas, salidas y cofres, con historial."
+        : isMonitoreo
+          ? "Bloques, fuego, lava, TNT y withers en Overworld — filtros por jugador, ítem, hora y coordenadas."
+          : isMinecraft
+            ? "Estado de actividad de jugadores del servidor de Minecraft."
+            : isAdministracion
+              ? "Administración de jugadores, allowlist, auditoría de gamertags y comparación con Minecraft."
+              : "Directorio de personas, filtros, importación y monitoreo Minecraft.";
 
   return (
     <header className="mb-5 border-b border-zinc-200/80 pb-5 dark:border-zinc-800/80 max-md:hidden sm:mb-6 sm:pb-6 md:mb-8 xl:mb-8 xl:border-0 xl:pb-0">
