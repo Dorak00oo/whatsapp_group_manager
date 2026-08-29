@@ -35,8 +35,9 @@ export default async function DashboardAjustesPage() {
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
             Arriba ves si Vanilla y Mods están hablando con el panel y asignás
-            cada dedicated. Abajo se edita el mundo seleccionado. Sync all sigue
-            en Jugadores → Listas.
+            cada dedicated. Abajo se edita el mundo seleccionado. Sincronizar
+            ajustes empuja umbrales y listas de config al addon; las
+            blacklist/whitelist se sincronizan en Jugadores → Listas.
           </p>
         </div>
 

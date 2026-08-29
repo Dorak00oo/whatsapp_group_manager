@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { StrokeSyncIcon } from "@/components/stroke-sync-icon";
 import { sanitizeBannedItemsList } from "@/lib/minecraft-banned-items";
 import { softBtnLavender, softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
 
@@ -147,8 +148,9 @@ export function MinecraftBannedItemsSection({ initialItems }: Props) {
         type="button"
         disabled={saving || syncing}
         onClick={() => void syncNow()}
-        className={`${softBtnLavender} self-start`}
+        className={`${softBtnLavender} inline-flex items-center gap-1.5 self-start`}
       >
+        <StrokeSyncIcon />
         {syncing ? "Enviando…" : "Sincronizar ahora"}
       </button>
 

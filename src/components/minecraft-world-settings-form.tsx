@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
+import { StrokeSyncIcon } from "@/components/stroke-sync-icon";
+import { softBtnLavender, softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
 import type { MinecraftServerId } from "@/lib/minecraft-server";
 
 type ConfigForm = {
@@ -26,6 +27,7 @@ export function MinecraftWorldSettingsForm({
   const [name, setName] = useState(initialName);
   const [form, setForm] = useState(config);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function save() {
@@ -60,6 +62,30 @@ export function MinecraftWorldSettingsForm({
       setMessage("Error de red");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function syncConfig() {
+    setSyncing(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/minecraft/sync-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: "syncconfig" }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setMessage(data.error ?? "No se pudo encolar la sincronización");
+        return;
+      }
+      setMessage(
+        "Sincronizar ajustes solicitado. El addon bajará umbrales, parcelas, ítems baneados y exclusiones de monitoreo en ~30 s.",
+      );
+    } catch {
+      setMessage("Error de red");
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -108,14 +134,25 @@ export function MinecraftWorldSettingsForm({
           </label>
         ))}
       </div>
-      <button
-        type="button"
-        className={`${softBtnPrimary} mt-4`}
-        disabled={saving}
-        onClick={() => void save()}
-      >
-        {saving ? "Guardando…" : "Guardar ajustes"}
-      </button>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className={softBtnPrimary}
+          disabled={saving || syncing}
+          onClick={() => void save()}
+        >
+          {saving ? "Guardando…" : "Guardar ajustes"}
+        </button>
+        <button
+          type="button"
+          className={`${softBtnLavender} inline-flex items-center gap-1.5`}
+          disabled={saving || syncing}
+          onClick={() => void syncConfig()}
+        >
+          <StrokeSyncIcon />
+          {syncing ? "Solicitando…" : "Sincronizar ajustes"}
+        </button>
+      </div>
       {message ? (
         <p className="mt-2 text-sm text-zinc-500">{message}</p>
       ) : null}

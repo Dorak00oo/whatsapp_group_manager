@@ -12,7 +12,7 @@ Actualizar el pack **no** cambia el UUID. Mundo nuevo = UUID nuevo = volver a as
 
 Addon viejo sin UUID sigue usando `SERVER_ID` en `config.js` (legado).
 
-Ajustes (`/dashboard/ajustes`) muestra pendientes, pings y el emparejado.
+Ajustes (`/dashboard/ajustes`) muestra pendientes, pings y el emparejado. **Sincronizar ajustes** baja umbrales, parcelas, ítems baneados y exclusiones de monitoreo al addon. Las blacklist/whitelist se sincronizan con **Sincronizar listas** en Jugadores → Listas.
 
 ## Qué es por mundo
 

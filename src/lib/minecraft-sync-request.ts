@@ -5,11 +5,10 @@ import type { MinecraftServerId } from "@/lib/minecraft-server";
 
 export const MINECRAFT_SYNC_QUEUE_ID = "minecraft_sync_request";
 
-export type MinecraftPanelCommand = "syncall";
+export type MinecraftPanelCommand = "syncall" | "synclists" | "syncconfig";
 
 /**
- * Encola un comando de panel para el addon (p. ej. `syncall` para aplicar
- * blacklist/whitelist del GET /api/minecraft/status).
+ * Encola un comando de panel para el addon (`synclists`, `syncconfig` o `syncall`).
  */
 export async function enqueueMinecraftPanelCommand(
   command: MinecraftPanelCommand = "syncall",

@@ -32,7 +32,7 @@ function buildLines(
     lines.push(`OK: +${addList.length} añadido${addList.length === 1 ? "" : "s"} / -${removeList.length} quitado${removeList.length === 1 ? "" : "s"}`);
   }
   for (const s of skipped) {
-    lines.push(`⚠ omitido "${s.oldGamertag}" → "${s.newGamertag}": ${s.reason}`);
+    lines.push(`omitido "${s.oldGamertag}" → "${s.newGamertag}": ${s.reason}`);
   }
   return lines;
 }

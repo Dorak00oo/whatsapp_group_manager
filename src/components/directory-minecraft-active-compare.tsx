@@ -273,9 +273,9 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
       setDialogOpen(false);
       setMessage(
         n > 0
-          ? `${n} jugador${n === 1 ? "" : "es"} a blacklist. Sync all enviado; el addon lo aplicará en ~30 s.`
+          ? `${n} jugador${n === 1 ? "" : "es"} a blacklist. Sincronizar listas enviado; el addon lo aplicará en ~30 s.`
           : already > 0
-            ? "Ya estaban en blacklist. Sync all enviado al servidor."
+            ? "Ya estaban en blacklist. Sincronizar listas enviado al servidor."
             : "Nada que actualizar.",
       );
       router.refresh();

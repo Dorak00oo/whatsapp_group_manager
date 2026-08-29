@@ -1,11 +1,71 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   MobileListItem,
   ResponsiveDataList,
 } from "@/components/responsive-data-list";
+import { StrokeSyncIcon } from "@/components/stroke-sync-icon";
+
+function Glyph({
+  children,
+  className = "size-3.5 shrink-0",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
+
+function IconBan() {
+  return (
+    <Glyph>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m4.9 4.9 14.2 14.2" />
+    </Glyph>
+  );
+}
+
+function IconCheck() {
+  return (
+    <Glyph>
+      <path d="M20 6 9 17l-5-5" />
+    </Glyph>
+  );
+}
+
+function IconStar() {
+  return (
+    <Glyph>
+      <path d="M12 3 9.5 8.5 3.5 9.5 8 13.5 7 19.5 12 16.5 17 19.5 16 13.5 20.5 9.5 14.5 8.5z" />
+    </Glyph>
+  );
+}
+
+function IconX() {
+  return (
+    <Glyph>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </Glyph>
+  );
+}
 
 /** Refresco del panel: intervalo alto para reducir consultas Neon (CU-h) cuando la pestaña está abierta mucho tiempo. */
 const DASHBOARD_REFRESH_MS = 60_000;
@@ -155,11 +215,11 @@ export function MinecraftPlayersSection({
     }
   };
 
-  const handleSyncAll = () =>
+  const handleSyncLists = () =>
     requestPanelCommand(
-      "syncall",
-      "syncall",
-      "Sync all solicitado. El addon lo aplicará en la próxima revisión (~30 s).",
+      "synclists",
+      "synclists",
+      "Sincronizar listas solicitado. El addon lo aplicará en la próxima revisión (~30 s).",
     );
 
   const searchNeedle = search.trim().toLowerCase();
@@ -288,11 +348,12 @@ export function MinecraftPlayersSection({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleSyncAll}
-              disabled={loading === "syncall"}
-              className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              onClick={handleSyncLists}
+              disabled={loading === "synclists"}
+              className="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              {loading === "syncall" ? "Solicitando..." : "🔄 Sync all"}
+              <StrokeSyncIcon />
+              {loading === "synclists" ? "Solicitando..." : "Sincronizar listas"}
             </button>
           </div>
         ) : (
@@ -634,7 +695,9 @@ function AccessListPanel({
                         className="rounded bg-zinc-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
                         title="Quitar de whitelist"
                       >
-                        ❌ Remove WL
+                        <span className="inline-flex items-center gap-1">
+                          <IconX /> Quitar WL
+                        </span>
                       </button>
                     ) : (
                       <button
@@ -645,7 +708,9 @@ function AccessListPanel({
                         className="rounded bg-green-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                         title="Quitar de blacklist"
                       >
-                        ✅ Unban
+                        <span className="inline-flex items-center gap-1">
+                          <IconCheck /> Quitar ban
+                        </span>
                       </button>
                     )}
                   </td>
@@ -670,19 +735,19 @@ function AccessListPanel({
                 <button
                   onClick={() => onAction(player.gamertag, "remove_whitelist")}
                   disabled={loading === player.gamertag}
-                  className="flex min-h-11 w-full items-center justify-center rounded-lg bg-zinc-600 px-3 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
+                  className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-zinc-600 px-3 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50"
                   title="Quitar de whitelist"
                 >
-                  ❌ Remove WL
+                  <IconX /> Quitar WL
                 </button>
               ) : (
                 <button
                   onClick={() => onAction(player.gamertag, "remove_blacklist")}
                   disabled={loading === player.gamertag}
-                  className="flex min-h-11 w-full items-center justify-center rounded-lg bg-green-600 px-3 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                  className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-green-600 px-3 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                   title="Quitar de blacklist"
                 >
-                  ✅ Unban
+                  <IconCheck /> Quitar ban
                 </button>
               )}
             </div>
@@ -739,38 +804,38 @@ function PlayerListActions({
         <button
           onClick={() => onAction(player.gamertag, "blacklist")}
           disabled={loading === player.gamertag}
-          className={`${btn} bg-red-600 hover:bg-red-700`}
+          className={`${btn} inline-flex items-center justify-center gap-1 bg-red-600 hover:bg-red-700`}
           title="Agregar a blacklist"
         >
-          🚫 Ban
+          <IconBan /> Ban
         </button>
       ) : (
         <button
           onClick={() => onAction(player.gamertag, "remove_blacklist")}
           disabled={loading === player.gamertag}
-          className={`${btn} bg-green-600 hover:bg-green-700`}
+          className={`${btn} inline-flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700`}
           title="Quitar de blacklist"
         >
-          ✅ Unban
+          <IconCheck /> Quitar ban
         </button>
       )}
       {!player.isWhitelisted ? (
         <button
           onClick={() => onAction(player.gamertag, "whitelist")}
           disabled={loading === player.gamertag}
-          className={`${btn} bg-blue-600 hover:bg-blue-700`}
+          className={`${btn} inline-flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700`}
           title="Agregar a whitelist"
         >
-          ⭐ WL
+          <IconStar /> WL
         </button>
       ) : (
         <button
           onClick={() => onAction(player.gamertag, "remove_whitelist")}
           disabled={loading === player.gamertag}
-          className={`${btn} bg-zinc-600 hover:bg-zinc-700`}
+          className={`${btn} inline-flex items-center justify-center gap-1 bg-zinc-600 hover:bg-zinc-700`}
           title="Quitar de whitelist"
         >
-          ❌ Remove WL
+          <IconX /> Quitar WL
         </button>
       )}
     </div>

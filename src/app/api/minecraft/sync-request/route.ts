@@ -3,7 +3,7 @@ import {
   requireMinecraftAddon,
   requireMinecraftPanel,
 } from "@/lib/minecraft-api-context";
-import { enqueueMinecraftPanelCommand } from "@/lib/minecraft-sync-request";
+import { enqueueMinecraftPanelCommand, type MinecraftPanelCommand } from "@/lib/minecraft-sync-request";
 import {
   readMinecraftQueueRow,
   updateMinecraftQueueData,
@@ -12,20 +12,24 @@ import { asSyncRequestData } from "@/lib/minecraft-sync-request-data";
 
 export const runtime = "nodejs";
 
-const ALLOWED_PANEL_COMMANDS = new Set(["syncall"]);
+const ALLOWED_PANEL_COMMANDS = new Set([
+  "syncall",
+  "synclists",
+  "syncconfig",
+]);
 
 export async function POST(request: Request) {
   const authz = await requireMinecraftPanel();
   if (!authz.ok) return authz.response;
 
-  let command: "syncall" = "syncall";
+  let command: MinecraftPanelCommand = "syncall";
   try {
     const body = (await request.json()) as { command?: unknown };
     if (
       typeof body.command === "string" &&
       ALLOWED_PANEL_COMMANDS.has(body.command.trim())
     ) {
-      command = body.command.trim() as "syncall";
+      command = body.command.trim() as MinecraftPanelCommand;
     }
   } catch {
     /* sin cuerpo / no JSON → syncall */

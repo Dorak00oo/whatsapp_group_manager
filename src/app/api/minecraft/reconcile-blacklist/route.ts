@@ -156,7 +156,7 @@ export async function POST(request: Request) {
       blacklisted.push(player.gamertag);
     }
 
-    const sync = await enqueueMinecraftPanelCommand("syncall", serverId);
+    const sync = await enqueueMinecraftPanelCommand("synclists", serverId);
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/minecraft");
