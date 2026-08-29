@@ -47,12 +47,14 @@ export function canAddExtraParcel(extraCount: number): boolean {
 export function resolveEventParcelId(
   raw: unknown,
   knownIds: Set<string>,
+  fallbackId: string = PRIMARY_PARCEL_ID,
 ): string {
   const id = typeof raw === "string" ? raw.trim() : "";
   if (id && knownIds.has(id)) return id;
+  if (knownIds.has(fallbackId)) return fallbackId;
   if (knownIds.has(PRIMARY_PARCEL_ID)) return PRIMARY_PARCEL_ID;
   const first = knownIds.values().next().value;
-  return typeof first === "string" ? first : PRIMARY_PARCEL_ID;
+  return typeof first === "string" ? first : fallbackId;
 }
 
 /** Extra nueva: apagada, caja por defecto. `extraIndex` 1 → "Parcela 2". */

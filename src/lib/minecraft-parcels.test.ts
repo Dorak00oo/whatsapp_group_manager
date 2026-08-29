@@ -33,6 +33,22 @@ test("evento sin parcela conocida cae en primary", () => {
   assert.equal(resolveEventParcelId("fantasma", known), "primary");
 });
 
+test("primary de mods no pisa la parcela primary de vanilla", () => {
+  const known = new Set(["mods:primary", "extra-mods"]);
+  assert.equal(
+    resolveEventParcelId("", known, "mods:primary"),
+    "mods:primary",
+  );
+  assert.equal(
+    resolveEventParcelId("fantasma", known, "mods:primary"),
+    "mods:primary",
+  );
+  assert.equal(
+    resolveEventParcelId("extra-mods", known, "mods:primary"),
+    "extra-mods",
+  );
+});
+
 test("una extra nueva nace apagada con caja por defecto", () => {
   const created = extraParcelCreatePayload(1);
   assert.equal(created.enabled, false);

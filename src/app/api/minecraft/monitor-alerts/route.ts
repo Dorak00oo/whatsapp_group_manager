@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireMinecraftPanel } from "@/lib/minecraft-api-context";
 import { listActiveMonitorAlerts } from "@/lib/minecraft-monitor-alerts";
 
 export const runtime = "nodejs";
 
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
-/** Panel: alertas activas (5 días, no descartadas). */
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
 
-  const alerts = await listActiveMonitorAlerts();
+  const alerts = await listActiveMonitorAlerts(authz.serverId);
   return NextResponse.json({ ok: true, alerts });
 }

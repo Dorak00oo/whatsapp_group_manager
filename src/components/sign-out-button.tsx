@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
+import { SidebarGlyphCaption, sidebarTileClass } from "@/components/sidebar-glyph-caption";
 
 function LogOutDoorIcon({ className }: { className?: string }) {
   return (
@@ -39,18 +40,30 @@ export function SignOutButton({
   iconOnlySize = "md",
 }: Props) {
   if (iconOnly) {
-    const circle =
-      iconOnlySize === "sm" ? "size-9" : "size-12";
+    if (iconOnlySize === "sm") {
+      return (
+        <button
+          type="button"
+          onClick={() => signOut({ callbackUrl: "/" })}
+          title="Cerrar sesión"
+          aria-label="Cerrar sesión"
+          className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-zinc-600 ring-1 ring-zinc-900/10 transition-colors hover:bg-red-500/10 hover:text-red-600 hover:ring-red-400/45 dark:bg-zinc-900/40 dark:text-zinc-400 dark:ring-zinc-700/60 dark:hover:bg-red-950/40 dark:hover:text-red-400 dark:hover:ring-red-500/45 ${className ?? ""}`}
+        >
+          <LogOutDoorIcon className="size-[18px]" />
+        </button>
+      );
+    }
     return (
       <button
         type="button"
         onClick={() => signOut({ callbackUrl: "/" })}
         title="Cerrar sesión"
         aria-label="Cerrar sesión"
-        className={`inline-flex ${circle} shrink-0 items-center justify-center rounded-full bg-white text-zinc-600 ring-1 ring-zinc-900/10 transition-colors hover:bg-red-500/10 hover:text-red-600 hover:ring-red-400/45 dark:bg-zinc-900/40 dark:text-zinc-400 dark:ring-zinc-700/60 dark:hover:bg-red-950/40 dark:hover:text-red-400 dark:hover:ring-red-500/45 ${className ?? ""}`}
+        className={`${sidebarTileClass} bg-white text-zinc-600 ring-1 ring-zinc-900/10 hover:bg-red-500/10 hover:text-red-600 hover:ring-red-400/45 dark:bg-zinc-900/40 dark:text-zinc-400 dark:ring-zinc-700/60 dark:hover:bg-red-950/40 dark:hover:text-red-400 dark:hover:ring-red-500/45 ${className ?? ""}`}
       >
-        <LogOutDoorIcon
-          className={iconOnlySize === "sm" ? "size-[18px]" : undefined}
+        <SidebarGlyphCaption
+          icon={<LogOutDoorIcon className="size-7" />}
+          caption="Salir"
         />
       </button>
     );

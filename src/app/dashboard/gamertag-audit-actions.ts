@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import type { GamertagAuditRunResult } from "@/lib/gamertag-audit";
 import { runGamertagAuditWithLog } from "@/lib/gamertag-audit";
+import { recordPendingGamertagCorrection } from "@/lib/allowlist-corrected";
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
@@ -70,14 +71,12 @@ export async function approveGamertagAuditSuggestion(
         where: { id },
         data: { status: "approved", decidedAt: new Date() },
       }),
-      prisma.pendingGamertagCorrection.create({
-        data: {
-          directoryMemberId: suggestion.directoryMemberId,
-          oldGamertag: suggestion.currentGamertag,
-          newGamertag: suggestion.suggestedGamertag,
-        },
-      }),
     ]);
+    await recordPendingGamertagCorrection(
+      suggestion.directoryMemberId,
+      suggestion.currentGamertag,
+      suggestion.suggestedGamertag,
+    );
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/administracion");

@@ -10,6 +10,7 @@ import {
 } from "@/lib/minecraft-monitor";
 import { listActiveMonitorAlerts } from "@/lib/minecraft-monitor-alerts";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
 import { prisma } from "@/lib/prisma";
 
 export default async function DashboardMonitoreoPage() {
@@ -17,14 +18,16 @@ export default async function DashboardMonitoreoPage() {
   if (!session?.user) return null;
 
   try {
+    const serverId = await getSelectedMinecraftServerId();
     const [config, events, eventTotal, alerts] = await Promise.all([
-      prisma.minecraftConfig.findUnique({ where: { id: "default" } }),
+      prisma.minecraftConfig.findUnique({ where: { id: serverId } }),
       prisma.minecraftMonitorEvent.findMany({
+        where: { serverId },
         orderBy: { occurredAt: "desc" },
         take: MONITOR_PAGE_SIZE,
       }),
-      prisma.minecraftMonitorEvent.count(),
-      listActiveMonitorAlerts(),
+      prisma.minecraftMonitorEvent.count({ where: { serverId } }),
+      listActiveMonitorAlerts(serverId),
     ]);
 
     const mapped = events.map((e) => {
@@ -62,6 +65,7 @@ export default async function DashboardMonitoreoPage() {
           </p>
         </div>
         <MinecraftMonitorSection
+          key={serverId}
           events={mapped}
           totalEvents={eventTotal}
           alerts={alerts}

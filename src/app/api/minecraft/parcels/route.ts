@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireMinecraftPanel } from "@/lib/minecraft-api-context";
 import {
   canAddExtraParcel,
   extraParcelCreatePayload,
@@ -12,16 +12,12 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
 
   try {
-    const parcels = await ensurePrimaryParcel();
+    const parcels = await ensurePrimaryParcel(authz.serverId);
     return NextResponse.json({ ok: true, parcels });
   } catch (error) {
     console.error("[Minecraft Parcels API] GET:", error);
@@ -33,12 +29,13 @@ export async function GET() {
 }
 
 export async function POST() {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
 
   try {
-    await ensurePrimaryParcel();
-    const extras = await extraParcelCount();
+    await ensurePrimaryParcel(serverId);
+    const extras = await extraParcelCount(serverId);
     if (!canAddExtraParcel(extras)) {
       return NextResponse.json(
         { error: "Máximo 5 parcelas extra" },
@@ -49,6 +46,7 @@ export async function POST() {
     const created = await prisma.minecraftParcel.create({
       data: {
         id: payload.id,
+        serverId,
         isPrimary: false,
         name: payload.name,
         enabled: payload.enabled,

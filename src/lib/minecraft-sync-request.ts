@@ -1,4 +1,7 @@
-import { prisma } from "@/lib/prisma";
+import {
+  upsertMinecraftQueue,
+} from "@/lib/minecraft-queue";
+import type { MinecraftServerId } from "@/lib/minecraft-server";
 
 export const MINECRAFT_SYNC_QUEUE_ID = "minecraft_sync_request";
 
@@ -10,26 +13,14 @@ export type MinecraftPanelCommand = "syncall";
  */
 export async function enqueueMinecraftPanelCommand(
   command: MinecraftPanelCommand = "syncall",
+  serverId: MinecraftServerId = "vanilla",
 ): Promise<{ command: MinecraftPanelCommand; requestedAt: string }> {
   const requestedAt = new Date().toISOString();
 
-  await prisma.minecraftSyncQueue.upsert({
-    where: { id: MINECRAFT_SYNC_QUEUE_ID },
-    update: {
-      data: {
-        command,
-        requestedAt,
-        handledAt: null,
-      },
-    },
-    create: {
-      id: MINECRAFT_SYNC_QUEUE_ID,
-      data: {
-        command,
-        requestedAt,
-        handledAt: null,
-      },
-    },
+  await upsertMinecraftQueue(serverId, "minecraft_sync_request", {
+    command,
+    requestedAt,
+    handledAt: null,
   });
 
   return { command, requestedAt };

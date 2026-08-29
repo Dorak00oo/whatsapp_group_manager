@@ -1,4 +1,9 @@
 /** Cola en `minecraft_sync_queue` para roster online reportado por el addon. */
+export function onlinePlayersQueueId(serverId: string): string {
+  return `${serverId}:online_players`;
+}
+
+/** @deprecated Usar onlinePlayersQueueId(serverId). Legacy vanilla. */
 export const ONLINE_PLAYERS_QUEUE_ID = "online_players";
 
 /** Si el reporte es más viejo que esto, el panel lo trata como vacío. */

@@ -5,6 +5,7 @@ import { MinecraftParcelSection } from "@/components/minecraft-parcel-section";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
 import { PARCEL_PAGE_SIZE, isParcelDimension } from "@/lib/minecraft-parcel";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
 import { prisma } from "@/lib/prisma";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 
@@ -30,8 +31,11 @@ export default async function DashboardParcelaDetailPage({ params }: Ctx) {
   if (!userId) return null;
 
   try {
+    const serverId = await getSelectedMinecraftServerId();
     const [parcel, events, eventTotal, members] = await Promise.all([
-      prisma.minecraftParcel.findUnique({ where: { id: parcelId } }),
+      prisma.minecraftParcel.findFirst({
+        where: { id: parcelId, serverId },
+      }),
       prisma.minecraftParcelEvent.findMany({
         where: { parcelId },
         orderBy: { occurredAt: "desc" },
@@ -82,6 +86,7 @@ export default async function DashboardParcelaDetailPage({ params }: Ctx) {
           </p>
         </div>
         <MinecraftParcelSection
+          key={`${serverId}:${parcel.id}`}
           parcelId={parcel.id}
           isPrimary={parcel.isPrimary}
           parcel={{

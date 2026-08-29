@@ -26,7 +26,7 @@ import {
   MISSING_DISPLAY_NAME_COLUMN_MESSAGE,
 } from "@/lib/prisma-migration-hints";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
-import { syncDirectoryMembersFromMinecraftTable } from "@/lib/minecraft-directory-sync";
+import { blacklistMinecraftGamertagOnAllWorlds, syncDirectoryMembersFromMinecraftTable } from "@/lib/minecraft-directory-sync";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import { parseMemberSpreadsheet } from "@/lib/spreadsheet-members";
 import type { DirectoryRosterSituation } from "@/lib/directory-situation";
@@ -494,6 +494,15 @@ export async function setDirectoryMemberBan(formData: FormData) {
   } else if (action === "ban") {
     const bannedReason = String(formData.get("bannedReason") ?? "").trim();
     if (!bannedReason) return;
+    const member = await prisma.directoryMember.findFirst({
+      where: { id: memberId, userId, banExempt: false },
+      select: {
+        gamertag: true,
+        allowlistSyncedAt: true,
+        allowlistRemovedAt: true,
+      },
+    });
+    if (!member) return;
     await prisma.directoryMember.updateMany({
       where: {
         id: memberId,
@@ -502,6 +511,8 @@ export async function setDirectoryMemberBan(formData: FormData) {
       },
       data: { banned: true, bannedReason },
     });
+    await enqueueAllowlistRemovalForMember(userId, member);
+    await blacklistMinecraftGamertagOnAllWorlds(member.gamertag);
   }
 
   revalidatePath("/dashboard");

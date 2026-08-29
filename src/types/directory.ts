@@ -13,6 +13,8 @@ export type DirectoryMemberDTO = {
   phone: string;
   phoneCountry: string | null;
   active: boolean;
+  /** Mundos Bedrock donde está activo (sin blacklist). */
+  activeOn: Array<"vanilla" | "mods">;
   permanentlyActive: boolean;
   absentWithCause: boolean;
   absentReason: string | null;

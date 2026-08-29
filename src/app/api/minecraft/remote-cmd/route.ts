@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import {
   markAllowlistAddsCompleted,
   markCorrectedAllowlistSynced,
@@ -11,8 +10,17 @@ import {
 } from "@/lib/allowlist-removal";
 import { DIRECTORY_NEW_MEMBER_DAYS } from "@/lib/directory-cohort";
 import {
+  requireMinecraftAddon,
+  requireMinecraftPanel,
+  unauthorizedMinecraft,
+} from "@/lib/minecraft-api-context";
+import {
+  readMinecraftQueueRow,
+  updateMinecraftQueueData,
+  upsertMinecraftQueue,
+} from "@/lib/minecraft-queue";
+import {
   REMOTE_CMD_ACTIONS,
-  REMOTE_CMD_QUEUE_ID,
   asRemoteCmdQueueData,
   isRemoteCmdAction,
   parseTpCoords,
@@ -25,21 +33,13 @@ import {
 import { prisma } from "@/lib/prisma";
 import { withDbRetry } from "@/lib/prisma-retry";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
+import { auth } from "@/auth";
+import type { MinecraftServerId } from "@/lib/minecraft-server";
 
 export const runtime = "nodejs";
 
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
-}
-
-function getBearerToken(request: Request): string | null {
-  const h = request.headers.get("authorization");
-  if (!h?.toLowerCase().startsWith("bearer ")) return null;
-  return h.slice(7).trim() || null;
 }
 
 async function isAdminGamertag(gamertag: string): Promise<boolean> {
@@ -80,7 +80,6 @@ function resolveAllowlistBatch(
   return { toAdd: addFiltered, toRemove: removeFiltered };
 }
 
-/** Miembros nuevos activos que aún no se sincronizaron al allowlist del servidor. */
 async function newMemberGamertags(
   userId: string,
   blockedFromAdd: Set<string>,
@@ -105,10 +104,13 @@ async function newMemberGamertags(
   );
 }
 
-/** Panel web: encola un comando para el addon (1 upsert en cola existente). */
 export async function POST(request: Request) {
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
+
   const session = await auth();
-  if (!session?.user) return unauthorized();
+  if (!session?.user) return unauthorizedMinecraft();
 
   let body: {
     action?: unknown;
@@ -200,17 +202,17 @@ export async function POST(request: Request) {
 
   if (remoteCmdNeedsTargetList(action)) {
     const userId = await resolveDirectoryUserId(session);
-    if (!userId) return unauthorized();
+    if (!userId) return unauthorizedMinecraft();
 
     if (action === "allowlist_sync") {
       const blockedFromAdd = new Set(
-        (await pendingAllowlistRemovalGamertags(userId)).map((t) =>
+        (await pendingAllowlistRemovalGamertags(userId, serverId)).map((t) =>
           t.toLowerCase(),
         ),
       );
       const [toAddRaw, toRemoveRaw] = await Promise.all([
         newMemberGamertags(userId, blockedFromAdd),
-        pendingAllowlistRemovalGamertags(userId),
+        pendingAllowlistRemovalGamertags(userId, serverId),
       ]);
       const { toAdd, toRemove } = resolveAllowlistBatch(toAddRaw, toRemoveRaw);
       if (toAdd.length === 0 && toRemove.length === 0) {
@@ -222,11 +224,11 @@ export async function POST(request: Request) {
       targetGamertagsRemove = toRemove.length > 0 ? toRemove : null;
     } else {
       const corrected = await withDbRetry(() =>
-        pendingCorrectedAllowlistSync(userId),
+        pendingCorrectedAllowlistSync(userId, serverId),
       );
       skippedCorrections = corrected.skipped;
       const blockedFromAdd = new Set(
-        (await pendingAllowlistRemovalGamertags(userId)).map((t) =>
+        (await pendingAllowlistRemovalGamertags(userId, serverId)).map((t) =>
           t.toLowerCase(),
         ),
       );
@@ -249,10 +251,8 @@ export async function POST(request: Request) {
           "No hay correcciones de gamertag ni reactivaciones manuales pendientes de sincronizar con el allowlist del servidor.",
         );
       }
-      targetGamertagsAdd =
-        toAdd.length > 0 ? toAdd : null;
-      targetGamertagsRemove =
-        toRemove.length > 0 ? toRemove : null;
+      targetGamertagsAdd = toAdd.length > 0 ? toAdd : null;
+      targetGamertagsRemove = toRemove.length > 0 ? toRemove : null;
       pendingCorrectionIds =
         corrected.correctionIds.length > 0 ? corrected.correctionIds : null;
     }
@@ -261,39 +261,18 @@ export async function POST(request: Request) {
   const requestedAt = new Date().toISOString();
 
   await withDbRetry(() =>
-    prisma.minecraftSyncQueue.upsert({
-      where: { id: REMOTE_CMD_QUEUE_ID },
-      update: {
-        data: {
-          action,
-          targetGamertag,
-          destinationGamertag,
-          destinationX,
-          destinationY,
-          destinationZ,
-          targetGamertagsAdd,
-          targetGamertagsRemove,
-          pendingCorrectionIds,
-          requestedAt,
-          handledAt: null,
-        },
-      },
-      create: {
-        id: REMOTE_CMD_QUEUE_ID,
-        data: {
-          action,
-          targetGamertag,
-          destinationGamertag,
-          destinationX,
-          destinationY,
-          destinationZ,
-          targetGamertagsAdd,
-          targetGamertagsRemove,
-          pendingCorrectionIds,
-          requestedAt,
-          handledAt: null,
-        },
-      },
+    upsertMinecraftQueue(serverId, "panel_remote_cmd", {
+      action,
+      targetGamertag,
+      destinationGamertag,
+      destinationX,
+      destinationY,
+      destinationZ,
+      targetGamertagsAdd,
+      targetGamertagsRemove,
+      pendingCorrectionIds,
+      requestedAt,
+      handledAt: null,
     }),
   );
 
@@ -313,23 +292,14 @@ export async function POST(request: Request) {
   });
 }
 
-/** Addon: lee comando pendiente (GET liviano, misma fila de cola). */
 export async function GET(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
+  const authz = await requireMinecraftAddon(request);
+  if (!authz.ok) return authz.response;
 
-  const token = getBearerToken(request);
-  if (token !== secret) return unauthorized();
-
-  const row = await withDbRetry(() =>
-    prisma.minecraftSyncQueue.findUnique({ where: { id: REMOTE_CMD_QUEUE_ID } }),
+  const found = await withDbRetry(() =>
+    readMinecraftQueueRow(authz.serverId, "panel_remote_cmd"),
   );
-  const data = asRemoteCmdQueueData(row?.data);
+  const data = asRemoteCmdQueueData(found?.data);
   const pending =
     Boolean(data.requestedAt) && data.requestedAt !== data.handledAt;
   const storedAction = pending && isRemoteCmdAction(data.action ?? "") ? data.action : null;
@@ -350,25 +320,17 @@ export async function GET(request: Request) {
   });
 }
 
-/** Addon: confirma ejecución. */
 export async function PUT(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
-
-  const token = getBearerToken(request);
-  if (token !== secret) return unauthorized();
-
-  let body: { requestedAt?: unknown } = {};
+  let body: { requestedAt?: unknown; serverId?: unknown } = {};
   try {
     body = await request.json();
   } catch {
     return badRequest("JSON inválido");
   }
+
+  const authz = await requireMinecraftAddon(request, body);
+  if (!authz.ok) return authz.response;
+  const serverId: MinecraftServerId = authz.serverId;
 
   const requestedAt =
     typeof body.requestedAt === "string" ? body.requestedAt : "";
@@ -376,33 +338,28 @@ export async function PUT(request: Request) {
     return badRequest("requestedAt es requerido");
   }
 
-  const row = await withDbRetry(() =>
-    prisma.minecraftSyncQueue.findUnique({ where: { id: REMOTE_CMD_QUEUE_ID } }),
+  const found = await withDbRetry(() =>
+    readMinecraftQueueRow(serverId, "panel_remote_cmd"),
   );
-  if (!row) {
+  if (!found) {
     return NextResponse.json({ error: "Sin cola de comandos" }, { status: 404 });
   }
 
-  const prev = asRemoteCmdQueueData(row.data);
+  const prev = asRemoteCmdQueueData(found.data);
 
   await withDbRetry(() =>
-    prisma.minecraftSyncQueue.update({
-      where: { id: REMOTE_CMD_QUEUE_ID },
-      data: {
-        data: {
-          action: prev.action,
-          targetGamertag: prev.targetGamertag ?? null,
-          destinationGamertag: prev.destinationGamertag ?? null,
-          destinationX: prev.destinationX ?? null,
-          destinationY: prev.destinationY ?? null,
-          destinationZ: prev.destinationZ ?? null,
-          targetGamertagsAdd: prev.targetGamertagsAdd ?? null,
-          targetGamertagsRemove: prev.targetGamertagsRemove ?? null,
-          pendingCorrectionIds: prev.pendingCorrectionIds ?? null,
-          requestedAt: prev.requestedAt ?? requestedAt,
-          handledAt: requestedAt,
-        },
-      },
+    updateMinecraftQueueData(found.id, {
+      action: prev.action,
+      targetGamertag: prev.targetGamertag ?? null,
+      destinationGamertag: prev.destinationGamertag ?? null,
+      destinationX: prev.destinationX ?? null,
+      destinationY: prev.destinationY ?? null,
+      destinationZ: prev.destinationZ ?? null,
+      targetGamertagsAdd: prev.targetGamertagsAdd ?? null,
+      targetGamertagsRemove: prev.targetGamertagsRemove ?? null,
+      pendingCorrectionIds: prev.pendingCorrectionIds ?? null,
+      requestedAt: prev.requestedAt ?? requestedAt,
+      handledAt: requestedAt,
     }),
   );
 
@@ -443,7 +400,7 @@ export async function PUT(request: Request) {
     (storedAction === "allowlist_sync" || storedAction === "allowlist_sync_corrected")
   ) {
     await withDbRetry(() =>
-      markAllowlistRemovesCompleted(owner.id, removedGamertags),
+      markAllowlistRemovesCompleted(owner.id, removedGamertags, serverId),
     );
   }
 

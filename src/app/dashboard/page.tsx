@@ -7,6 +7,7 @@ import {
   parseDirectoryFilters,
 } from "@/lib/directory-query";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import { activeOnByGamertagMap } from "@/lib/minecraft-directory-sync";
 import { prisma } from "@/lib/prisma";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import type { DirectoryMemberDTO } from "@/types/directory";
@@ -47,8 +48,10 @@ export default async function DashboardPage({
   let countryRows: { phoneCountry: string | null }[];
   let rosterCounts: { active: number; inactive: number; left: number };
 
+  let activeOnByTag = new Map<string, ("vanilla" | "mods")[]>();
+
   try {
-    [membersRaw, countryRows, rosterCounts] = await Promise.all([
+    const [raw, countries, counts, onMap] = await Promise.all([
       prisma.directoryMember.findMany({
         where: whereMembers,
         include: {
@@ -87,7 +90,12 @@ export default async function DashboardPage({
         ]);
         return { active, inactive, left };
       })(),
+      activeOnByGamertagMap().catch(() => new Map()),
     ]);
+    membersRaw = raw;
+    countryRows = countries;
+    rosterCounts = counts;
+    activeOnByTag = onMap;
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
       return <DatabaseUnavailable />;
@@ -106,6 +114,7 @@ export default async function DashboardPage({
     phone: m.phone,
     phoneCountry: m.phoneCountry,
     active: m.active,
+    activeOn: activeOnByTag.get(m.gamertag.trim().toLowerCase()) ?? [],
     permanentlyActive: m.permanentlyActive,
     absentWithCause: m.absentWithCause,
     absentReason: m.absentReason,

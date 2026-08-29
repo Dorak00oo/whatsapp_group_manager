@@ -3,6 +3,7 @@ import {
   alreadyRemovedAllowlistGamertags,
   enqueueAllowlistRemoval,
 } from "@/lib/allowlist-removal";
+import { MINECRAFT_SERVER_IDS, type MinecraftServerId } from "@/lib/minecraft-server";
 
 export type CorrectedAllowlistSync = {
   toAdd: string[];
@@ -75,8 +76,13 @@ export async function recordPendingGamertagCorrection(
   const newTag = newGamertag.trim();
   if (!oldTag || !newTag || oldTag === newTag) return;
 
-  await prisma.pendingGamertagCorrection.create({
-    data: { directoryMemberId, oldGamertag: oldTag, newGamertag: newTag },
+  await prisma.pendingGamertagCorrection.createMany({
+    data: MINECRAFT_SERVER_IDS.map((serverId) => ({
+      directoryMemberId,
+      serverId,
+      oldGamertag: oldTag,
+      newGamertag: newTag,
+    })),
   });
 
   const member = await prisma.directoryMember.findUnique({
@@ -84,7 +90,7 @@ export async function recordPendingGamertagCorrection(
     select: { userId: true, allowlistSyncedAt: true },
   });
   if (member?.allowlistSyncedAt) {
-    await enqueueAllowlistRemoval(member.userId, oldTag);
+    await enqueueAllowlistRemoval(member.userId, oldTag, "all");
   }
 }
 
@@ -94,10 +100,11 @@ export async function recordPendingGamertagCorrection(
  */
 export async function pendingCorrectedAllowlistSync(
   userId: string,
+  serverId: MinecraftServerId,
 ): Promise<CorrectedAllowlistSync> {
   const [rows, reactivations, activeMembers] = await Promise.all([
     prisma.pendingGamertagCorrection.findMany({
-      where: { syncedAt: null, directoryMember: { userId } },
+      where: { syncedAt: null, serverId, directoryMember: { userId } },
       select: {
         id: true,
         directoryMemberId: true,
@@ -198,7 +205,11 @@ export async function pendingCorrectedAllowlistSync(
     toAdd.push(tag);
   }
 
-  const removedAlready = await alreadyRemovedAllowlistGamertags(userId, toRemove);
+  const removedAlready = await alreadyRemovedAllowlistGamertags(
+    userId,
+    toRemove,
+    serverId,
+  );
   const filteredRemove = toRemove.filter(
     (tag) => !removedAlready.has(tag.toLowerCase()),
   );

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  requireMinecraftAddon,
+  requireMinecraftPanel,
+} from "@/lib/minecraft-api-context";
 import {
   clearMonitorSyncRequest,
   isMonitorSyncPending,
@@ -8,54 +11,28 @@ import {
 
 export const runtime = "nodejs";
 
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
-function getBearerToken(request: Request): string | null {
-  const h = request.headers.get("authorization");
-  if (!h?.toLowerCase().startsWith("bearer ")) return null;
-  return h.slice(7).trim() || null;
-}
-
-/** Panel: pide al addon que envíe el lote de monitoreo. */
 export async function POST() {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
 
-  requestMonitorSync();
+  requestMonitorSync(authz.serverId);
   return NextResponse.json({ ok: true, requestedAt: new Date().toISOString() });
 }
 
-/** Addon: ¿hay solicitud pendiente? */
 export async function GET(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
+  const authz = await requireMinecraftAddon(request);
+  if (!authz.ok) return authz.response;
 
-  const token = getBearerToken(request);
-  if (token !== secret) return unauthorized();
-
-  return NextResponse.json({ ok: true, pending: isMonitorSyncPending() });
+  return NextResponse.json({
+    ok: true,
+    pending: isMonitorSyncPending(authz.serverId),
+  });
 }
 
-/** Addon: confirma envío. */
 export async function PUT(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
+  const authz = await requireMinecraftAddon(request);
+  if (!authz.ok) return authz.response;
 
-  const token = getBearerToken(request);
-  if (token !== secret) return unauthorized();
-
-  clearMonitorSyncRequest();
+  clearMonitorSyncRequest(authz.serverId);
   return NextResponse.json({ ok: true });
 }

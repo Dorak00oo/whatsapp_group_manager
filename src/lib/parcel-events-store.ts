@@ -1,25 +1,37 @@
-/** Solicitud manual desde el panel: el addon envía el lote al ver esto en true. */
-let syncPending = false;
+import type { MinecraftServerId } from "@/lib/minecraft-server";
 
-/** Marca cuándo llegó el último lote del addon (memoria; sin BD). */
-let lastBatchAt: string | null = null;
+type ParcelSyncState = {
+  syncPending: boolean;
+  lastBatchAt: string | null;
+};
 
-export function requestParcelSync() {
-  syncPending = true;
+const byServer = new Map<MinecraftServerId, ParcelSyncState>();
+
+function state(serverId: MinecraftServerId): ParcelSyncState {
+  let s = byServer.get(serverId);
+  if (!s) {
+    s = { syncPending: false, lastBatchAt: null };
+    byServer.set(serverId, s);
+  }
+  return s;
 }
 
-export function isParcelSyncPending(): boolean {
-  return syncPending;
+export function requestParcelSync(serverId: MinecraftServerId) {
+  state(serverId).syncPending = true;
 }
 
-export function clearParcelSyncRequest() {
-  syncPending = false;
+export function isParcelSyncPending(serverId: MinecraftServerId): boolean {
+  return state(serverId).syncPending;
 }
 
-export function markParcelBatchReceived() {
-  lastBatchAt = new Date().toISOString();
+export function clearParcelSyncRequest(serverId: MinecraftServerId) {
+  state(serverId).syncPending = false;
 }
 
-export function getLastParcelBatchAt(): string | null {
-  return lastBatchAt;
+export function markParcelBatchReceived(serverId: MinecraftServerId) {
+  state(serverId).lastBatchAt = new Date().toISOString();
+}
+
+export function getLastParcelBatchAt(serverId: MinecraftServerId): string | null {
+  return state(serverId).lastBatchAt;
 }

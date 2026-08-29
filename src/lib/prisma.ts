@@ -41,6 +41,7 @@ function isCurrentPrismaClient(c: PrismaClient | undefined): boolean {
     minecraftPlayer?: { findMany?: unknown };
     minecraftConfig?: { findUnique?: unknown };
     minecraftParcel?: { findMany?: unknown };
+    minecraftInstall?: { findMany?: unknown };
   };
   return (
     c != null &&
@@ -48,7 +49,8 @@ function isCurrentPrismaClient(c: PrismaClient | undefined): boolean {
     typeof x.minecraftSyncQueue?.findUnique === "function" &&
     typeof x.minecraftPlayer?.findMany === "function" &&
     typeof x.minecraftConfig?.findUnique === "function" &&
-    typeof x.minecraftParcel?.findMany === "function"
+    typeof x.minecraftParcel?.findMany === "function" &&
+    typeof x.minecraftInstall?.findMany === "function"
   );
 }
 

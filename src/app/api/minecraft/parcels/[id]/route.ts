@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireMinecraftPanel } from "@/lib/minecraft-api-context";
 import {
   canDeleteParcel,
   parcelRowUpdateFromPayload,
@@ -12,17 +12,13 @@ export const runtime = "nodejs";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
 function notFound() {
   return NextResponse.json({ error: "Parcela no encontrada" }, { status: 404 });
 }
 
 export async function PATCH(request: Request, context: Ctx) {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
 
   const { id } = await context.params;
   const parcelId = id?.trim();
@@ -37,8 +33,8 @@ export async function PATCH(request: Request, context: Ctx) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const existing = await prisma.minecraftParcel.findUnique({
-    where: { id: parcelId },
+  const existing = await prisma.minecraftParcel.findFirst({
+    where: { id: parcelId, serverId: authz.serverId },
   });
   if (!existing) return notFound();
 
@@ -49,7 +45,7 @@ export async function PATCH(request: Request, context: Ctx) {
   });
 
   if (updated.isPrimary) {
-    await syncPrimaryConfigColumns({
+    await syncPrimaryConfigColumns(authz.serverId, {
       enabled: updated.enabled,
       name: updated.name,
       dimension: updated.dimension as ParcelConfigPayload["dimension"],
@@ -81,8 +77,8 @@ export async function PATCH(request: Request, context: Ctx) {
 }
 
 export async function DELETE(_request: Request, context: Ctx) {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
 
   const { id } = await context.params;
   const parcelId = id?.trim();
@@ -90,8 +86,8 @@ export async function DELETE(_request: Request, context: Ctx) {
     return NextResponse.json({ error: "id requerido" }, { status: 400 });
   }
 
-  const existing = await prisma.minecraftParcel.findUnique({
-    where: { id: parcelId },
+  const existing = await prisma.minecraftParcel.findFirst({
+    where: { id: parcelId, serverId: authz.serverId },
     select: { id: true, isPrimary: true },
   });
   if (!existing) return notFound();

@@ -1,9 +1,8 @@
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
-import { MinecraftBannedItemsSection } from "@/components/minecraft-banned-items-section";
 import { MinecraftRemoteCommandsPanel } from "@/components/minecraft-remote-commands-panel";
-import { parseBannedItems } from "@/lib/minecraft-banned-items";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
 import { prisma } from "@/lib/prisma";
 
 export default async function DashboardComandosPage() {
@@ -11,22 +10,15 @@ export default async function DashboardComandosPage() {
   if (!session?.user) return null;
 
   let admins: { id: string; gamertag: string; displayName: string | null }[];
-  let bannedItems: string[];
+  const serverId = await getSelectedMinecraftServerId();
 
   try {
-    const [adminRows, config] = await Promise.all([
-      prisma.directoryMember.findMany({
-        where: { isAdmin: true },
-        orderBy: { gamertag: "asc" },
-        select: { id: true, gamertag: true, displayName: true },
-      }),
-      prisma.minecraftConfig.findUnique({
-        where: { id: "default" },
-        select: { bannedItemsJson: true },
-      }),
-    ]);
+    const adminRows = await prisma.directoryMember.findMany({
+      where: { isAdmin: true },
+      orderBy: { gamertag: "asc" },
+      select: { id: true, gamertag: true, displayName: true },
+    });
     admins = adminRows;
-    bannedItems = parseBannedItems(config?.bannedItemsJson);
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
       return <DatabaseUnavailable />;
@@ -44,8 +36,7 @@ export default async function DashboardComandosPage() {
           Envía órdenes al mundo de Minecraft Bedrock vía el addon PlayerStatus.
         </p>
       </div>
-      <MinecraftRemoteCommandsPanel admins={admins} />
-      <MinecraftBannedItemsSection initialItems={bannedItems} />
+      <MinecraftRemoteCommandsPanel key={serverId} admins={admins} />
     </section>
   );
 }

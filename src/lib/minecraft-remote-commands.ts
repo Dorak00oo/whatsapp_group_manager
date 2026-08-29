@@ -1,4 +1,11 @@
-/** Cola en `minecraft_sync_queue` (misma tabla que sync-request; sin migración nueva). */
+import type { MinecraftServerId } from "./minecraft-server";
+
+/** Cola en `minecraft_sync_queue` (misma tabla que sync-request). */
+export function remoteCmdQueueId(serverId: MinecraftServerId): string {
+  return `${serverId}:panel_remote_cmd`;
+}
+
+/** @deprecated Usar remoteCmdQueueId(serverId). Legacy vanilla. */
 export const REMOTE_CMD_QUEUE_ID = "panel_remote_cmd";
 
 export const REMOTE_CMD_ACTIONS = [

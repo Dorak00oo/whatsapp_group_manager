@@ -13,6 +13,7 @@ import {
   type ParcelRecordPayload,
   parcelConfigFromRow,
 } from "@/lib/minecraft-parcel";
+import type { MinecraftServerId } from "@/lib/minecraft-server";
 
 export type MinecraftConfigPayload = {
   daysInactive: number;
@@ -36,6 +37,28 @@ export type MinecraftConfigUpdateInput = Partial<
   monitorExcludeJson?: string | null;
   bannedItemsJson?: string | null;
 };
+
+export function minecraftConfigCreateData(serverId: MinecraftServerId) {
+  return {
+    id: serverId,
+    daysInactive: MINECRAFT_CONFIG_DEFAULTS.daysInactive,
+    daysBlacklist: MINECRAFT_CONFIG_DEFAULTS.daysBlacklist,
+    daysPurge: MINECRAFT_CONFIG_DEFAULTS.daysPurge,
+    snapshotRetentionDays: MINECRAFT_CONFIG_DEFAULTS.snapshotRetentionDays,
+    snapshotKeepMinimum: MINECRAFT_CONFIG_DEFAULTS.snapshotKeepMinimum,
+    parcelEnabled: MINECRAFT_CONFIG_DEFAULTS.parcel.enabled,
+    parcelName: MINECRAFT_CONFIG_DEFAULTS.parcel.name,
+    parcelDimension: MINECRAFT_CONFIG_DEFAULTS.parcel.dimension,
+    parcelMinX: MINECRAFT_CONFIG_DEFAULTS.parcel.minX,
+    parcelMinY: MINECRAFT_CONFIG_DEFAULTS.parcel.minY,
+    parcelMinZ: MINECRAFT_CONFIG_DEFAULTS.parcel.minZ,
+    parcelMaxX: MINECRAFT_CONFIG_DEFAULTS.parcel.maxX,
+    parcelMaxY: MINECRAFT_CONFIG_DEFAULTS.parcel.maxY,
+    parcelMaxZ: MINECRAFT_CONFIG_DEFAULTS.parcel.maxZ,
+    monitorExcludeJson: JSON.stringify(DEFAULT_MONITOR_EXCLUDE),
+    bannedItemsJson: "[]",
+  };
+}
 
 export const MINECRAFT_CONFIG_DEFAULTS: MinecraftConfigPayload = {
   daysInactive: 7,

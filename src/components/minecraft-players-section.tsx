@@ -21,21 +21,12 @@ type MinecraftPlayer = {
   createdAt: string;
 };
 
-type Config = {
-  daysInactive: number;
-  daysBlacklist: number;
-  daysPurge: number;
-  snapshotRetentionDays: number;
-  snapshotKeepMinimum: number;
-};
-
 type Props = {
   players: MinecraftPlayer[];
   blacklistPlayers: MinecraftPlayer[];
   whitelistPlayers: MinecraftPlayer[];
   activePlayers: number;
   inactivePlayers: number;
-  config: Config;
   summary: {
     total: number;
     active: number;
@@ -68,7 +59,6 @@ export function MinecraftPlayersSection({
   whitelistPlayers,
   activePlayers,
   inactivePlayers,
-  config,
   summary,
 }: Props) {
   const router = useRouter();
@@ -108,12 +98,6 @@ export function MinecraftPlayersSection({
   const [pageTab, setPageTab] = useState<PageTab>("players");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [configForm, setConfigForm] = useState(config);
-
-  useEffect(() => {
-    setConfigForm(config);
-  }, [config]);
 
   const handlePlayerAction = async (
     gamertag: string,
@@ -137,31 +121,6 @@ export function MinecraftPlayersSection({
     } catch (error) {
       console.error("Error:", error);
       alert("Error al actualizar jugador");
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleConfigSave = async () => {
-    setLoading("config");
-    try {
-      const res = await fetch("/api/minecraft/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(configForm),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        alert(`Error: ${error.error}`);
-        return;
-      }
-
-      setShowConfigModal(false);
-      router.refresh();
-    } catch (error) {
-      console.error("Error:", error);
-      alert("Error al guardar configuración");
     } finally {
       setLoading(null);
     }
@@ -325,22 +284,20 @@ export function MinecraftPlayersSection({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowConfigModal(true)}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            ⚙️ Configurar días
-          </button>
-          <button
-            type="button"
-            onClick={handleSyncAll}
-            disabled={loading === "syncall"}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            {loading === "syncall" ? "Solicitando..." : "🔄 Sync all"}
-          </button>
-        </div>
+        {pageTab === "lists" ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSyncAll}
+              disabled={loading === "syncall"}
+              className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              {loading === "syncall" ? "Solicitando..." : "🔄 Sync all"}
+            </button>
+          </div>
+        ) : (
+          <div />
+        )}
         <input
           type="text"
           placeholder="Buscar gamertag..."
@@ -413,146 +370,6 @@ export function MinecraftPlayersSection({
             loading={loading}
             onAction={handlePlayerAction}
           />
-        </div>
-      )}
-
-      {/* Modal de configuración */}
-      {showConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg bg-white p-6 dark:bg-zinc-900">
-            <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              Configurar días del sistema
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Días para considerar inactivo
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={configForm.daysInactive}
-                  onChange={(e) =>
-                    setConfigForm({
-                      ...configForm,
-                      daysInactive: parseInt(e.target.value) || 7,
-                    })
-                  }
-                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-                />
-                <p className="mt-1 text-xs text-zinc-500">
-                  Actual: {config.daysInactive} días
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Días para blacklist automática
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={configForm.daysBlacklist}
-                  onChange={(e) =>
-                    setConfigForm({
-                      ...configForm,
-                      daysBlacklist: parseInt(e.target.value) || 14,
-                    })
-                  }
-                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-                />
-                <p className="mt-1 text-xs text-zinc-500">
-                  Actual: {config.daysBlacklist} días
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Días para purgar de la lista
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={configForm.daysPurge}
-                  onChange={(e) =>
-                    setConfigForm({
-                      ...configForm,
-                      daysPurge: parseInt(e.target.value) || 21,
-                    })
-                  }
-                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-                />
-                <p className="mt-1 text-xs text-zinc-500">
-                  Actual: {config.daysPurge} días (solo en el servidor Bedrock)
-                </p>
-              </div>
-              <div className="md:col-span-2">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                  Historial en la base (Neon)
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Días de historial de snapshots
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={configForm.snapshotRetentionDays}
-                  onChange={(e) =>
-                    setConfigForm({
-                      ...configForm,
-                      snapshotRetentionDays:
-                        parseInt(e.target.value, 10) || 45,
-                    })
-                  }
-                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-                />
-                <p className="mt-1 text-xs text-zinc-500">
-                  Actual: {config.snapshotRetentionDays} días (~mes y medio por
-                  defecto). No borra jugadores actuales.
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Mínimo de snapshots a conservar
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={configForm.snapshotKeepMinimum}
-                  onChange={(e) =>
-                    setConfigForm({
-                      ...configForm,
-                      snapshotKeepMinimum:
-                        parseInt(e.target.value, 10) || 10,
-                    })
-                  }
-                  className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-                />
-                <p className="mt-1 text-xs text-zinc-500">
-                  Actual: {config.snapshotKeepMinimum} (los más recientes no se
-                  purgan por antigüedad).
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex gap-2">
-              <button
-                onClick={handleConfigSave}
-                disabled={loading === "config"}
-                className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading === "config" ? "Guardando..." : "Guardar"}
-              </button>
-              <button
-                onClick={() => {
-                  setShowConfigModal(false);
-                  setConfigForm(config);
-                }}
-                className="flex-1 rounded-md bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-50 dark:hover:bg-zinc-600"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

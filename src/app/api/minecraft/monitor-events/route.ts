@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  requireMinecraftAddon,
+  requireMinecraftPanel,
+} from "@/lib/minecraft-api-context";
 import {
   isMonitorEventType,
   MONITOR_PAGE_SIZE,
@@ -28,16 +31,6 @@ export const runtime = "nodejs";
 
 const MAX_EVENTS_PER_POST = 500;
 const PANEL_MAX_PAGE_SIZE = 100;
-
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
-function getBearerToken(request: Request): string | null {
-  const h = request.headers.get("authorization");
-  if (!h?.toLowerCase().startsWith("bearer ")) return null;
-  return h.slice(7).trim() || null;
-}
 
 type ParsedEvent = {
   gamertag: string;
@@ -105,25 +98,17 @@ async function purgeOldMonitorEvents() {
   });
 }
 
-/** Addon: lote → createMany + purga de eventos más viejos que MONITOR_RETENTION_DAYS. */
 export async function POST(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
-
-  const token = getBearerToken(request);
-  if (token !== secret) return unauthorized();
-
-  let body: { events?: unknown };
+  let body: { events?: unknown; serverId?: unknown; flavor?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
+
+  const authz = await requireMinecraftAddon(request, body);
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
 
   if (!Array.isArray(body.events)) {
     return NextResponse.json({ error: "events[] requerido" }, { status: 400 });
@@ -135,16 +120,19 @@ export async function POST(request: Request) {
     if (row) rows.push(row);
   }
 
-  markMonitorBatchReceived();
+  markMonitorBatchReceived(serverId);
   await purgeOldMonitorEvents();
 
   if (rows.length === 0) {
-    const total = await prisma.minecraftMonitorEvent.count();
+    const total = await prisma.minecraftMonitorEvent.count({
+      where: { serverId },
+    });
     return NextResponse.json({ ok: true, saved: 0, total });
   }
 
   const result = await prisma.minecraftMonitorEvent.createMany({
     data: rows.map((r) => ({
+      serverId,
       gamertag: r.gamertag,
       eventType: r.eventType,
       occurredAt: r.occurredAt,
@@ -168,9 +156,12 @@ export async function POST(request: Request) {
       blockType: r.blockType,
       itemType: r.itemType,
     })),
+    serverId,
   );
 
-  const total = await prisma.minecraftMonitorEvent.count();
+  const total = await prisma.minecraftMonitorEvent.count({
+    where: { serverId },
+  });
 
   return NextResponse.json({
     ok: true,
@@ -179,10 +170,10 @@ export async function POST(request: Request) {
   });
 }
 
-/** Panel: historial con filtros opcionales. */
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
 
   const url = new URL(request.url);
   const gamertag = url.searchParams.get("gamertag")?.trim() ?? "";
@@ -204,7 +195,7 @@ export async function GET(request: Request) {
 
   await purgeOldMonitorEvents();
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = { serverId };
   if (gamertag) {
     where.gamertag = { contains: gamertag, mode: "insensitive" };
   }
@@ -256,11 +247,11 @@ export async function GET(request: Request) {
     take: pageSize,
   });
 
-  const alerts = await listActiveMonitorAlerts();
+  const alerts = await listActiveMonitorAlerts(serverId);
 
   return NextResponse.json({
     ok: true,
-    lastBatchAt: getLastMonitorBatchAt(),
+    lastBatchAt: getLastMonitorBatchAt(serverId),
     total,
     page,
     pageSize,
@@ -284,15 +275,16 @@ export async function GET(request: Request) {
   });
 }
 
-/** Panel: borra un lote del historial de monitoreo. */
 export async function DELETE(request: Request) {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
 
   const url = new URL(request.url);
   const limit = parsePurgeLimit(url.searchParams.get("limit"));
 
   const rows = await prisma.minecraftMonitorEvent.findMany({
+    where: { serverId },
     select: { id: true },
     take: limit,
   });
@@ -303,7 +295,9 @@ export async function DELETE(request: Request) {
   await prisma.minecraftMonitorEvent.deleteMany({
     where: { id: { in: rows.map((r) => r.id) } },
   });
-  const remaining = await prisma.minecraftMonitorEvent.count();
+  const remaining = await prisma.minecraftMonitorEvent.count({
+    where: { serverId },
+  });
   return NextResponse.json({
     ok: true,
     deleted: rows.length,

@@ -9,28 +9,33 @@ import {
   buildRosterFromSnapshot,
   snapshotStatusByGamertag,
 } from "@/lib/minecraft-active";
+import {
+  requireMinecraftPanel,
+  unauthorizedMinecraft,
+} from "@/lib/minecraft-api-context";
 import { MINECRAFT_CONFIG_DEFAULTS } from "@/lib/minecraft-config-defaults";
 import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
 import { enqueueMinecraftPanelCommand } from "@/lib/minecraft-sync-request";
 import { prisma } from "@/lib/prisma";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
+import { ensureMinecraftConfig } from "@/lib/minecraft-servers-db";
 
 export const runtime = "nodejs";
-
-function unauthorized() {
-  return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-}
 
 function tagKey(gamertag: string): string {
   return gamertag.trim().toLowerCase();
 }
 
 export async function POST(request: Request) {
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
+
   const session = await auth();
-  if (!session?.user) return unauthorized();
+  if (!session?.user) return unauthorizedMinecraft();
 
   const userId = await resolveDirectoryUserId(session);
-  if (!userId) return unauthorized();
+  if (!userId) return unauthorizedMinecraft();
 
   let body: { gamertags?: unknown };
   try {
@@ -74,17 +79,16 @@ export async function POST(request: Request) {
           leftAt: true,
         },
       }),
-      prisma.minecraftPlayer.findMany(),
+      prisma.minecraftPlayer.findMany({ where: { serverId } }),
       prisma.minecraftSnapshot.findFirst({
+        where: { serverId },
         orderBy: { timestamp: "desc" },
       }),
-      prisma.minecraftConfig.findUnique({
-        where: { id: "default" },
-      }),
+      ensureMinecraftConfig(serverId),
     ]);
 
     const daysInactiveThreshold =
-      config?.daysInactive ?? MINECRAFT_CONFIG_DEFAULTS.daysInactive;
+      config.daysInactive ?? MINECRAFT_CONFIG_DEFAULTS.daysInactive;
     const displayPlayers = buildRosterFromSnapshot(
       mcPlayers,
       snapshotStatusByGamertag(lastSnapshot?.data),
@@ -116,13 +120,17 @@ export async function POST(request: Request) {
 
     for (const tag of toApply) {
       const player = await prisma.minecraftPlayer.findFirst({
-        where: { gamertag: { equals: tag, mode: "insensitive" } },
+        where: {
+          serverId,
+          gamertag: { equals: tag, mode: "insensitive" },
+        },
       });
 
       if (!player) {
         const canonical = allowed.get(tagKey(tag)) ?? tag;
         await prisma.minecraftPlayer.create({
           data: {
+            serverId,
             gamertag: canonical,
             lastSeen: new Date(),
             active: true,
@@ -130,7 +138,7 @@ export async function POST(request: Request) {
             isBlacklisted: true,
           },
         });
-        await syncDirectoryActiveWithMinecraft(canonical, false);
+        await syncDirectoryActiveWithMinecraft(canonical);
         blacklisted.push(canonical);
         continue;
       }
@@ -144,11 +152,11 @@ export async function POST(request: Request) {
         where: { id: player.id },
         data: { isBlacklisted: true },
       });
-      await syncDirectoryActiveWithMinecraft(player.gamertag, false);
+      await syncDirectoryActiveWithMinecraft(player.gamertag);
       blacklisted.push(player.gamertag);
     }
 
-    const sync = await enqueueMinecraftPanelCommand("syncall");
+    const sync = await enqueueMinecraftPanelCommand("syncall", serverId);
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/minecraft");

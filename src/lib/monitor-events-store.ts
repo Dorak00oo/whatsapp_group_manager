@@ -1,23 +1,39 @@
-/** Solicitud manual desde el panel: el addon envía el lote de monitoreo. */
-let syncPending = false;
-let lastBatchAt: string | null = null;
+import type { MinecraftServerId } from "@/lib/minecraft-server";
 
-export function requestMonitorSync() {
-  syncPending = true;
+type MonitorSyncState = {
+  syncPending: boolean;
+  lastBatchAt: string | null;
+};
+
+const byServer = new Map<MinecraftServerId, MonitorSyncState>();
+
+function state(serverId: MinecraftServerId): MonitorSyncState {
+  let s = byServer.get(serverId);
+  if (!s) {
+    s = { syncPending: false, lastBatchAt: null };
+    byServer.set(serverId, s);
+  }
+  return s;
 }
 
-export function isMonitorSyncPending(): boolean {
-  return syncPending;
+export function requestMonitorSync(serverId: MinecraftServerId) {
+  state(serverId).syncPending = true;
 }
 
-export function clearMonitorSyncRequest() {
-  syncPending = false;
+export function isMonitorSyncPending(serverId: MinecraftServerId): boolean {
+  return state(serverId).syncPending;
 }
 
-export function markMonitorBatchReceived() {
-  lastBatchAt = new Date().toISOString();
+export function clearMonitorSyncRequest(serverId: MinecraftServerId) {
+  state(serverId).syncPending = false;
 }
 
-export function getLastMonitorBatchAt(): string | null {
-  return lastBatchAt;
+export function markMonitorBatchReceived(serverId: MinecraftServerId) {
+  state(serverId).lastBatchAt = new Date().toISOString();
+}
+
+export function getLastMonitorBatchAt(
+  serverId: MinecraftServerId,
+): string | null {
+  return state(serverId).lastBatchAt;
 }

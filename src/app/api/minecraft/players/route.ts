@@ -1,25 +1,15 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireMinecraftPanel } from "@/lib/minecraft-api-context";
 import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-/**
- * La blacklist / whitelist en el panel solo actualiza la base en Vercel.
- * El addon del servidor de Bedrock debe consultar con frecuencia
- * `GET /api/minecraft/status` (mismo Bearer que el POST) y aplicar listas
- * al unirse o en bucle; si solo confía en el POST de actividad, no verá
- * cambios del panel hasta el siguiente envío del servidor.
- */
-
-// POST: Actualizar estado de un jugador
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
 
   let body: {
     gamertag: string;
@@ -42,7 +32,10 @@ export async function POST(request: Request) {
   try {
     const tag = body.gamertag.trim();
     const player = await prisma.minecraftPlayer.findFirst({
-      where: { gamertag: { equals: tag, mode: "insensitive" } },
+      where: {
+        serverId,
+        gamertag: { equals: tag, mode: "insensitive" },
+      },
     });
 
     if (!player) {
@@ -82,13 +75,8 @@ export async function POST(request: Request) {
       data: updateData,
     });
 
-    if (body.action === "blacklist") {
-      await syncDirectoryActiveWithMinecraft(updated.gamertag, false);
-    } else if (body.action === "remove_blacklist") {
-      await syncDirectoryActiveWithMinecraft(
-        updated.gamertag,
-        updated.active,
-      );
+    if (body.action === "blacklist" || body.action === "remove_blacklist") {
+      await syncDirectoryActiveWithMinecraft(updated.gamertag);
     }
 
     revalidatePath("/dashboard");

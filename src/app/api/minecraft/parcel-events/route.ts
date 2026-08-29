@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import {
+  requireMinecraftAddon,
+  requireMinecraftPanel,
+} from "@/lib/minecraft-api-context";
 import {
   isParcelEventType,
   PARCEL_PAGE_SIZE,
@@ -14,25 +17,12 @@ import {
 import { parsePurgeLimit } from "@/lib/history-purge";
 import { ensurePrimaryParcel, knownParcelIdSet } from "@/lib/minecraft-parcels-db";
 import { prisma } from "@/lib/prisma";
+import { primaryParcelIdForServer } from "@/lib/minecraft-server";
 
 export const runtime = "nodejs";
 
 const MAX_EVENTS_PER_POST = 500;
 const PANEL_MAX_PAGE_SIZE = 100;
-
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
-function getBearerToken(request: Request): string | null {
-  const h = request.headers.get("authorization");
-  if (!h?.toLowerCase().startsWith("bearer ")) return null;
-  return h.slice(7).trim() || null;
-}
-
-function isEventType(value: string): value is ParcelEventType {
-  return isParcelEventType(value);
-}
 
 type ParsedEvent = {
   gamertag: string;
@@ -52,7 +42,7 @@ function parseAddonEvent(raw: unknown): ParsedEvent | null {
   const gamertag = typeof e.gamertag === "string" ? e.gamertag.trim() : "";
   const event = typeof e.event === "string" ? e.event.trim() : "";
   const at = typeof e.at === "string" ? e.at : "";
-  if (!gamertag || !isEventType(event) || !at) return null;
+  if (!gamertag || !isParcelEventType(event) || !at) return null;
   const occurredAt = new Date(at);
   if (Number.isNaN(occurredAt.getTime())) return null;
 
@@ -83,25 +73,17 @@ async function purgeOldParcelEvents() {
   });
 }
 
-/** Addon: lote → createMany + purga de eventos más viejos que PARCEL_RETENTION_DAYS. */
 export async function POST(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
-
-  const token = getBearerToken(request);
-  if (token !== secret) return unauthorized();
-
-  let body: { events?: unknown };
+  let body: { events?: unknown; serverId?: unknown; flavor?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
+
+  const authz = await requireMinecraftAddon(request, body);
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
 
   if (!Array.isArray(body.events)) {
     return NextResponse.json({ error: "events[] requerido" }, { status: 400 });
@@ -113,16 +95,19 @@ export async function POST(request: Request) {
     if (row) rows.push(row);
   }
 
-  markParcelBatchReceived();
+  markParcelBatchReceived(serverId);
   await purgeOldParcelEvents();
 
   if (rows.length === 0) {
-    const total = await prisma.minecraftParcelEvent.count();
+    const total = await prisma.minecraftParcelEvent.count({
+      where: { parcel: { serverId } },
+    });
     return NextResponse.json({ ok: true, saved: 0, total });
   }
 
-  await ensurePrimaryParcel();
-  const knownIds = await knownParcelIdSet();
+  await ensurePrimaryParcel(serverId);
+  const knownIds = await knownParcelIdSet(serverId);
+  const fallbackId = primaryParcelIdForServer(serverId);
 
   const result = await prisma.minecraftParcelEvent.createMany({
     data: rows.map((r) => ({
@@ -134,11 +119,13 @@ export async function POST(request: Request) {
       posZ: r.posZ,
       dimension: r.dimension,
       blockType: r.blockType,
-      parcelId: resolveEventParcelId(r.parcelIdRaw, knownIds),
+      parcelId: resolveEventParcelId(r.parcelIdRaw, knownIds, fallbackId),
     })),
   });
 
-  const total = await prisma.minecraftParcelEvent.count();
+  const total = await prisma.minecraftParcelEvent.count({
+    where: { parcel: { serverId } },
+  });
 
   return NextResponse.json({
     ok: true,
@@ -147,10 +134,10 @@ export async function POST(request: Request) {
   });
 }
 
-/** Panel: historial con filtros opcionales (retención 6 meses). */
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
 
   const url = new URL(request.url);
   const pageSizeRaw = Number(
@@ -170,7 +157,9 @@ export async function GET(request: Request) {
   const to = url.searchParams.get("to")?.trim() ?? "";
   const parcelId = url.searchParams.get("parcelId")?.trim() ?? "";
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {
+    parcel: { serverId },
+  };
   if (parcelId) where.parcelId = parcelId;
   if (gamertag) {
     where.gamertag = { contains: gamertag, mode: "insensitive" };
@@ -204,7 +193,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    lastBatchAt: getLastParcelBatchAt(),
+    lastBatchAt: getLastParcelBatchAt(serverId),
     total,
     page,
     pageSize,
@@ -223,10 +212,9 @@ export async function GET(request: Request) {
   });
 }
 
-/** Panel: borra el historial de una parcela (`parcelId` obligatorio). Lote si hay `limit`. */
 export async function DELETE(request: Request) {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
 
   const url = new URL(request.url);
   const parcelId = url.searchParams.get("parcelId")?.trim() ?? "";
@@ -235,6 +223,14 @@ export async function DELETE(request: Request) {
       { error: "parcelId es obligatorio para limpiar historial" },
       { status: 400 },
     );
+  }
+
+  const parcel = await prisma.minecraftParcel.findFirst({
+    where: { id: parcelId, serverId: authz.serverId },
+    select: { id: true },
+  });
+  if (!parcel) {
+    return NextResponse.json({ error: "Parcela no encontrada" }, { status: 404 });
   }
 
   const where = { parcelId };

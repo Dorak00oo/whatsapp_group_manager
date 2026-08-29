@@ -80,7 +80,53 @@ model DirectoryStrike {
 }
 
 /**
- * Cola panel ↔ addon: peticiones de sync (id fijo `minecraft_sync_request`).
+ * Mundo Bedrock conocido por el panel (`vanilla` | `mods`).
+ */
+model MinecraftServer {
+  id            String    @id
+  name          String
+  flavor        String
+  edition       String    @default("bedrock")
+  lastSeenAt    DateTime? @map("last_seen_at")
+  lastVersion   String?   @map("last_version")
+  lastWorldName String?   @map("last_world_name")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  players       MinecraftPlayer[]
+  snapshots     MinecraftSnapshot[]
+  config        MinecraftConfig?
+  parcels                    MinecraftParcel[]
+  monitorEvents              MinecraftMonitorEvent[]
+  monitorAlerts              MinecraftMonitorAlert[]
+  pendingAllowlistRemovals   PendingAllowlistRemoval[]
+  pendingGamertagCorrections PendingGamertagCorrection[]
+  installs                   MinecraftInstall[]
+
+  @@map("minecraft_servers")
+}
+
+/**
+ * Dedicated Bedrock visto por el panel. `id` = UUIDv4 guardado en el mundo.
+ * `serverId` null = pendiente de asignar a vanilla o mods.
+ */
+model MinecraftInstall {
+  id            String           @id
+  serverId      String?          @map("server_id")
+  server        MinecraftServer? @relation(fields: [serverId], references: [id], onDelete: SetNull)
+  lastWorldName String?          @map("last_world_name")
+  lastVersion   String?          @map("last_version")
+  lastSeenAt    DateTime         @map("last_seen_at")
+  assignedAt    DateTime?        @map("assigned_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  @@unique([serverId])
+  @@map("minecraft_installs")
+}
+
+/**
+ * Cola panel ↔ addon. Id `{serverId}:{kind}` (legacy sin prefijo = vanilla).
  */
 model MinecraftSyncQueue {
   id        String   @id
@@ -95,7 +141,9 @@ model MinecraftSyncQueue {
  */
 model MinecraftPlayer {
   id               String                    @id @default(cuid())
-  gamertag         String                    @unique
+  serverId         String                    @default("vanilla") @map("server_id")
+  server           MinecraftServer           @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  gamertag         String
   lastSeen         DateTime                  @map("last_seen")
   active           Boolean                   @default(true)
   daysInactive     Int                       @default(0) @map("days_inactive")
@@ -105,6 +153,8 @@ model MinecraftPlayer {
   createdAt        DateTime                  @default(now()) @map("created_at")
   updatedAt        DateTime                  @updatedAt @map("updated_at")
 
+  @@unique([serverId, gamertag])
+  @@index([serverId, lastSeen])
   @@map("minecraft_players")
 }
 
@@ -112,26 +162,31 @@ model MinecraftPlayer {
  * Snapshot de datos del servidor de Minecraft (histórico)
  */
 model MinecraftSnapshot {
-  id              String   @id @default(cuid())
-  timestamp       DateTime @default(now())
-  totalPlayers    Int      @map("total_players")
-  activePlayers   Int      @map("active_players")
-  inactivePlayers Int      @map("inactive_players")
-  data            Json     @default("{}")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id              String           @id @default(cuid())
+  serverId        String           @default("vanilla") @map("server_id")
+  server          MinecraftServer  @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  timestamp       DateTime         @default(now())
+  totalPlayers    Int              @map("total_players")
+  activePlayers   Int              @map("active_players")
+  inactivePlayers Int              @map("inactive_players")
+  data            Json             @default("{}")
+  createdAt       DateTime         @default(now()) @map("created_at")
 
   @@index([timestamp])
+  @@index([serverId, timestamp])
   @@map("minecraft_snapshots")
 }
 
 /**
- * Configuración del sistema de Minecraft (editable desde web)
+ * Configuración del sistema de Minecraft (editable desde web).
+ * `id` = serverId (`vanilla` | `mods`). Legacy `default` se migra a `vanilla`.
  */
 model MinecraftConfig {
-  id                    String   @id @default("default")
-  daysInactive          Int      @default(7) @map("days_inactive")
-  daysBlacklist         Int      @default(14) @map("days_blacklist")
-  daysPurge             Int      @default(21) @map("days_purge")
+  id                    String           @id @default("vanilla")
+  server                MinecraftServer  @relation(fields: [id], references: [id], onDelete: Cascade)
+  daysInactive          Int              @default(7) @map("days_inactive")
+  daysBlacklist         Int              @default(14) @map("days_blacklist")
+  daysPurge             Int              @default(21) @map("days_purge")
   /**
    * Días de historial de snapshots en Neon antes de borrar (no afecta jugadores actuales).
    */
@@ -169,6 +224,8 @@ model MinecraftConfig {
  */
 model MinecraftParcel {
   id         String                 @id
+  serverId   String                 @default("vanilla") @map("server_id")
+  server     MinecraftServer        @relation(fields: [serverId], references: [id], onDelete: Cascade)
   name       String                 @default("Parcela")
   enabled    Boolean                @default(false)
   dimension  String                 @default("overworld")
@@ -184,6 +241,8 @@ model MinecraftParcel {
   updatedAt  DateTime               @updatedAt @map("updated_at")
 
   @@index([isPrimary])
+  @@index([serverId])
+  @@index([serverId, isPrimary])
   @@map("minecraft_parcels")
 }
 
@@ -192,10 +251,12 @@ model MinecraftParcel {
  * Retención: 6 meses / 180 días (purga en POST/GET).
  */
 model MinecraftMonitorEvent {
-  id            String   @id @default(cuid())
+  id            String           @id @default(cuid())
+  serverId      String           @default("vanilla") @map("server_id")
+  server        MinecraftServer  @relation(fields: [serverId], references: [id], onDelete: Cascade)
   gamertag      String
-  eventType     String   @map("event_type")
-  occurredAt    DateTime @map("occurred_at")
+  eventType     String           @map("event_type")
+  occurredAt    DateTime         @map("occurred_at")
   posX          Int?     @map("pos_x")
   posY          Int?     @map("pos_y")
   posZ          Int?     @map("pos_z")
@@ -212,6 +273,7 @@ model MinecraftMonitorEvent {
   @@index([eventType])
   @@index([blockType])
   @@index([fireId])
+  @@index([serverId, occurredAt(sort: Desc)])
   @@map("minecraft_monitor_events")
 }
 
@@ -220,7 +282,9 @@ model MinecraftMonitorEvent {
  * Una alerta abierta por jugador: eventos posteriores suman al contador.
  */
 model MinecraftMonitorAlert {
-  id           String    @id @default(cuid())
+  id           String           @id @default(cuid())
+  serverId     String           @default("vanilla") @map("server_id")
+  server       MinecraftServer  @relation(fields: [serverId], references: [id], onDelete: Cascade)
   gamertag     String
   /** Clave normalizada para buscar la alerta abierta del jugador. */
   gamertagKey  String    @map("gamertag_key")
@@ -238,6 +302,7 @@ model MinecraftMonitorAlert {
   @@index([gamertagKey, dismissedAt])
   @@index([expiresAt])
   @@index([lastEventAt(sort: Desc)])
+  @@index([serverId, gamertagKey, dismissedAt])
   @@map("minecraft_monitor_alerts")
 }
 
@@ -311,6 +376,8 @@ model GamertagAuditSuggestion {
  */
 model PendingGamertagCorrection {
   id                String          @id @default(cuid())
+  serverId          String          @default("vanilla") @map("server_id")
+  server            MinecraftServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
   directoryMemberId String          @map("directory_member_id")
   directoryMember   DirectoryMember @relation(fields: [directoryMemberId], references: [id], onDelete: Cascade)
   oldGamertag       String          @map("old_gamertag")
@@ -323,6 +390,7 @@ model PendingGamertagCorrection {
   createdAt         DateTime        @default(now()) @map("created_at")
 
   @@index([syncedAt])
+  @@index([serverId, syncedAt])
   @@map("pending_gamertag_corrections")
 }
 
@@ -331,12 +399,15 @@ model PendingGamertagCorrection {
  * ficha borrada o nombre viejo tras corrección). `syncedAt` null = pendiente.
  */
 model PendingAllowlistRemoval {
-  id        String    @id @default(cuid())
-  userId    String    @map("user_id")
+  id        String          @id @default(cuid())
+  userId    String          @map("user_id")
+  serverId  String          @default("vanilla") @map("server_id")
+  server    MinecraftServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
   gamertag  String
   syncedAt  DateTime? @map("synced_at")
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@index([userId, syncedAt])
+  @@index([userId, serverId, syncedAt])
   @@map("pending_allowlist_removals")
 }

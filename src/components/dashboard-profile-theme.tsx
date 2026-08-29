@@ -23,7 +23,7 @@ export function DashboardProfileTheme({
       columnShowLabels={columnShowLabels}
       wrapperClassName={
         columnCompact
-          ? "flex flex-col items-center gap-1.5"
+          ? "grid w-full grid-cols-2 gap-x-1 gap-y-2"
           : "flex flex-col items-center gap-2"
       }
     />

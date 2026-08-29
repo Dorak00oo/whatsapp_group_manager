@@ -15,6 +15,7 @@ import {
   snapshotStatusByGamertag,
 } from "@/lib/minecraft-active";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
 import { prisma } from "@/lib/prisma";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 
@@ -36,6 +37,8 @@ export default async function DashboardAdministracionPage() {
   let compareData;
   let snapshotAt: string | null = null;
   let activeCount = 0;
+  let selectedWorld: Awaited<ReturnType<typeof getSelectedMinecraftServerId>> =
+    "vanilla";
   let rosterMembers: Awaited<
     ReturnType<
       typeof prisma.directoryMember.findMany<{
@@ -52,6 +55,8 @@ export default async function DashboardAdministracionPage() {
   > = [];
 
   try {
+    const serverId = await getSelectedMinecraftServerId();
+    selectedWorld = serverId;
     const [waMembers, mcPlayers, lastSnapshot, config] = await Promise.all([
       prisma.directoryMember.findMany({
         where: { userId },
@@ -69,13 +74,15 @@ export default async function DashboardAdministracionPage() {
         orderBy: { gamertag: "asc" },
       }),
       prisma.minecraftPlayer.findMany({
+        where: { serverId },
         orderBy: { lastSeen: "desc" },
       }),
       prisma.minecraftSnapshot.findFirst({
+        where: { serverId },
         orderBy: { timestamp: "desc" },
       }),
       prisma.minecraftConfig.findUnique({
-        where: { id: "default" },
+        where: { id: serverId },
       }),
     ]);
 
@@ -137,6 +144,7 @@ export default async function DashboardAdministracionPage() {
       <GamertagAuditPanel />
 
       <DirectoryMinecraftActiveCompare
+        key={selectedWorld}
         data={compareData}
         snapshotAt={snapshotAt}
       />

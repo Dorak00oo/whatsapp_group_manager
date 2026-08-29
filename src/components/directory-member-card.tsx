@@ -10,6 +10,7 @@ import {
 import { DirectoryMemberEditorDialog } from "@/components/directory-member-editor-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
 import type { DirectoryMemberDTO } from "@/types/directory";
+import { activeOnLabel } from "@/lib/minecraft-server";
 
 function regionLabel(code: string | null): string | null {
   if (!code) return null;
@@ -159,6 +160,11 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
                 {m.displayName ? (
                   <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
                     {m.displayName.trim()}
+                  </p>
+                ) : null}
+                {m.activeOn.length > 0 ? (
+                  <p className="mt-0.5 text-xs text-emerald-800 dark:text-emerald-300">
+                    {activeOnLabel(m.activeOn)}
                   </p>
                 ) : null}
               </div>

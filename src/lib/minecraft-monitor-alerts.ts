@@ -9,6 +9,7 @@ import {
   tallyCriticalAlertTypes,
   type MonitorAlertCounts,
 } from "@/lib/minecraft-monitor";
+import type { MinecraftServerId } from "@/lib/minecraft-server";
 import { prisma } from "@/lib/prisma";
 
 export type MonitorAlertEventInput = {
@@ -50,6 +51,7 @@ const CRITICAL_EVENT_TYPES = [
  */
 export async function applyMonitorAlertsFromEvents(
   events: MonitorAlertEventInput[],
+  serverId: MinecraftServerId,
 ): Promise<void> {
   const critical = events
     .filter((e) => isMonitorAlertCriticalType(e.eventType))
@@ -91,6 +93,7 @@ export async function applyMonitorAlertsFromEvents(
 
     const open = await prisma.minecraftMonitorAlert.findFirst({
       where: {
+        serverId,
         gamertagKey: key,
         dismissedAt: null,
         expiresAt: { gt: now },
@@ -128,6 +131,7 @@ export async function applyMonitorAlertsFromEvents(
       const lookback = new Date(now.getTime() - MONITOR_ALERT_WINDOW_MS);
       const recent = await prisma.minecraftMonitorEvent.findMany({
         where: {
+          serverId,
           gamertag: { equals: display, mode: "insensitive" },
           eventType: { in: [...CRITICAL_EVENT_TYPES] },
           occurredAt: { gte: lookback },
@@ -162,6 +166,7 @@ export async function applyMonitorAlertsFromEvents(
 
     await prisma.minecraftMonitorAlert.create({
       data: {
+        serverId,
         gamertag: display,
         gamertagKey: key,
         eventCount: initialCount,
@@ -175,10 +180,13 @@ export async function applyMonitorAlertsFromEvents(
   }
 }
 
-export async function listActiveMonitorAlerts(): Promise<MonitorAlertRow[]> {
+export async function listActiveMonitorAlerts(
+  serverId: MinecraftServerId,
+): Promise<MonitorAlertRow[]> {
   const now = new Date();
   await prisma.minecraftMonitorAlert.deleteMany({
     where: {
+      serverId,
       OR: [
         { expiresAt: { lt: now }, dismissedAt: null },
         {
@@ -192,6 +200,7 @@ export async function listActiveMonitorAlerts(): Promise<MonitorAlertRow[]> {
 
   const rows = await prisma.minecraftMonitorAlert.findMany({
     where: {
+      serverId,
       dismissedAt: null,
       expiresAt: { gt: now },
     },
@@ -211,8 +220,13 @@ export async function listActiveMonitorAlerts(): Promise<MonitorAlertRow[]> {
   }));
 }
 
-export async function dismissMonitorAlert(id: string): Promise<boolean> {
-  const row = await prisma.minecraftMonitorAlert.findUnique({ where: { id } });
+export async function dismissMonitorAlert(
+  id: string,
+  serverId?: MinecraftServerId,
+): Promise<boolean> {
+  const row = await prisma.minecraftMonitorAlert.findFirst({
+    where: { id, ...(serverId ? { serverId } : {}) },
+  });
   if (!row || row.dismissedAt) return false;
   await prisma.minecraftMonitorAlert.update({
     where: { id },

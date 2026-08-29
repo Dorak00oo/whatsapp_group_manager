@@ -8,9 +8,7 @@ import {
   snapshotStatusByGamertag,
 } from "@/lib/minecraft-active";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
-import {
-  MINECRAFT_CONFIG_DEFAULTS,
-} from "@/lib/minecraft-config-defaults";
+import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
 import { prisma } from "@/lib/prisma";
 
 export default async function MinecraftPage() {
@@ -25,16 +23,19 @@ export default async function MinecraftPage() {
     ReturnType<typeof prisma.minecraftConfig.findUnique>
   > | null;
 
+  const serverId = await getSelectedMinecraftServerId();
   try {
     [players, lastSnapshot, config] = await Promise.all([
       prisma.minecraftPlayer.findMany({
+        where: { serverId },
         orderBy: { lastSeen: "desc" },
       }),
       prisma.minecraftSnapshot.findFirst({
+        where: { serverId },
         orderBy: { timestamp: "desc" },
       }),
       prisma.minecraftConfig.findUnique({
-        where: { id: "default" },
+        where: { id: serverId },
       }),
     ]);
   } catch (e) {
@@ -89,6 +90,7 @@ export default async function MinecraftPage() {
       </div>
 
       <MinecraftPlayersSection
+        key={serverId}
         players={displayPlayers.map(toClientMinecraftPlayer)}
         blacklistPlayers={accessLists.blacklist.map(toClientMinecraftPlayer)}
         whitelistPlayers={accessLists.whitelist.map(toClientMinecraftPlayer)}
@@ -104,25 +106,6 @@ export default async function MinecraftPage() {
                 lastUpdate: lastUpdateZones,
               }
             : null
-        }
-        config={
-          config
-            ? {
-                daysInactive: config.daysInactive,
-                daysBlacklist: config.daysBlacklist,
-                daysPurge: config.daysPurge,
-                snapshotRetentionDays: config.snapshotRetentionDays,
-                snapshotKeepMinimum: config.snapshotKeepMinimum,
-              }
-            : {
-                daysInactive: MINECRAFT_CONFIG_DEFAULTS.daysInactive,
-                daysBlacklist: MINECRAFT_CONFIG_DEFAULTS.daysBlacklist,
-                daysPurge: MINECRAFT_CONFIG_DEFAULTS.daysPurge,
-                snapshotRetentionDays:
-                  MINECRAFT_CONFIG_DEFAULTS.snapshotRetentionDays,
-                snapshotKeepMinimum:
-                  MINECRAFT_CONFIG_DEFAULTS.snapshotKeepMinimum,
-              }
         }
       />
     </section>

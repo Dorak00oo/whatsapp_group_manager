@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma";
+import type { MinecraftServerId } from "@/lib/minecraft-server";
 
 /** Mes y medio ≈ 45 días (histórico en Neon). */
 export const DEFAULT_SNAPSHOT_RETENTION_DAYS = 45;
@@ -37,11 +38,15 @@ export function resolveSnapshotPurgeConfig(
 export async function purgeOldMinecraftSnapshots(
   db: PrismaClient,
   config?: Partial<SnapshotPurgeConfig> | null,
+  serverId?: MinecraftServerId,
 ): Promise<{ deleted: number }> {
   const { snapshotRetentionDays, snapshotKeepMinimum } =
     resolveSnapshotPurgeConfig(config);
 
+  const serverFilter = serverId ? { serverId } : {};
+
   const protectedRows = await db.minecraftSnapshot.findMany({
+    where: serverFilter,
     orderBy: { timestamp: "desc" },
     take: snapshotKeepMinimum,
     select: { id: true },
@@ -58,6 +63,7 @@ export async function purgeOldMinecraftSnapshots(
 
   const result = await db.minecraftSnapshot.deleteMany({
     where: {
+      ...serverFilter,
       timestamp: { lt: cutoff },
       id: { notIn: protectedIds },
     },

@@ -1,26 +1,21 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireMinecraftPanel } from "@/lib/minecraft-api-context";
 import { dismissMonitorAlert } from "@/lib/minecraft-monitor-alerts";
 
 export const runtime = "nodejs";
 
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
 type Ctx = { params: Promise<{ id: string }> };
 
-/** Panel: descartar alerta manualmente. */
 export async function DELETE(_request: Request, context: Ctx) {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
 
   const { id } = await context.params;
   if (!id?.trim()) {
     return NextResponse.json({ error: "id requerido" }, { status: 400 });
   }
 
-  const ok = await dismissMonitorAlert(id.trim());
+  const ok = await dismissMonitorAlert(id.trim(), authz.serverId);
   if (!ok) {
     return NextResponse.json(
       { error: "Alerta no encontrada o ya descartada" },

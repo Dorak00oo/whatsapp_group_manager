@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { sanitizeBannedItemsList } from "@/lib/minecraft-banned-items";
 import {
-  MINECRAFT_CONFIG_DEFAULTS,
   type MinecraftConfigUpdateInput,
 } from "@/lib/minecraft-config-defaults";
 import {
@@ -19,20 +17,21 @@ import {
   fullMinecraftConfigPayload,
 } from "@/lib/minecraft-parcels-db";
 import { prisma } from "@/lib/prisma";
+import {
+  requireMinecraftAddon,
+  requireMinecraftAddonOrPanel,
+} from "@/lib/minecraft-api-context";
+import {
+  ensureMinecraftConfig,
+  getMinecraftServer,
+} from "@/lib/minecraft-servers-db";
+import type { MinecraftServerId } from "@/lib/minecraft-server";
 
 export const runtime = "nodejs";
 
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
-function getBearerToken(request: Request): string | null {
-  const h = request.headers.get("authorization");
-  if (!h?.toLowerCase().startsWith("bearer ")) return null;
-  return h.slice(7).trim() || null;
-}
-
 type ConfigBody = {
+  serverId?: unknown;
+  flavor?: unknown;
   daysInactive?: number;
   daysBlacklist?: number;
   daysPurge?: number;
@@ -59,54 +58,32 @@ function pickPositiveInt(value: unknown): number | undefined {
     : undefined;
 }
 
-// GET: Obtener configuración actual
-export async function GET(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
+async function configResponse(serverId: MinecraftServerId) {
+  const [config, server] = await Promise.all([
+    ensureMinecraftConfig(serverId),
+    getMinecraftServer(serverId),
+  ]);
+  return {
+    ok: true,
+    server: {
+      id: server.id,
+      name: server.name,
+      flavor: server.flavor,
+      edition: server.edition,
+      lastSeenAt: server.lastSeenAt?.toISOString() ?? null,
+      lastVersion: server.lastVersion,
+      lastWorldName: server.lastWorldName,
+    },
+    config: await fullMinecraftConfigPayload(config, serverId),
+  };
+}
 
-  const token = getBearerToken(request);
-  if (token !== secret) {
-    return unauthorized();
-  }
+export async function GET(request: Request) {
+  const authz = await requireMinecraftAddon(request);
+  if (!authz.ok) return authz.response;
 
   try {
-    let config = await prisma.minecraftConfig.findUnique({
-      where: { id: "default" },
-    });
-
-    if (!config) {
-      config = await prisma.minecraftConfig.create({
-        data: {
-          id: "default",
-          daysInactive: MINECRAFT_CONFIG_DEFAULTS.daysInactive,
-          daysBlacklist: MINECRAFT_CONFIG_DEFAULTS.daysBlacklist,
-          daysPurge: MINECRAFT_CONFIG_DEFAULTS.daysPurge,
-          snapshotRetentionDays: MINECRAFT_CONFIG_DEFAULTS.snapshotRetentionDays,
-          snapshotKeepMinimum: MINECRAFT_CONFIG_DEFAULTS.snapshotKeepMinimum,
-          parcelEnabled: MINECRAFT_CONFIG_DEFAULTS.parcel.enabled,
-          parcelName: MINECRAFT_CONFIG_DEFAULTS.parcel.name,
-          parcelDimension: MINECRAFT_CONFIG_DEFAULTS.parcel.dimension,
-          parcelMinX: MINECRAFT_CONFIG_DEFAULTS.parcel.minX,
-          parcelMinY: MINECRAFT_CONFIG_DEFAULTS.parcel.minY,
-          parcelMinZ: MINECRAFT_CONFIG_DEFAULTS.parcel.minZ,
-          parcelMaxX: MINECRAFT_CONFIG_DEFAULTS.parcel.maxX,
-          parcelMaxY: MINECRAFT_CONFIG_DEFAULTS.parcel.maxY,
-          parcelMaxZ: MINECRAFT_CONFIG_DEFAULTS.parcel.maxZ,
-          monitorExcludeJson: JSON.stringify(DEFAULT_MONITOR_EXCLUDE),
-          bannedItemsJson: "[]",
-        },
-      });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      config: await fullMinecraftConfigPayload(config),
-    });
+    return NextResponse.json(await configResponse(authz.serverId));
   } catch (error) {
     console.error("[Minecraft Config API] Error:", error);
     return NextResponse.json(
@@ -116,34 +93,17 @@ export async function GET(request: Request) {
   }
 }
 
-// POST: Actualizar configuración
-export async function POST(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  const token = getBearerToken(request);
-
-  if (token) {
-    if (!secret) {
-      return NextResponse.json(
-        { error: "MINECRAFT_API_KEY no configurado" },
-        { status: 503 },
-      );
-    }
-    if (token !== secret) {
-      return unauthorized();
-    }
-  } else {
-    const session = await auth();
-    if (!session?.user) {
-      return unauthorized();
-    }
-  }
-
+async function updateConfig(request: Request) {
   let body: ConfigBody;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
+
+  const authz = await requireMinecraftAddonOrPanel(request, body);
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
 
   try {
     const updateData: MinecraftConfigUpdateInput = {};
@@ -186,40 +146,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const config = await prisma.minecraftConfig.upsert({
-      where: { id: "default" },
-      update: { ...updateData, ...parcelFields },
-      create: {
-        id: "default",
-        daysInactive: daysInactive ?? MINECRAFT_CONFIG_DEFAULTS.daysInactive,
-        daysBlacklist:
-          daysBlacklist ?? MINECRAFT_CONFIG_DEFAULTS.daysBlacklist,
-        daysPurge: daysPurge ?? MINECRAFT_CONFIG_DEFAULTS.daysPurge,
-        snapshotRetentionDays:
-          snapshotRetentionDays ??
-          MINECRAFT_CONFIG_DEFAULTS.snapshotRetentionDays,
-        snapshotKeepMinimum:
-          snapshotKeepMinimum ??
-          MINECRAFT_CONFIG_DEFAULTS.snapshotKeepMinimum,
-        parcelEnabled: MINECRAFT_CONFIG_DEFAULTS.parcel.enabled,
-        parcelName: MINECRAFT_CONFIG_DEFAULTS.parcel.name,
-        parcelDimension: MINECRAFT_CONFIG_DEFAULTS.parcel.dimension,
-        parcelMinX: MINECRAFT_CONFIG_DEFAULTS.parcel.minX,
-        parcelMinY: MINECRAFT_CONFIG_DEFAULTS.parcel.minY,
-        parcelMinZ: MINECRAFT_CONFIG_DEFAULTS.parcel.minZ,
-        parcelMaxX: MINECRAFT_CONFIG_DEFAULTS.parcel.maxX,
-        parcelMaxY: MINECRAFT_CONFIG_DEFAULTS.parcel.maxY,
-        parcelMaxZ: MINECRAFT_CONFIG_DEFAULTS.parcel.maxZ,
-        monitorExcludeJson:
-          monitorExcludeJson ??
-          JSON.stringify(DEFAULT_MONITOR_EXCLUDE),
-        bannedItemsJson: updateData.bannedItemsJson ?? "[]",
-        ...parcelFields,
-      },
+    await ensureMinecraftConfig(serverId);
+    await prisma.minecraftConfig.update({
+      where: { id: serverId },
+      data: { ...updateData, ...parcelFields },
     });
 
     if (body.parcel && typeof body.parcel === "object") {
-      const parcels = await ensurePrimaryParcel();
+      const parcels = await ensurePrimaryParcel(serverId);
       const primary = parcels.find((p) => p.isPrimary) ?? parcels[0];
       if (primary) {
         await prisma.minecraftParcel.update({
@@ -231,10 +165,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({
-      ok: true,
-      config: await fullMinecraftConfigPayload(config),
-    });
+    return NextResponse.json(await configResponse(serverId));
   } catch (error) {
     console.error("[Minecraft Config API] Error:", error);
     return NextResponse.json(
@@ -242,4 +173,12 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+export async function POST(request: Request) {
+  return updateConfig(request);
+}
+
+export async function PATCH(request: Request) {
+  return updateConfig(request);
 }

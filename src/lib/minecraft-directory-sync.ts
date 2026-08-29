@@ -4,6 +4,18 @@ import {
   snapshotStatusByGamertag,
 } from "@/lib/minecraft-active";
 import { MINECRAFT_CONFIG_DEFAULTS } from "@/lib/minecraft-config-defaults";
+import {
+  activeMinecraftServerIds,
+  groupWorldActivityByGamertag,
+  isCommunityActiveFromWorlds,
+  type WorldActivityRow,
+} from "@/lib/minecraft-community-activity";
+import {
+  MINECRAFT_SERVER_IDS,
+  parseMinecraftServerId,
+  type MinecraftServerId,
+} from "@/lib/minecraft-server";
+import { ensureMinecraftServers } from "@/lib/minecraft-servers-db";
 
 function directoryMayReceiveMcInactive(): {
   permanentlyActive: false;
@@ -17,15 +29,27 @@ function directoryMayReceiveMcInactive(): {
   };
 }
 
+async function worldRowsForGamertag(gamertag: string): Promise<WorldActivityRow[]> {
+  const tag = gamertag.trim();
+  if (!tag) return [];
+  const players = await prisma.minecraftPlayer.findMany({
+    where: { gamertag: { equals: tag, mode: "insensitive" } },
+    select: { serverId: true, active: true, isBlacklisted: true },
+  });
+  return players.flatMap((p) => {
+    const serverId = parseMinecraftServerId(p.serverId);
+    if (!serverId) return [];
+    return [{ serverId, active: p.active, isBlacklisted: p.isBlacklisted }];
+  });
+}
+
 /**
- * Alinea `DirectoryMember.active` con el estado deseado (p. ej. activo en
- * servidor **y** no blacklist) cuando el gamertag coincide (sin distinguir
- * mayúsculas). No modifica filas con `leftAt` (se salieron del grupo).
+ * Alinea `DirectoryMember.active` con la unión de mundos (activo y sin
+ * blacklist en al menos uno). No modifica filas con `leftAt`.
  * Respeta `permanentlyActive`, `absentWithCause` y `activeHoldFromMc` al bajar a inactivo.
  */
 export async function syncDirectoryActiveWithMinecraft(
   gamertag: string,
-  minecraftActive: boolean,
 ): Promise<void> {
   const email = process.env.COMMUNITY_EMAIL?.trim().toLowerCase();
   if (!email) return;
@@ -38,6 +62,10 @@ export async function syncDirectoryActiveWithMinecraft(
 
   const tag = gamertag.trim();
   if (!tag) return;
+
+  const minecraftActive = isCommunityActiveFromWorlds(
+    await worldRowsForGamertag(tag),
+  );
 
   const baseWhere = {
     userId: owner.id,
@@ -70,39 +98,67 @@ export type SyncDirectoryFromMinecraftSummary = {
   deactivated: string[];
 };
 
+async function unionActivityByGamertag(): Promise<Map<string, WorldActivityRow[]>> {
+  const [players, snapshots, configs] = await Promise.all([
+    prisma.minecraftPlayer.findMany(),
+    prisma.minecraftSnapshot.findMany({ orderBy: { timestamp: "desc" } }),
+    prisma.minecraftConfig.findMany(),
+  ]);
+
+  const latestByServer = new Map<string, (typeof snapshots)[number]>();
+  for (const snap of snapshots) {
+    if (!latestByServer.has(snap.serverId)) {
+      latestByServer.set(snap.serverId, snap);
+    }
+  }
+  const configById = new Map(configs.map((c) => [c.id, c]));
+  const playersByServer = new Map<string, typeof players>();
+  for (const p of players) {
+    const list = playersByServer.get(p.serverId) ?? [];
+    list.push(p);
+    playersByServer.set(p.serverId, list);
+  }
+
+  const merged: Array<{
+    gamertag: string;
+    serverId: string;
+    active: boolean;
+    isBlacklisted: boolean;
+  }> = [];
+
+  for (const serverId of MINECRAFT_SERVER_IDS) {
+    const serverPlayers = playersByServer.get(serverId) ?? [];
+    const daysInactiveThreshold =
+      configById.get(serverId)?.daysInactive ??
+      MINECRAFT_CONFIG_DEFAULTS.daysInactive;
+    const roster = buildRosterFromSnapshot(
+      serverPlayers,
+      snapshotStatusByGamertag(latestByServer.get(serverId)?.data),
+      daysInactiveThreshold,
+    );
+    for (const p of roster) {
+      merged.push({
+        gamertag: p.gamertag,
+        serverId,
+        active: p.active,
+        isBlacklisted: p.isBlacklisted,
+      });
+    }
+  }
+
+  return groupWorldActivityByGamertag(merged);
+}
+
 /**
- * Alinea el directorio con el roster de Minecraft (misma regla que Reconciliación:
- * activo en MC y sin blacklist, usando el último snapshot si existe).
+ * Alinea el directorio con el roster de Minecraft (unión de mundos:
+ * activo en MC y sin blacklist en al menos uno).
  * Solo filas del panel sin `leftAt`. El activo permanente y el ausente con causa no se bajan.
  * Esta acción de panel ignora `activeHoldFromMc` (si no, casi nadie se inactiva).
  */
 export async function syncDirectoryMembersFromMinecraftTable(
   userId: string,
 ): Promise<SyncDirectoryFromMinecraftSummary> {
-  const [players, lastSnapshot, config] = await Promise.all([
-    prisma.minecraftPlayer.findMany(),
-    prisma.minecraftSnapshot.findFirst({
-      orderBy: { timestamp: "desc" },
-    }),
-    prisma.minecraftConfig.findUnique({
-      where: { id: "default" },
-    }),
-  ]);
-
-  const daysInactiveThreshold =
-    config?.daysInactive ?? MINECRAFT_CONFIG_DEFAULTS.daysInactive;
-  const displayPlayers = buildRosterFromSnapshot(
-    players,
-    snapshotStatusByGamertag(lastSnapshot?.data),
-    daysInactiveThreshold,
-  );
-
-  const activeMcKeys = new Set(
-    displayPlayers
-      .filter((p) => p.active && !p.isBlacklisted)
-      .map((p) => p.gamertag.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  const byTag = await unionActivityByGamertag();
 
   const members = await prisma.directoryMember.findMany({
     where: { userId, leftAt: null },
@@ -132,7 +188,8 @@ export async function syncDirectoryMembersFromMinecraftTable(
 
   for (const m of members) {
     const key = m.gamertag.trim().toLowerCase();
-    const mcActive = Boolean(key) && activeMcKeys.has(key);
+    const worlds = byTag.get(key) ?? [];
+    const mcActive = isCommunityActiveFromWorlds(worlds);
     if (mcActive) matchedGamertags += 1;
 
     const shouldBeActive = m.permanentlyActive || mcActive;
@@ -167,11 +224,70 @@ export async function syncDirectoryMembersFromMinecraftTable(
     updatedRows += r.count;
   }
 
+  const minecraftCount = [...byTag.values()].filter((worlds) =>
+    isCommunityActiveFromWorlds(worlds),
+  ).length;
+
   return {
     updatedRows,
-    minecraftCount: activeMcKeys.size,
+    minecraftCount,
     matchedGamertags,
     activated,
     deactivated,
   };
+}
+
+export async function activeOnByGamertagMap(): Promise<
+  Map<string, MinecraftServerId[]>
+> {
+  const players = await prisma.minecraftPlayer.findMany({
+    select: {
+      gamertag: true,
+      serverId: true,
+      active: true,
+      isBlacklisted: true,
+    },
+  });
+  const grouped = groupWorldActivityByGamertag(players);
+  const out = new Map<string, MinecraftServerId[]>();
+  for (const [key, worlds] of grouped) {
+    out.set(key, activeMinecraftServerIds(worlds));
+  }
+  return out;
+}
+
+export const directoryActiveOnByGamertag = activeOnByGamertagMap;
+
+export async function blacklistMinecraftGamertagOnAllWorlds(
+  gamertag: string,
+): Promise<void> {
+  const tag = gamertag.trim();
+  if (!tag) return;
+  await ensureMinecraftServers();
+  for (const serverId of MINECRAFT_SERVER_IDS) {
+    const existing = await prisma.minecraftPlayer.findFirst({
+      where: {
+        serverId,
+        gamertag: { equals: tag, mode: "insensitive" },
+      },
+    });
+    if (existing) {
+      await prisma.minecraftPlayer.update({
+        where: { id: existing.id },
+        data: { isBlacklisted: true },
+      });
+    } else {
+      await prisma.minecraftPlayer.create({
+        data: {
+          serverId,
+          gamertag: tag,
+          lastSeen: new Date(),
+          active: false,
+          daysInactive: 0,
+          isBlacklisted: true,
+        },
+      });
+    }
+  }
+  await syncDirectoryActiveWithMinecraft(tag);
 }

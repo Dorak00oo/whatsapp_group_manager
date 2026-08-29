@@ -3,13 +3,17 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/prisma";
 import { isActiveByDaysInactive } from "@/lib/minecraft-active";
+import { requireMinecraftAddon } from "@/lib/minecraft-api-context";
 import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
+import { ensureMinecraftConfig } from "@/lib/minecraft-servers-db";
 import { purgeOldMinecraftSnapshots } from "@/lib/minecraft-snapshot-purge";
 
 export const runtime = "nodejs";
 
 type MinecraftStatusPayload = {
   timestamp: number;
+  serverId?: unknown;
+  flavor?: unknown;
   serverInfo: {
     totalPlayers: number;
     activePlayers: number;
@@ -27,10 +31,6 @@ type MinecraftStatusPayload = {
   blacklist: string[];
   whitelist: string[];
 };
-
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
 
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
@@ -51,30 +51,10 @@ function snapshotDateFromPayload(timestamp: unknown): Date {
         ? Number(timestamp)
         : NaN;
   if (!Number.isFinite(n)) return new Date();
-  // Segundos UNIX (~1e9) vs milisegundos (~1e12+)
   return new Date(n < 1_000_000_000_000 ? n * 1000 : n);
 }
 
-function getBearerToken(request: Request): string | null {
-  const h = request.headers.get("authorization");
-  if (!h?.toLowerCase().startsWith("bearer ")) return null;
-  return h.slice(7).trim() || null;
-}
-
 export async function POST(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado en el servidor" },
-      { status: 503 },
-    );
-  }
-
-  const token = getBearerToken(request);
-  if (token !== secret) {
-    return unauthorized();
-  }
-
   let body: MinecraftStatusPayload;
   try {
     body = (await request.json()) as MinecraftStatusPayload;
@@ -82,20 +62,22 @@ export async function POST(request: Request) {
     return badRequest("JSON inválido");
   }
 
+  const authz = await requireMinecraftAddon(request, body);
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
+
   if (!body.players || !Array.isArray(body.players)) {
     return badRequest("El campo 'players' es requerido y debe ser un array");
   }
 
   try {
     const serverSnapshotTime = snapshotDateFromPayload(body.timestamp);
-    const config = await prisma.minecraftConfig.findUnique({
-      where: { id: "default" },
-    });
-    const daysInactiveThreshold = config?.daysInactive ?? 7;
+    const config = await ensureMinecraftConfig(serverId);
+    const daysInactiveThreshold = config.daysInactive;
 
-    // Guardar snapshot histórico
     await prisma.minecraftSnapshot.create({
       data: {
+        serverId,
         timestamp: serverSnapshotTime,
         totalPlayers: body.serverInfo.totalPlayers,
         activePlayers: body.serverInfo.activePlayers,
@@ -104,24 +86,26 @@ export async function POST(request: Request) {
       },
     });
 
-    const purgeResult = await purgeOldMinecraftSnapshots(prisma, config);
+    const purgeResult = await purgeOldMinecraftSnapshots(
+      prisma,
+      config,
+      serverId,
+    );
     if (purgeResult.deleted > 0) {
       console.info(
-        `[Minecraft API] Purga snapshots: ${purgeResult.deleted} filas (> ${config?.snapshotRetentionDays ?? 45} días, mín. ${config?.snapshotKeepMinimum ?? 10} recientes)`,
+        `[Minecraft API] Purga snapshots ${serverId}: ${purgeResult.deleted} filas (> ${config.snapshotRetentionDays} días, mín. ${config.snapshotKeepMinimum} recientes)`,
       );
     }
 
-    // Actualizar o crear jugadores (gamertag sin distinguir mayúsculas en la búsqueda)
-    // Blacklist/WL: si el panel editó la fila recientemente, no pisar con un snapshot
-    // del servidor que aún refleja el estado anterior (antes de Sync all / GET).
-    // Si el snapshot es más nuevo que esa ventana, el servidor manda y además se usa OR
-    // para no perder un ban desde panel hasta que el mundo confirme.
     for (const player of body.players) {
       const name = player.name.trim();
       if (!name) continue;
 
       const existing = await prisma.minecraftPlayer.findFirst({
-        where: { gamertag: { equals: name, mode: "insensitive" } },
+        where: {
+          serverId,
+          gamertag: { equals: name, mode: "insensitive" },
+        },
       });
 
       const panelListsNewerThanSnapshot =
@@ -135,10 +119,8 @@ export async function POST(request: Request) {
         mergedBlacklist = existing!.isBlacklisted;
         mergedWhitelist = existing!.isWhitelisted;
       } else if (existing) {
-        mergedBlacklist =
-          existing.isBlacklisted || player.isBlacklisted;
-        mergedWhitelist =
-          existing.isWhitelisted || player.isWhitelisted;
+        mergedBlacklist = existing.isBlacklisted || player.isBlacklisted;
+        mergedWhitelist = existing.isWhitelisted || player.isWhitelisted;
       } else {
         mergedBlacklist = player.isBlacklisted;
         mergedWhitelist = player.isWhitelisted;
@@ -148,9 +130,6 @@ export async function POST(request: Request) {
         player.daysInactive,
         daysInactiveThreshold,
       );
-
-      /** Directorio WhatsApp: inactivo si no cumple días activos o está en blacklist */
-      const directoryActive = active && !mergedBlacklist;
 
       if (existing) {
         await prisma.minecraftPlayer.update({
@@ -163,10 +142,10 @@ export async function POST(request: Request) {
             isWhitelisted: mergedWhitelist,
           },
         });
-        await syncDirectoryActiveWithMinecraft(name, directoryActive);
       } else {
         await prisma.minecraftPlayer.create({
           data: {
+            serverId,
             gamertag: name,
             lastSeen: new Date(player.lastSeen),
             active,
@@ -175,8 +154,8 @@ export async function POST(request: Request) {
             isWhitelisted: mergedWhitelist,
           },
         });
-        await syncDirectoryActiveWithMinecraft(name, directoryActive);
       }
+      await syncDirectoryActiveWithMinecraft(name);
     }
 
     const totalReported = body.serverInfo?.totalPlayers ?? 0;
@@ -189,16 +168,21 @@ export async function POST(request: Request) {
           .filter(Boolean),
       );
       const stale = await prisma.minecraftPlayer.findMany({
+        where: { serverId },
         select: { id: true, gamertag: true },
       });
-      const staleIds = stale
-        .filter((r) => !seen.has(r.gamertag.toLowerCase()))
-        .map((r) => r.id);
+      const staleRows = stale.filter(
+        (r) => !seen.has(r.gamertag.toLowerCase()),
+      );
+      const staleIds = staleRows.map((r) => r.id);
       if (staleIds.length > 0) {
         await prisma.minecraftPlayer.updateMany({
           where: { id: { in: staleIds } },
           data: { active: false },
         });
+        for (const row of staleRows) {
+          await syncDirectoryActiveWithMinecraft(row.gamertag);
+        }
       }
     }
 
@@ -207,6 +191,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
+      serverId,
       processed: body.players.length,
       timestamp: new Date().toISOString(),
     });
@@ -220,30 +205,21 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
-
-  const token = getBearerToken(request);
-  if (token !== secret) {
-    return unauthorized();
-  }
+  const authz = await requireMinecraftAddon(request);
+  if (!authz.ok) return authz.response;
+  const { serverId } = authz;
 
   try {
     const [players, lastSnapshot, config] = await Promise.all([
       prisma.minecraftPlayer.findMany({
+        where: { serverId },
         orderBy: { lastSeen: "desc" },
       }),
       prisma.minecraftSnapshot.findFirst({
+        where: { serverId },
         orderBy: { timestamp: "desc" },
       }),
-      prisma.minecraftConfig.findUnique({
-        where: { id: "default" },
-      }),
+      ensureMinecraftConfig(serverId),
     ]);
 
     const blacklist = players
@@ -255,6 +231,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       ok: true,
+      serverId,
       players: players.map((p) => ({
         gamertag: p.gamertag,
         lastSeen: p.lastSeen.toISOString(),
@@ -263,7 +240,6 @@ export async function GET(request: Request) {
         isBlacklisted: p.isBlacklisted,
         isWhitelisted: p.isWhitelisted,
       })),
-      /** Listas planas para el addon del servidor (mismo contrato que el POST) */
       blacklist,
       whitelist,
       lastUpdate: lastSnapshot?.timestamp.toISOString() ?? null,
@@ -274,21 +250,13 @@ export async function GET(request: Request) {
             inactivePlayers: lastSnapshot.inactivePlayers,
           }
         : null,
-      config: config
-        ? {
-            daysInactive: config.daysInactive,
-            daysBlacklist: config.daysBlacklist,
-            daysPurge: config.daysPurge,
-            snapshotRetentionDays: config.snapshotRetentionDays,
-            snapshotKeepMinimum: config.snapshotKeepMinimum,
-          }
-        : {
-            daysInactive: 7,
-            daysBlacklist: 14,
-            daysPurge: 21,
-            snapshotRetentionDays: 45,
-            snapshotKeepMinimum: 10,
-          },
+      config: {
+        daysInactive: config.daysInactive,
+        daysBlacklist: config.daysBlacklist,
+        daysPurge: config.daysPurge,
+        snapshotRetentionDays: config.snapshotRetentionDays,
+        snapshotKeepMinimum: config.snapshotKeepMinimum,
+      },
     });
   } catch (error) {
     console.error("[Minecraft API] Error:", error);

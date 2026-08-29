@@ -3,6 +3,7 @@ import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftParcelHub } from "@/components/minecraft-parcel-hub";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { ensurePrimaryParcel } from "@/lib/minecraft-parcels-db";
+import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
 import { prisma } from "@/lib/prisma";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import type { ParcelEventType } from "@/lib/minecraft-parcel";
@@ -22,7 +23,8 @@ export default async function DashboardParcelaPage() {
   }
 
   try {
-    const parcels = await ensurePrimaryParcel();
+    const serverId = await getSelectedMinecraftServerId();
+    const parcels = await ensurePrimaryParcel(serverId);
     const latestRows = await Promise.all(
       parcels.map((p) =>
         prisma.minecraftParcelEvent.findFirst({
@@ -55,6 +57,7 @@ export default async function DashboardParcelaPage() {
           </p>
         </div>
         <MinecraftParcelHub
+          key={serverId}
           parcels={parcels.map((p) => {
             const last = latestById.get(p.id);
             return {

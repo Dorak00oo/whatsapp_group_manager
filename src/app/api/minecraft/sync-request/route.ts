@@ -1,41 +1,22 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import {
-  enqueueMinecraftPanelCommand,
-  MINECRAFT_SYNC_QUEUE_ID,
-} from "@/lib/minecraft-sync-request";
+  requireMinecraftAddon,
+  requireMinecraftPanel,
+} from "@/lib/minecraft-api-context";
+import { enqueueMinecraftPanelCommand } from "@/lib/minecraft-sync-request";
+import {
+  readMinecraftQueueRow,
+  updateMinecraftQueueData,
+} from "@/lib/minecraft-queue";
+import { asSyncRequestData } from "@/lib/minecraft-sync-request-data";
 
 export const runtime = "nodejs";
 
-const SETTINGS_ID = MINECRAFT_SYNC_QUEUE_ID;
-
 const ALLOWED_PANEL_COMMANDS = new Set(["syncall"]);
 
-type SyncRequestData = {
-  command?: string;
-  requestedAt?: string;
-  handledAt?: string | null;
-};
-
-function unauthorized() {
-  return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-}
-
-function getBearerToken(request: Request): string | null {
-  const h = request.headers.get("authorization");
-  if (!h?.toLowerCase().startsWith("bearer ")) return null;
-  return h.slice(7).trim() || null;
-}
-
-function asSyncRequestData(value: unknown): SyncRequestData {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return value as SyncRequestData;
-}
-
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user) return unauthorized();
+  const authz = await requireMinecraftPanel();
+  if (!authz.ok) return authz.response;
 
   let command: "syncall" = "syncall";
   try {
@@ -50,27 +31,23 @@ export async function POST(request: Request) {
     /* sin cuerpo / no JSON → syncall */
   }
 
-  const { requestedAt } = await enqueueMinecraftPanelCommand(command);
+  const { requestedAt } = await enqueueMinecraftPanelCommand(
+    command,
+    authz.serverId,
+  );
 
   return NextResponse.json({ ok: true, command, requestedAt });
 }
 
 export async function GET(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
+  const authz = await requireMinecraftAddon(request);
+  if (!authz.ok) return authz.response;
 
-  const token = getBearerToken(request);
-  if (token !== secret) return unauthorized();
-
-  const row = await prisma.minecraftSyncQueue.findUnique({
-    where: { id: SETTINGS_ID },
-  });
-  const data = asSyncRequestData(row?.data);
+  const found = await readMinecraftQueueRow(
+    authz.serverId,
+    "minecraft_sync_request",
+  );
+  const data = asSyncRequestData(found?.data);
   const pending =
     Boolean(data.requestedAt) && data.requestedAt !== data.handledAt;
 
@@ -83,23 +60,15 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const secret = process.env.MINECRAFT_API_KEY?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "MINECRAFT_API_KEY no configurado" },
-      { status: 503 },
-    );
-  }
-
-  const token = getBearerToken(request);
-  if (token !== secret) return unauthorized();
-
-  let body: { requestedAt?: unknown } = {};
+  let body: { requestedAt?: unknown; serverId?: unknown } = {};
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
+
+  const authz = await requireMinecraftAddon(request, body);
+  if (!authz.ok) return authz.response;
 
   const requestedAt =
     typeof body.requestedAt === "string" ? body.requestedAt : "";
@@ -110,24 +79,20 @@ export async function PUT(request: Request) {
     );
   }
 
-  const row = await prisma.minecraftSyncQueue.findUnique({
-    where: { id: SETTINGS_ID },
-  });
-  if (!row) {
+  const found = await readMinecraftQueueRow(
+    authz.serverId,
+    "minecraft_sync_request",
+  );
+  if (!found) {
     return NextResponse.json({ error: "Sin cola de panel" }, { status: 404 });
   }
 
-  const prev = asSyncRequestData(row.data);
+  const prev = asSyncRequestData(found.data);
 
-  await prisma.minecraftSyncQueue.update({
-    where: { id: SETTINGS_ID },
-    data: {
-      data: {
-        command: prev.command ?? "syncall",
-        requestedAt: prev.requestedAt ?? requestedAt,
-        handledAt: requestedAt,
-      },
-    },
+  await updateMinecraftQueueData(found.id, {
+    command: prev.command ?? "syncall",
+    requestedAt: prev.requestedAt ?? requestedAt,
+    handledAt: requestedAt,
   });
 
   return NextResponse.json({ ok: true, handledAt: requestedAt });
