@@ -1,7 +1,11 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { SidebarGlyphCaption, sidebarTileClass } from "@/components/sidebar-glyph-caption";
+import {
+  SidebarGlyphCaption,
+  sidebarTileClass,
+  sidebarTileDangerClass,
+} from "@/components/sidebar-glyph-caption";
 
 function LogOutDoorIcon({ className }: { className?: string }) {
   return (
@@ -59,7 +63,7 @@ export function SignOutButton({
         onClick={() => signOut({ callbackUrl: "/" })}
         title="Cerrar sesión"
         aria-label="Cerrar sesión"
-        className={`${sidebarTileClass} bg-white text-zinc-600 ring-1 ring-zinc-900/10 hover:bg-red-500/10 hover:text-red-600 hover:ring-red-400/45 dark:bg-zinc-900/40 dark:text-zinc-400 dark:ring-zinc-700/60 dark:hover:bg-red-950/40 dark:hover:text-red-400 dark:hover:ring-red-500/45 ${className ?? ""}`}
+        className={`${sidebarTileClass} ${sidebarTileDangerClass} ${className ?? ""}`}
       >
         <SidebarGlyphCaption
           icon={<LogOutDoorIcon className="size-7" />}

@@ -11,8 +11,9 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Registros WA / Minecraft",
-  description: "Usuarios, login y registros con Next.js, Postgres y Auth.js",
+  title: "Panel de la comunidad",
+  description:
+    "Directorio de personas, WhatsApp y Minecraft. Entrá con la cuenta compartida.",
 };
 
 export const viewport: Viewport = {
@@ -33,10 +34,10 @@ export default async function RootLayout({
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} min-h-full antialiased${defaultThemeDark ? " dark" : ""}`}
+      className={`${geistSans.variable} min-h-dvh antialiased${defaultThemeDark ? " dark" : ""}`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col bg-background dark:bg-transparent">
+      <body className="flex min-h-dvh flex-col bg-background dark:bg-transparent">
         <Providers defaultThemeDark={defaultThemeDark}>{children}</Providers>
       </body>
     </html>

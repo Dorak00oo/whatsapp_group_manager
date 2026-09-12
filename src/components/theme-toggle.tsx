@@ -2,7 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useSyncExternalStore, type ReactNode } from "react";
-import { SidebarGlyphCaption, sidebarTileClass } from "@/components/sidebar-glyph-caption";
+import {
+  SidebarGlyphCaption,
+  sidebarTileClass,
+  sidebarTileIdleClass,
+} from "@/components/sidebar-glyph-caption";
 
 const THEME_COOKIE_ATTRS = "path=/;max-age=31536000;SameSite=Lax";
 
@@ -112,13 +116,9 @@ export function ThemeToggle({
     : "flex size-12 shrink-0 items-center justify-center rounded-full transition-colors duration-200";
   const columnIcon = columnCompact ? 28 : 22;
   const sunActive =
-    "bg-amber-500 text-amber-950 dark:bg-amber-400 dark:text-amber-950";
-  const sunIdle =
-    "bg-amber-200/45 text-amber-900/50 hover:bg-amber-200/70 hover:text-amber-900/75 dark:bg-amber-950/40 dark:text-amber-300/40 dark:hover:bg-amber-950/55 dark:hover:text-amber-300/65";
+    "bg-amber-500 text-amber-950 ring-1 ring-amber-500 dark:bg-amber-400 dark:text-amber-950 dark:ring-amber-400";
   const moonActive =
-    "bg-violet-600 text-white dark:bg-violet-400 dark:text-violet-950";
-  const moonIdle =
-    "bg-violet-200/45 text-violet-800/50 hover:bg-violet-200/70 hover:text-violet-800/75 dark:bg-violet-950/40 dark:text-violet-300/40 dark:hover:bg-violet-950/55 dark:hover:text-violet-300/65";
+    "bg-violet-600 text-white ring-1 ring-violet-600 dark:bg-violet-400 dark:text-violet-950 dark:ring-violet-400";
   const columnActive =
     "bg-zinc-900 text-white shadow-md dark:bg-zinc-100 dark:text-zinc-900 dark:shadow-none";
   const columnIdle =
@@ -126,14 +126,14 @@ export function ThemeToggle({
   const sunCls = columnCompact
     ? !isDark
       ? sunActive
-      : sunIdle
+      : sidebarTileIdleClass
     : !isDark
       ? columnActive
       : columnIdle;
   const moonCls = columnCompact
     ? isDark
       ? moonActive
-      : moonIdle
+      : sidebarTileIdleClass
     : isDark
       ? columnActive
       : columnIdle;

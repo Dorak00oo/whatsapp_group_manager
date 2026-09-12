@@ -1,6 +1,7 @@
 import { SignOutButton } from "@/components/sign-out-button";
 import { DashboardProfileTheme } from "@/components/dashboard-profile-theme";
 import { DashboardSidebarNav } from "@/components/dashboard-navigation";
+import { sidebarGroupRule } from "@/components/sidebar-glyph-caption";
 
 type User = {
   email?: string | null;
@@ -19,8 +20,6 @@ const sidebarRailClass =
 const groupClass = "flex w-full flex-col items-center px-1";
 
 const dividerWrap = "mt-4 flex w-full flex-col items-stretch px-1";
-const dividerRule =
-  "mx-2 shrink-0 border-t border-zinc-300/45 dark:border-zinc-700/55";
 
 export function DashboardSidebarColumn({ user: _user, defaultThemeDark }: Props) {
   return (
@@ -30,14 +29,14 @@ export function DashboardSidebarColumn({ user: _user, defaultThemeDark }: Props)
       </div>
 
       <div className={dividerWrap}>
-        <span className={dividerRule} aria-hidden />
+        <span className={sidebarGroupRule} aria-hidden />
         <div className="pt-4">
           <DashboardSidebarNav />
         </div>
       </div>
 
       <div className={dividerWrap}>
-        <span className={dividerRule} aria-hidden />
+        <span className={sidebarGroupRule} aria-hidden />
         <div className="pt-4">
           <SignOutButton iconOnly />
         </div>

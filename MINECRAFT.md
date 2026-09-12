@@ -4,7 +4,7 @@ Dos dedicated Bedrock (`vanilla` y `mods`) hablan con las mismas APIs. El select
 
 ## Copiar el addon
 
-El pack es `x:\minecraft\ScriptUsuarios\PlayerStatusBP`. **La misma copia** vale para los dos BDS.
+El pack es `x:\Code\Mine\minecraft\ScriptUsuarios\PlayerStatusBP`. **La misma copia** vale para los dos BDS.
 
 Al arrancar, el addon guarda un **UUIDv4** en el mundo (`wsp_install_id`). Cada ping lo manda en `X-Minecraft-Install-Id`. En Ajustes asignás ese UUID a Vanilla o Mods. Hasta que no lo asignes, ese dedicated no escribe jugadores ni comandos.
 

@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { scrollOverflowSides } from "@/lib/scroll-overflow-sides";
-import { SidebarGlyphCaption, sidebarTileClass } from "@/components/sidebar-glyph-caption";
+import {
+  SidebarGlyphCaption,
+  sidebarGroupRule,
+  sidebarTileClass,
+  sidebarTileStateClass,
+} from "@/components/sidebar-glyph-caption";
 
 const iconSm = "size-5";
 const iconSidebar = "size-7";
@@ -54,9 +59,6 @@ function IconUserPlus({ className }: { className?: string }) {
     </svg>
   );
 }
-
-/** Teselas del carril: icono, raya, etiqueta corta. */
-const linkBaseSidebar = sidebarTileClass;
 
 function IconParcel({ className }: { className?: string }) {
   return (
@@ -223,47 +225,30 @@ function useNavActive() {
   return { list, add, bulk, minecraft, comandos, parcela, monitoreo, bot, ajustes };
 }
 
-type NavHue =
-  | "sky"
-  | "cyan"
-  | "amber"
-  | "lime"
-  | "teal"
-  | "violet"
-  | "green"
-  | "orange"
-  | "blue";
+type SidebarNavItem = {
+  href: string;
+  on: boolean;
+  title: string;
+  caption: string;
+  icon: ReactNode;
+};
 
-/** Seleccionado = color intenso. Reposo = misma tinta, más gris y menos saturada. */
-function navHueCls(on: boolean, hue: NavHue) {
-  const idle: Record<NavHue, string> = {
-    sky: "bg-sky-200/45 text-sky-800/50 hover:bg-sky-200/70 hover:text-sky-800/75 dark:bg-sky-950/40 dark:text-sky-300/40 dark:hover:bg-sky-950/55 dark:hover:text-sky-300/65",
-    cyan: "bg-cyan-200/45 text-cyan-800/50 hover:bg-cyan-200/70 hover:text-cyan-800/75 dark:bg-cyan-950/40 dark:text-cyan-300/40 dark:hover:bg-cyan-950/55 dark:hover:text-cyan-300/65",
-    amber:
-      "bg-amber-200/45 text-amber-900/50 hover:bg-amber-200/70 hover:text-amber-900/75 dark:bg-amber-950/40 dark:text-amber-300/40 dark:hover:bg-amber-950/55 dark:hover:text-amber-300/65",
-    lime: "bg-lime-200/45 text-lime-800/50 hover:bg-lime-200/70 hover:text-lime-800/75 dark:bg-lime-950/40 dark:text-lime-300/40 dark:hover:bg-lime-950/55 dark:hover:text-lime-300/65",
-    teal: "bg-teal-200/45 text-teal-800/50 hover:bg-teal-200/70 hover:text-teal-800/75 dark:bg-teal-950/40 dark:text-teal-300/40 dark:hover:bg-teal-950/55 dark:hover:text-teal-300/65",
-    violet:
-      "bg-violet-200/45 text-violet-800/50 hover:bg-violet-200/70 hover:text-violet-800/75 dark:bg-violet-950/40 dark:text-violet-300/40 dark:hover:bg-violet-950/55 dark:hover:text-violet-300/65",
-    green:
-      "bg-green-200/45 text-green-800/50 hover:bg-green-200/70 hover:text-green-800/75 dark:bg-green-950/40 dark:text-green-300/40 dark:hover:bg-green-950/55 dark:hover:text-green-300/65",
-    orange:
-      "bg-orange-200/45 text-orange-800/50 hover:bg-orange-200/70 hover:text-orange-800/75 dark:bg-orange-950/40 dark:text-orange-300/40 dark:hover:bg-orange-950/55 dark:hover:text-orange-300/65",
-    blue: "bg-blue-200/45 text-blue-800/50 hover:bg-blue-200/70 hover:text-blue-800/75 dark:bg-blue-950/40 dark:text-blue-300/40 dark:hover:bg-blue-950/55 dark:hover:text-blue-300/65",
-  };
-  const active: Record<NavHue, string> = {
-    sky: "bg-sky-600 text-white dark:bg-sky-400 dark:text-sky-950",
-    cyan: "bg-cyan-600 text-white dark:bg-cyan-400 dark:text-cyan-950",
-    amber: "bg-amber-500 text-amber-950 dark:bg-amber-400 dark:text-amber-950",
-    lime: "bg-lime-600 text-white dark:bg-lime-400 dark:text-lime-950",
-    teal: "bg-teal-600 text-white dark:bg-teal-400 dark:text-teal-950",
-    violet: "bg-violet-600 text-white dark:bg-violet-400 dark:text-violet-950",
-    green: "bg-green-600 text-white dark:bg-green-400 dark:text-green-950",
-    orange: "bg-orange-500 text-white dark:bg-orange-400 dark:text-orange-950",
-    blue: "bg-blue-600 text-white dark:bg-blue-400 dark:text-blue-950",
-  };
-  return on ? active[hue] : idle[hue];
+function SidebarNavTile({ href, on, title, caption, icon }: SidebarNavItem) {
+  return (
+    <Link
+      href={href}
+      className={`${sidebarTileClass} ${sidebarTileStateClass(on)}`}
+      title={title}
+      aria-label={title}
+      aria-current={on ? "page" : undefined}
+    >
+      <SidebarGlyphCaption icon={icon} caption={caption} />
+    </Link>
+  );
 }
+
+const navGroupClass = "grid w-full grid-cols-2 gap-x-1 gap-y-2";
+const navGroupDivider = `${sidebarGroupRule} my-3`;
 
 function activeTabCls(on: boolean) {
   return on
@@ -271,115 +256,84 @@ function activeTabCls(on: boolean) {
     : "text-zinc-500 dark:text-zinc-400";
 }
 
-/** Barra lateral: iconos pequeños (md+). */
+/** Barra lateral: grupos por función, color solo en la tesela activa. */
 export function DashboardSidebarNav() {
   const { list, add, bulk, minecraft, comandos, parcela, monitoreo, bot, ajustes } =
     useNavActive();
 
   return (
-    <nav
-      className="grid w-full grid-cols-2 gap-x-1 gap-y-2"
-      aria-label="Secciones del panel"
-    >
-      <Link
-        href="/dashboard"
-        className={`${linkBaseSidebar} ${navHueCls(list, "sky")}`}
-        title="Lista de personas"
-        aria-label="Lista de personas"
-        aria-current={list ? "page" : undefined}
-      >
-        <SidebarGlyphCaption icon={<IconList className={iconSidebar} />} caption="Lista" />
-      </Link>
-      <Link
-        href="/dashboard/agregar"
-        className={`${linkBaseSidebar} ${navHueCls(add, "cyan")}`}
-        title="Agregar persona"
-        aria-label="Agregar persona"
-        aria-current={add ? "page" : undefined}
-      >
-        <SidebarGlyphCaption
-          icon={<IconUserPlus className={iconSidebar} />}
+    <nav className="flex w-full flex-col" aria-label="Secciones del panel">
+      <div className={navGroupClass} role="group" aria-label="Vista">
+        <SidebarNavTile
+          href="/dashboard"
+          on={list}
+          title="Lista de personas"
+          caption="Lista"
+          icon={<IconList className={iconSidebar} />}
+        />
+        <SidebarNavTile
+          href="/dashboard/agregar"
+          on={add}
+          title="Agregar persona"
           caption="Agregar"
+          icon={<IconUserPlus className={iconSidebar} />}
         />
-      </Link>
-      <Link
-        href="/dashboard/administracion"
-        className={`${linkBaseSidebar} ${navHueCls(bulk, "amber")}`}
-        title="Administración de jugadores"
-        aria-label="Administración de jugadores"
-        aria-current={bulk ? "page" : undefined}
-      >
-        <SidebarGlyphCaption icon={<IconAdmin className={iconSidebar} />} caption="Admin" />
-      </Link>
-      <Link
-        href="/dashboard/minecraft"
-        className={`${linkBaseSidebar} ${navHueCls(minecraft, "lime")}`}
-        title="Jugadores de Minecraft"
-        aria-label="Jugadores de Minecraft"
-        aria-current={minecraft ? "page" : undefined}
-      >
-        <SidebarGlyphCaption
-          icon={<IconMinecraft className={iconSidebar} />}
+      </div>
+      <span className={navGroupDivider} aria-hidden />
+      <div className={navGroupClass} role="group" aria-label="Administración">
+        <SidebarNavTile
+          href="/dashboard/administracion"
+          on={bulk}
+          title="Administración de jugadores"
+          caption="Admin"
+          icon={<IconAdmin className={iconSidebar} />}
+        />
+        <SidebarNavTile
+          href="/dashboard/minecraft"
+          on={minecraft}
+          title="Jugadores de Minecraft"
           caption="MC"
+          icon={<IconMinecraft className={iconSidebar} />}
         />
-      </Link>
-      <Link
-        href="/dashboard/parcela"
-        className={`${linkBaseSidebar} ${navHueCls(parcela, "teal")}`}
-        title="Parcela"
-        aria-label="Parcela"
-        aria-current={parcela ? "page" : undefined}
-      >
-        <SidebarGlyphCaption
-          icon={<IconParcel className={iconSidebar} />}
+        <SidebarNavTile
+          href="/dashboard/parcela"
+          on={parcela}
+          title="Parcela"
           caption="Parcela"
+          icon={<IconParcel className={iconSidebar} />}
         />
-      </Link>
-      <Link
-        href="/dashboard/monitoreo"
-        className={`${linkBaseSidebar} ${navHueCls(monitoreo, "violet")}`}
-        title="Monitoreo"
-        aria-label="Monitoreo"
-        aria-current={monitoreo ? "page" : undefined}
-      >
-        <SidebarGlyphCaption
-          icon={<IconMonitor className={iconSidebar} />}
+        <SidebarNavTile
+          href="/dashboard/monitoreo"
+          on={monitoreo}
+          title="Monitoreo"
           caption="Monitor"
+          icon={<IconMonitor className={iconSidebar} />}
         />
-      </Link>
-      <Link
-        href="/dashboard/bot"
-        className={`${linkBaseSidebar} ${navHueCls(bot, "green")}`}
-        title="Bot de WhatsApp"
-        aria-label="Bot de WhatsApp"
-        aria-current={bot ? "page" : undefined}
-      >
-        <SidebarGlyphCaption icon={<IconBot className={iconSidebar} />} caption="Bot" />
-      </Link>
-      <Link
-        href="/dashboard/comandos"
-        className={`${linkBaseSidebar} ${navHueCls(comandos, "orange")}`}
-        title="Comandos rápidos"
-        aria-label="Comandos rápidos"
-        aria-current={comandos ? "page" : undefined}
-      >
-        <SidebarGlyphCaption
-          icon={<IconCommands className={iconSidebar} />}
+      </div>
+      <span className={navGroupDivider} aria-hidden />
+      <div className={navGroupClass} role="group" aria-label="Sistema">
+        <SidebarNavTile
+          href="/dashboard/bot"
+          on={bot}
+          title="Bot de WhatsApp"
+          caption="Bot"
+          icon={<IconBot className={iconSidebar} />}
+        />
+        <SidebarNavTile
+          href="/dashboard/comandos"
+          on={comandos}
+          title="Comandos rápidos"
           caption="Cmd"
+          icon={<IconCommands className={iconSidebar} />}
         />
-      </Link>
-      <Link
-        href="/dashboard/ajustes"
-        className={`${linkBaseSidebar} ${navHueCls(ajustes, "blue")}`}
-        title="Ajustes de Minecraft"
-        aria-label="Ajustes de Minecraft"
-        aria-current={ajustes ? "page" : undefined}
-      >
-        <SidebarGlyphCaption
-          icon={<IconSettings className={iconSidebar} />}
+        <SidebarNavTile
+          href="/dashboard/ajustes"
+          on={ajustes}
+          title="Ajustes de Minecraft"
           caption="Ajustes"
+          icon={<IconSettings className={iconSidebar} />}
         />
-      </Link>
+      </div>
     </nav>
   );
 }
@@ -532,6 +486,10 @@ export function DashboardMobileTabNav() {
           <IconUserPlus className="size-[1.125rem] shrink-0" />
           <span className="text-[10px] font-medium leading-none">Agregar</span>
         </Link>
+        <span
+          className="mx-0.5 my-2 w-px shrink-0 self-stretch bg-zinc-300/55 dark:bg-zinc-700/60"
+          aria-hidden
+        />
         <Link
           href="/dashboard/administracion"
           className={`${tabBase} ${activeTabCls(bulk)}`}
@@ -564,6 +522,10 @@ export function DashboardMobileTabNav() {
           <IconMonitor className="size-[1.125rem] shrink-0" />
           <span className="text-[10px] font-medium leading-none">Monitor</span>
         </Link>
+        <span
+          className="mx-0.5 my-2 w-px shrink-0 self-stretch bg-zinc-300/55 dark:bg-zinc-700/60"
+          aria-hidden
+        />
         <Link
           href="/dashboard/bot"
           className={`${tabBase} ${activeTabCls(bot)}`}
