@@ -58,6 +58,30 @@ export function placeholderGamertag(digits: string, name?: string): string {
   return `wa-${digits}`;
 }
 
+/** Gamertag del comando `.addwsp`; si no viene, el placeholder del join automático. */
+export function gamertagForJoin(
+  digits: string,
+  name?: string,
+  gamertag?: string,
+): string {
+  const explicit = (gamertag ?? "").trim().slice(0, 64);
+  if (explicit) return explicit;
+  return placeholderGamertag(digits, name);
+}
+
+/**
+ * En un reingreso, rellena displayName solo si estaba vacío.
+ * `undefined` = no tocar el campo.
+ */
+export function displayNameForRestore(
+  existing: string | null | undefined,
+  incoming?: string | null,
+): string | undefined {
+  if ((existing ?? "").trim()) return undefined;
+  const next = (incoming ?? "").trim();
+  return next || undefined;
+}
+
 export function findMemberByPhone<T extends { phone: string }>(
   members: T[],
   incomingPhone: string,

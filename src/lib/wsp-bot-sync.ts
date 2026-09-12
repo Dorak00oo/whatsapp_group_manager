@@ -6,9 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { withDbRetry } from "@/lib/prisma-retry";
 import { normalizeWhatsAppPhoneInput } from "@/lib/whatsapp-phone-normalize";
 import {
+  displayNameForRestore,
   findMemberByPhone,
+  gamertagForJoin,
   phonesLikelySame,
-  placeholderGamertag,
   planWhatsAppRosterChange,
   type RosterEvent,
 } from "@/lib/wsp-bot-directory";
@@ -16,12 +17,14 @@ import {
 export type WspBotParticipant = {
   jid: string;
   name?: string;
+  gamertag?: string;
 };
 
 type DirectoryRow = {
   id: string;
   phone: string;
   gamertag: string;
+  displayName: string | null;
   leftAt: Date | null;
   allowlistSyncedAt: Date | null;
   allowlistRemovedAt: Date | null;
@@ -52,6 +55,7 @@ async function loadMembers(userId: string): Promise<DirectoryRow[]> {
         id: true,
         phone: true,
         gamertag: true,
+        displayName: true,
         leftAt: true,
         allowlistSyncedAt: true,
         allowlistRemovedAt: true,
@@ -68,7 +72,7 @@ function parseParticipant(p: WspBotParticipant) {
     phone: parsed.phone,
     phoneCountry: parsed.phoneCountry,
     digits,
-    gamertag: placeholderGamertag(digits, p.name),
+    gamertag: gamertagForJoin(digits, p.name, p.gamertag),
     displayName: (p.name ?? "").trim() || null,
   };
 }
@@ -103,6 +107,10 @@ async function applyJoin(
     return "created";
   }
 
+  const displayName = displayNameForRestore(
+    existing?.displayName,
+    parsed.displayName,
+  );
   await prisma.directoryMember.updateMany({
     where: { id: plan.memberId, userId },
     data: {
@@ -111,6 +119,7 @@ async function applyJoin(
       absentWithCause: false,
       absentReason: null,
       activeHoldFromMc: true,
+      ...(displayName !== undefined ? { displayName } : {}),
     },
   });
   if (existing) {

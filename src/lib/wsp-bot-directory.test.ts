@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  displayNameForRestore,
   findMemberByPhone,
+  gamertagForJoin,
   phonesLikelySame,
   placeholderGamertag,
   planWhatsAppRosterChange,
@@ -55,4 +57,20 @@ test("gamertag placeholder no usa un nombre que es solo el número", () => {
   assert.equal(placeholderGamertag("573001112233", ""), "wa-573001112233");
   assert.equal(placeholderGamertag("573001112233", "573001112233"), "wa-573001112233");
   assert.equal(placeholderGamertag("573001112233", "Drako"), "Drako");
+});
+
+test("join usa gamertag explícito si viene; si no, el placeholder", () => {
+  assert.equal(
+    gamertagForJoin("573001112233", "Carlos", "Steve123"),
+    "Steve123",
+  );
+  assert.equal(gamertagForJoin("573001112233", "Carlos"), "Carlos");
+  assert.equal(gamertagForJoin("573001112233", ""), "wa-573001112233");
+});
+
+test("restore rellena displayName vacío y no pisa uno existente", () => {
+  assert.equal(displayNameForRestore(null, "Carlos"), "Carlos");
+  assert.equal(displayNameForRestore("", "Carlos"), "Carlos");
+  assert.equal(displayNameForRestore("Ana", "Carlos"), undefined);
+  assert.equal(displayNameForRestore(null, ""), undefined);
 });

@@ -13,14 +13,18 @@ function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
-function asParticipant(value: unknown): { jid: string; name?: string } | null {
+function asParticipant(
+  value: unknown,
+): { jid: string; name?: string; gamertag?: string } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const jid = (value as { jid?: unknown }).jid;
   if (typeof jid !== "string" || !jid.trim()) return null;
   const name = (value as { name?: unknown }).name;
+  const gamertag = (value as { gamertag?: unknown }).gamertag;
   return {
     jid: jid.trim(),
     name: typeof name === "string" ? name : undefined,
+    gamertag: typeof gamertag === "string" ? gamertag : undefined,
   };
 }
 
