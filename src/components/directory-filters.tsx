@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DIRECTORY_NEW_MEMBER_DAYS } from "@/lib/directory-cohort";
 import {
@@ -9,6 +9,8 @@ import {
   type DirectoryCohort,
   type DirectoryUrlFilters,
 } from "@/lib/directory-query";
+import { shouldMirrorExternalSearch } from "@/lib/search-debounce";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { softInputNeutral, softPanel } from "@/lib/soft-ui";
 import {
   SoftListbox,
@@ -43,11 +45,9 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
   const bannedLabelId = useId();
 
   const [qDraft, setQDraft] = useState(filters.q);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- espejo de searchParams
-    setQDraft(filters.q);
-  }, [filters.q]);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const lastSentQ = useRef(filters.q);
+  const debouncedQ = useDebouncedValue(qDraft);
 
   const navigate = useCallback(
     (patch: Partial<DirectoryUrlFilters>) => {
@@ -63,11 +63,31 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
     },
     [pathname, router, searchParams],
   );
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
 
-  const onSearchChange = (v: string) => {
-    setQDraft(v);
-    navigate({ q: v.trim() });
-  };
+  useEffect(() => {
+    if (
+      !shouldMirrorExternalSearch({
+        draft: qDraft,
+        lastSent: lastSentQ.current,
+        incoming: filters.q,
+        focused: searchFocused,
+      })
+    ) {
+      return;
+    }
+    lastSentQ.current = filters.q;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- espejo de searchParams cuando el campo está idle
+    setQDraft(filters.q);
+  }, [filters.q, qDraft, searchFocused]);
+
+  useEffect(() => {
+    const next = debouncedQ.trim();
+    if (next === lastSentQ.current) return;
+    lastSentQ.current = next;
+    navigateRef.current({ q: next });
+  }, [debouncedQ]);
 
   const w = "w-full min-w-0";
 
@@ -240,7 +260,9 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
               id={searchLabelId}
               type="search"
               value={qDraft}
-              onChange={(e) => onSearchChange(e.target.value)}
+              onChange={(e) => setQDraft(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
               placeholder="Texto libre…"
               className={`${softInputNeutral} ${w}`}
             />
@@ -262,8 +284,8 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
         </div>
       </div>
       <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-        Los cambios y la búsqueda se aplican al instante (cada tecla actualiza
-        la URL y la lista).
+        Los filtros se aplican al instante. La búsqueda espera ~0,3 s sin teclas
+        para no perder letras si escribes rápido.
       </p>
     </div>
   );

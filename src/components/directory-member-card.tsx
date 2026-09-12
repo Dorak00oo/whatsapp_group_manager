@@ -202,7 +202,7 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
 
             <DirectoryMemberRoleChips m={m} compact />
 
-            {m.banned && m.bannedReason ? (
+            {m.banned && m.bannedReason && !m.banExempt ? (
               <p className="mt-2 line-clamp-2 text-xs font-medium text-red-800 dark:text-red-300">
                 <span className="font-medium">Ban:</span> {m.bannedReason}
               </p>

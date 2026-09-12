@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import {
   addDirectoryStrike,
   removeDirectoryStrike,
@@ -142,20 +143,21 @@ export function PlayerAdminStrikePanel({ members }: Props) {
 
   const [selectedId, setSelectedId] = useState(roster[0]?.id ?? "");
   const [filter, setFilter] = useState("");
+  const debouncedFilter = useDebouncedValue(filter);
   const [kind, setKind] = useState<StrikeKind>(STRIKE_KIND_PENDING);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase();
+    const q = debouncedFilter.trim().toLowerCase();
     if (!q) return roster;
     return roster.filter(
       (m) =>
         m.gamertag.toLowerCase().includes(q) ||
         (m.displayName?.toLowerCase().includes(q) ?? false),
     );
-  }, [roster, filter]);
+  }, [roster, debouncedFilter]);
 
   useEffect(() => {
     if (roster.length === 0) {

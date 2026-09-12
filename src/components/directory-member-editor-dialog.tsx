@@ -169,7 +169,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
             </p>
           ) : null}
 
-          {m.banned && m.bannedReason ? (
+          {m.banned && m.bannedReason && !m.banExempt ? (
             <p className="mt-4 text-sm text-red-700 dark:text-red-300">
               <span className="font-medium">Motivo del ban:</span> {m.bannedReason}
             </p>
@@ -289,48 +289,50 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
             </button>
           </form>
 
-          <div className="mt-10 border-t border-zinc-200 pt-8 dark:border-zinc-800">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              Ban
-            </p>
-            {m.banExempt ? null : m.banned ? (
-              <form action={setDirectoryMemberBan}>
-                <input type="hidden" name="memberId" value={m.id} />
-                <input type="hidden" name="banAction" value="unban" />
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="text-sm font-medium text-emerald-600 hover:underline disabled:opacity-50 dark:text-emerald-400"
+          {m.banExempt ? null : (
+            <div className="mt-10 border-t border-zinc-200 pt-8 dark:border-zinc-800">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Ban
+              </p>
+              {m.banned ? (
+                <form action={setDirectoryMemberBan}>
+                  <input type="hidden" name="memberId" value={m.id} />
+                  <input type="hidden" name="banAction" value="unban" />
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="text-sm font-medium text-emerald-600 hover:underline disabled:opacity-50 dark:text-emerald-400"
+                  >
+                    Desbanear
+                  </button>
+                </form>
+              ) : (
+                <form
+                  action={setDirectoryMemberBan}
+                  className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end"
                 >
-                  Desbanear
-                </button>
-              </form>
-            ) : (
-              <form
-                action={setDirectoryMemberBan}
-                className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end"
-              >
-                <input type="hidden" name="memberId" value={m.id} />
-                <input type="hidden" name="banAction" value="ban" />
-                <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                  Motivo del ban
-                  <input
-                    name="bannedReason"
-                    required
-                    placeholder="Obligatorio para banear"
-                    className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm dark:border-red-900 dark:bg-zinc-900 dark:text-zinc-100"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="rounded-lg border border-red-400/80 bg-red-50 px-4 py-2 text-sm font-medium text-red-900 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
-                >
-                  Banear
-                </button>
-              </form>
-            )}
-          </div>
+                  <input type="hidden" name="memberId" value={m.id} />
+                  <input type="hidden" name="banAction" value="ban" />
+                  <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                    Motivo del ban
+                    <input
+                      name="bannedReason"
+                      required
+                      placeholder="Obligatorio para banear"
+                      className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm dark:border-red-900 dark:bg-zinc-900 dark:text-zinc-100"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="rounded-lg border border-red-400/80 bg-red-50 px-4 py-2 text-sm font-medium text-red-900 hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
+                  >
+                    Banear
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
 
           <div className="mt-10 border-t border-zinc-200 pt-8 dark:border-zinc-800">
             <p className="mb-4 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">

@@ -80,7 +80,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       className: `${base} bg-lime-200 text-lime-950 ring-lime-300/80 dark:bg-lime-900/45 dark:text-lime-100 dark:ring-lime-700/50`,
     });
   }
-  if (m.banned) {
+  if (m.banned && !m.banExempt) {
     chips.push({
       key: "banned",
       label: "Baneado",

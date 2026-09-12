@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useRouter } from "next/navigation";
 import {
   MobileListItem,
@@ -157,6 +158,7 @@ export function MinecraftPlayersSection({
   const [filter, setFilter] = useState<FilterType>("all");
   const [pageTab, setPageTab] = useState<PageTab>("players");
   const [search, setSearch] = useState("");
+  const searchNeedle = useDebouncedValue(search).trim().toLowerCase();
   const [loading, setLoading] = useState<string | null>(null);
 
   const handlePlayerAction = async (
@@ -222,7 +224,6 @@ export function MinecraftPlayersSection({
       "Sincronizar listas solicitado. El addon lo aplicará en la próxima revisión (~30 s).",
     );
 
-  const searchNeedle = search.trim().toLowerCase();
   const filtered = players
     .filter((p) => {
       const matchesSearch = p.gamertag.toLowerCase().includes(searchNeedle);
