@@ -28,7 +28,7 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
         </h2>
       </div>
       <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
-        Nick de Minecraft + celular
+        Nick de Minecraft + celular o usuario de WhatsApp
       </p>
       <label className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
         Nick de Minecraft{" "}
@@ -56,8 +56,27 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
           className={softInputNeutral}
         />
       </label>
+      <label className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+        Usuario de WhatsApp{" "}
+        <span className="font-normal text-zinc-500 dark:text-zinc-400">
+          (@usuario, no es el nombre de perfil)
+        </span>
+        <input
+          name="whatsappUsername"
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="Ej. Drak00_oo"
+          className={softInputNeutral}
+        />
+      </label>
       <div className="flex flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-        <span>Celular</span>
+        <span>
+          Celular{" "}
+          <span className="font-normal text-zinc-500 dark:text-zinc-400">
+            (o el usuario de arriba)
+          </span>
+        </span>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
           <label className="sr-only" htmlFor="directory-phone-country">
             País y prefijo
@@ -65,7 +84,6 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
           <select
             id="directory-phone-country"
             name="phoneCountry"
-            required
             defaultValue="MX"
             className={`${softSelectNeutral} shrink-0 sm:max-w-[min(100%,14rem)]`}
           >
@@ -79,15 +97,14 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
             name="phoneNational"
             type="tel"
             inputMode="tel"
-            required
             autoComplete="tel-national"
             placeholder="Ej. 55 1234 5678 o 55-1234-5678"
             className={`${softInputNeutral} min-w-0 flex-1`}
           />
         </div>
         <p className="font-normal text-zinc-500 dark:text-zinc-400">
-          El prefijo internacional va en el desplegable; aquí el número nacional.
-          Puedes usar espacios, guiones o puntos.
+          Hace falta el celular o el @usuario (el usuario de WhatsApp es único y
+          no se puede cambiar; no uses el nombre que aparece en el chat).
         </p>
       </div>
       <DirectoryFormSituation />

@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  formatWhatsAppUsername,
+  normalizeWhatsAppUsername,
+} from "./whatsapp-username.ts";
+import {
   displayNameForRestore,
   findMemberByPhone,
+  findMemberByUsername,
+  findMemberByWhatsAppIdentity,
   gamertagForJoin,
   phonesLikelySame,
   placeholderGamertag,
@@ -53,6 +59,13 @@ test("busca miembro por dígitos aunque el formato del panel tenga espacios", ()
   assert.equal(hit?.id, "1");
 });
 
+test("no empareja teléfonos vacíos", () => {
+  assert.equal(
+    findMemberByPhone([{ id: "1", phone: null }], "573001112233"),
+    undefined,
+  );
+});
+
 test("gamertag placeholder no usa un nombre que es solo el número", () => {
   assert.equal(placeholderGamertag("573001112233", ""), "wa-573001112233");
   assert.equal(placeholderGamertag("573001112233", "573001112233"), "wa-573001112233");
@@ -73,4 +86,38 @@ test("restore rellena displayName vacío y no pisa uno existente", () => {
   assert.equal(displayNameForRestore("", "Carlos"), "Carlos");
   assert.equal(displayNameForRestore("Ana", "Carlos"), undefined);
   assert.equal(displayNameForRestore(null, ""), undefined);
+});
+
+test("usuario de WhatsApp normaliza @ y mayúsculas; no es el nombre de perfil", () => {
+  assert.deepEqual(normalizeWhatsAppUsername("@Drak00_oo"), {
+    ok: true,
+    username: "drak00_oo",
+  });
+  assert.equal(formatWhatsAppUsername("drak00_oo"), "@drak00_oo");
+  const empty = normalizeWhatsAppUsername("");
+  assert.equal(empty.ok, false);
+  if (!empty.ok) assert.equal(empty.empty, true);
+  assert.equal(normalizeWhatsAppUsername("Ana Perez").ok, false);
+});
+
+test("busca por usuario aunque no haya teléfono", () => {
+  const members = [
+    { id: "1", phone: null, whatsappUsername: "drak00_oo" },
+    { id: "2", phone: "+57 300 111 2233", whatsappUsername: null },
+  ];
+  assert.equal(findMemberByUsername(members, "@Drak00_oo")?.id, "1");
+  assert.equal(
+    findMemberByWhatsAppIdentity(members, {
+      phone: null,
+      username: "drak00_oo",
+    })?.id,
+    "1",
+  );
+  assert.equal(
+    findMemberByWhatsAppIdentity(members, {
+      phone: "573001112233",
+      username: null,
+    })?.id,
+    "2",
+  );
 });

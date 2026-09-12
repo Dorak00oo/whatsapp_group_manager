@@ -1,6 +1,10 @@
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftRemoteCommandsPanel } from "@/components/minecraft-remote-commands-panel";
+import {
+  TP_PROTECTED_DESTINATION_GAMERTAG,
+  mergePrivilegedTpOrigin,
+} from "@/lib/minecraft-remote-commands";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +22,16 @@ export default async function DashboardComandosPage() {
       orderBy: { gamertag: "asc" },
       select: { id: true, gamertag: true, displayName: true },
     });
-    admins = adminRows;
+    const privileged = await prisma.directoryMember.findFirst({
+      where: {
+        gamertag: {
+          equals: TP_PROTECTED_DESTINATION_GAMERTAG,
+          mode: "insensitive",
+        },
+      },
+      select: { id: true, gamertag: true, displayName: true },
+    });
+    admins = mergePrivilegedTpOrigin(adminRows, privileged);
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
       return <DatabaseUnavailable />;

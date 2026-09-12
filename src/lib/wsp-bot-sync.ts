@@ -5,24 +5,26 @@ import {
 import { prisma } from "@/lib/prisma";
 import { withDbRetry } from "@/lib/prisma-retry";
 import { normalizeWhatsAppPhoneInput } from "@/lib/whatsapp-phone-normalize";
+import { normalizeWhatsAppUsername } from "@/lib/whatsapp-username";
 import {
   displayNameForRestore,
-  findMemberByPhone,
+  findMemberByWhatsAppIdentity,
   gamertagForJoin,
-  phonesLikelySame,
   planWhatsAppRosterChange,
   type RosterEvent,
 } from "@/lib/wsp-bot-directory";
 
 export type WspBotParticipant = {
-  jid: string;
+  jid?: string;
+  username?: string;
   name?: string;
   gamertag?: string;
 };
 
 type DirectoryRow = {
   id: string;
-  phone: string;
+  phone: string | null;
+  whatsappUsername: string | null;
   gamertag: string;
   displayName: string | null;
   leftAt: Date | null;
@@ -54,6 +56,7 @@ async function loadMembers(userId: string): Promise<DirectoryRow[]> {
       select: {
         id: true,
         phone: true,
+        whatsappUsername: true,
         gamertag: true,
         displayName: true,
         leftAt: true,
@@ -65,16 +68,47 @@ async function loadMembers(userId: string): Promise<DirectoryRow[]> {
 }
 
 function parseParticipant(p: WspBotParticipant) {
-  const parsed = normalizeWhatsAppPhoneInput(p.jid);
-  if (!parsed.ok) return null;
-  const digits = parsed.phone.replace(/\D/g, "");
+  const usernameN = normalizeWhatsAppUsername(p.username ?? "");
+  const username = usernameN.ok ? usernameN.username : null;
+  const jid = (p.jid ?? "").trim();
+  const phoneParsed = jid ? normalizeWhatsAppPhoneInput(jid) : null;
+  const phone = phoneParsed?.ok ? phoneParsed.phone : null;
+  const phoneCountry = phoneParsed?.ok ? phoneParsed.phoneCountry : null;
+  if (!phone && !username) return null;
+  const digits = phone ? phone.replace(/\D/g, "") : username ?? "user";
   return {
-    phone: parsed.phone,
-    phoneCountry: parsed.phoneCountry,
+    phone,
+    phoneCountry,
+    username,
     digits,
     gamertag: gamertagForJoin(digits, p.name, p.gamertag),
     displayName: (p.name ?? "").trim() || null,
   };
+}
+
+function identityFill(
+  existing: DirectoryRow,
+  parsed: NonNullable<ReturnType<typeof parseParticipant>>,
+) {
+  const data: {
+    phone?: string | null;
+    phoneCountry?: string | null;
+    whatsappUsername?: string | null;
+    displayName?: string | null;
+  } = {};
+  if (!existing.phone && parsed.phone) {
+    data.phone = parsed.phone;
+    data.phoneCountry = parsed.phoneCountry;
+  }
+  if (!existing.whatsappUsername && parsed.username) {
+    data.whatsappUsername = parsed.username;
+  }
+  const displayName = displayNameForRestore(
+    existing.displayName,
+    parsed.displayName,
+  );
+  if (displayName !== undefined) data.displayName = displayName;
+  return data;
 }
 
 async function applyJoin(
@@ -82,7 +116,10 @@ async function applyJoin(
   members: DirectoryRow[],
   parsed: NonNullable<ReturnType<typeof parseParticipant>>,
 ): Promise<"created" | "restored" | "skipped"> {
-  const existing = findMemberByPhone(members, parsed.phone);
+  const existing = findMemberByWhatsAppIdentity(members, {
+    phone: parsed.phone,
+    username: parsed.username,
+  });
   const plan = planWhatsAppRosterChange(
     existing
       ? { id: existing.id, leftAt: existing.leftAt }
@@ -99,6 +136,7 @@ async function applyJoin(
         displayName: parsed.displayName,
         phone: parsed.phone,
         phoneCountry: parsed.phoneCountry,
+        whatsappUsername: parsed.username,
         active: true,
         leftAt: null,
         userId,
@@ -107,10 +145,7 @@ async function applyJoin(
     return "created";
   }
 
-  const displayName = displayNameForRestore(
-    existing?.displayName,
-    parsed.displayName,
-  );
+  const fill = existing ? identityFill(existing, parsed) : {};
   await prisma.directoryMember.updateMany({
     where: { id: plan.memberId, userId },
     data: {
@@ -119,7 +154,7 @@ async function applyJoin(
       absentWithCause: false,
       absentReason: null,
       activeHoldFromMc: true,
-      ...(displayName !== undefined ? { displayName } : {}),
+      ...fill,
     },
   });
   if (existing) {
@@ -133,7 +168,10 @@ async function applyLeave(
   members: DirectoryRow[],
   parsed: NonNullable<ReturnType<typeof parseParticipant>>,
 ): Promise<"left" | "skipped"> {
-  const existing = findMemberByPhone(members, parsed.phone);
+  const existing = findMemberByWhatsAppIdentity(members, {
+    phone: parsed.phone,
+    username: parsed.username,
+  });
   const plan = planWhatsAppRosterChange(
     existing
       ? { id: existing.id, leftAt: existing.leftAt }
@@ -166,7 +204,7 @@ export async function applyWspBotEvent(input: {
   }
   const parsed = parseParticipant(input.participant);
   if (!parsed) {
-    return { error: "JID o teléfono inválido", status: 400 };
+    return { error: "Falta teléfono o usuario de WhatsApp", status: 400 };
   }
   const members = await loadMembers(userId);
   const result =
@@ -218,13 +256,20 @@ export async function applyWspBotSync(input: {
       if (row.leftAt != null) continue;
       const stillHere = input.participants.some((p) => {
         const parsed = parseParticipant(p);
-        return parsed ? phonesLikelySame(row.phone, parsed.phone) : false;
+        if (!parsed) return false;
+        return Boolean(
+          findMemberByWhatsAppIdentity([row], {
+            phone: parsed.phone,
+            username: parsed.username,
+          }),
+        );
       });
       if (stillHere) continue;
       const result = await applyLeave(userId, [row], {
         phone: row.phone,
         phoneCountry: null,
-        digits: row.phone.replace(/\D/g, ""),
+        username: row.whatsappUsername,
+        digits: (row.phone ?? "").replace(/\D/g, "") || row.whatsappUsername || "user",
         gamertag: row.gamertag,
         displayName: null,
       });

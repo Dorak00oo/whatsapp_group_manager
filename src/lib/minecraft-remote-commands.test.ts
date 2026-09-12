@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   isRemoteCmdAction,
+  isTpPrivilegedOrigin,
+  isTpProtectedDestination,
   parseTpCoords,
   remoteCmdNeedsDestination,
   remoteCmdNeedsTarget,
+  tpDestinationBlockedReason,
+  tpDestinationOptions,
+  mergePrivilegedTpOrigin,
 } from "./minecraft-remote-commands.ts";
 
 test("coordenada vacía se convierte en ~", () => {
@@ -47,4 +52,38 @@ test("sync_config aplica la lista baneada sin jugador destino", () => {
   assert.equal(isRemoteCmdAction("sync_config"), true);
   assert.equal(remoteCmdNeedsTarget("sync_config"), false);
   assert.equal(remoteCmdNeedsDestination("sync_config"), false);
+});
+
+test("nadie puede TP hacia drako274; él sí puede TP hacia otros", () => {
+  assert.equal(isTpProtectedDestination("drako274"), true);
+  assert.equal(isTpProtectedDestination("Drako274"), true);
+  assert.equal(isTpProtectedDestination("otro"), false);
+  assert.equal(isTpPrivilegedOrigin("Drako274"), true);
+  assert.equal(isTpPrivilegedOrigin("Steve"), false);
+  assert.equal(
+    tpDestinationBlockedReason("drako274"),
+    "No se puede teletransportar a drako274",
+  );
+  assert.equal(tpDestinationBlockedReason("Steve"), null);
+  assert.deepEqual(
+    tpDestinationOptions(["Moderador", "drako274", "Steve"], "Moderador"),
+    ["Steve"],
+  );
+  assert.deepEqual(
+    tpDestinationOptions(["drako274", "Steve", "Alex"], "drako274"),
+    ["Steve", "Alex"],
+  );
+});
+
+test("drako274 queda como origen de TP aunque no esté en la lista de admins", () => {
+  const merged = mergePrivilegedTpOrigin(
+    [{ id: "1", gamertag: "Moderador", displayName: "Mod" }],
+    null,
+  );
+  assert.equal(merged.some((a) => isTpPrivilegedOrigin(a.gamertag)), true);
+  const already = mergePrivilegedTpOrigin(
+    [{ id: "1", gamertag: "Drako274", displayName: null }],
+    null,
+  );
+  assert.equal(already.length, 1);
 });

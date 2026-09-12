@@ -14,6 +14,7 @@ import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chi
 import { DirectoryMemberSituationPicker } from "@/components/directory-member-situation-picker";
 import { getCallingCodeOptions } from "@/lib/phone-calling-codes";
 import { splitPhoneForDirectoryForm } from "@/lib/phone-normalize";
+import { formatWhatsAppUsername } from "@/lib/whatsapp-username";
 import { softBtnMint, softInputNeutral, softSelectNeutral } from "@/lib/soft-ui";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
@@ -120,12 +121,22 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
             ) : null}
             <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
               {country ? `${country} · ` : null}
-              <a
-                href={`tel:${m.phone.replace(/\s/g, "")}`}
-                className="font-medium text-zinc-800 hover:underline dark:text-zinc-200"
-              >
-                {m.phone}
-              </a>
+              {m.phone ? (
+                <a
+                  href={`tel:${m.phone.replace(/\s/g, "")}`}
+                  className="font-medium text-zinc-800 hover:underline dark:text-zinc-200"
+                >
+                  {m.phone}
+                </a>
+              ) : null}
+              {m.whatsappUsername ? (
+                <>
+                  {m.phone ? <span className="text-zinc-400"> · </span> : null}
+                  <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                    {formatWhatsAppUsername(m.whatsappUsername)}
+                  </span>
+                </>
+              ) : null}
               <span className="text-zinc-400"> · </span>
               <time dateTime={m.createdAt} suppressHydrationWarning>
                 Alta {new Date(m.createdAt).toLocaleString("es")}
@@ -205,8 +216,28 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                 />
               </label>
             </div>
+            <label className="flex min-w-0 flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Usuario de WhatsApp{" "}
+              <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                (@usuario, no el nombre de perfil)
+              </span>
+              <input
+                name="whatsappUsername"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                defaultValue={m.whatsappUsername ?? ""}
+                placeholder="Ej. Drak00_oo"
+                className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+            </label>
             <div className="flex flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              <span>Celular</span>
+              <span>
+                Celular{" "}
+                <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                  (o el usuario de arriba)
+                </span>
+              </span>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                 <label className="sr-only" htmlFor={`edit-phone-country-${m.id}`}>
                   País y prefijo
@@ -214,7 +245,6 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                 <select
                   id={`edit-phone-country-${m.id}`}
                   name="phoneCountry"
-                  required
                   defaultValue={phoneDefaults.iso}
                   className={`${softSelectNeutral} shrink-0 sm:max-w-[min(100%,14rem)]`}
                 >
@@ -228,7 +258,6 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                   name="phoneNational"
                   type="tel"
                   inputMode="tel"
-                  required
                   autoComplete="tel-national"
                   defaultValue={phoneDefaults.national}
                   placeholder="Ej. 55 1234 5678"

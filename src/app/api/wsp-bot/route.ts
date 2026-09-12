@@ -15,14 +15,18 @@ function badRequest(message: string) {
 
 function asParticipant(
   value: unknown,
-): { jid: string; name?: string; gamertag?: string } | null {
+): { jid?: string; username?: string; name?: string; gamertag?: string } | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const jid = (value as { jid?: unknown }).jid;
-  if (typeof jid !== "string" || !jid.trim()) return null;
+  const jidRaw = (value as { jid?: unknown }).jid;
+  const usernameRaw = (value as { username?: unknown }).username;
+  const jid = typeof jidRaw === "string" ? jidRaw.trim() : "";
+  const username = typeof usernameRaw === "string" ? usernameRaw.trim() : "";
+  if (!jid && !username) return null;
   const name = (value as { name?: unknown }).name;
   const gamertag = (value as { gamertag?: unknown }).gamertag;
   return {
-    jid: jid.trim(),
+    ...(jid ? { jid } : {}),
+    ...(username ? { username } : {}),
     name: typeof name === "string" ? name : undefined,
     gamertag: typeof gamertag === "string" ? gamertag : undefined,
   };
@@ -55,7 +59,7 @@ export async function POST(request: Request) {
   const action = (body as { action?: unknown }).action;
   if (action === "join" || action === "leave") {
     const participant = asParticipant((body as { participant?: unknown }).participant);
-    if (!participant) return badRequest("Falta participant.jid");
+    if (!participant) return badRequest("Falta participant.jid o participant.username");
     const result = await applyWspBotEvent({ action, participant });
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: result.status });

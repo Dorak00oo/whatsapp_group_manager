@@ -9,6 +9,7 @@ import {
 } from "react";
 import { DirectoryMemberEditorDialog } from "@/components/directory-member-editor-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
+import { formatWhatsAppUsername } from "@/lib/whatsapp-username";
 import type { DirectoryMemberDTO } from "@/types/directory";
 import { activeOnLabel } from "@/lib/minecraft-server";
 
@@ -174,12 +175,22 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
               {country ? (
                 <span className="text-zinc-600 dark:text-zinc-400">{country}</span>
               ) : null}
-              <a
-                href={`tel:${m.phone.replace(/\s/g, "")}`}
-                className="font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
-              >
-                {m.phone}
-              </a>
+              {m.phone ? (
+                <a
+                  href={`tel:${m.phone.replace(/\s/g, "")}`}
+                  className="font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
+                >
+                  {m.phone}
+                </a>
+              ) : null}
+              {m.whatsappUsername ? (
+                <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                  {formatWhatsAppUsername(m.whatsappUsername)}
+                </span>
+              ) : null}
+              {!m.phone && !m.whatsappUsername ? (
+                <span className="text-zinc-500 dark:text-zinc-400">Sin celular ni @usuario</span>
+              ) : null}
               <time
                 className="text-xs text-zinc-500 dark:text-zinc-500"
                 dateTime={m.createdAt}

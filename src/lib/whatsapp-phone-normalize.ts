@@ -11,6 +11,9 @@ export function normalizeWhatsAppPhoneInput(input: string):
   if (!raw) {
     return { ok: false, error: "Teléfono o JID vacío" };
   }
+  if (/@(lid|g\.us|newsletter)$/i.test(raw)) {
+    return { ok: false, error: "JID sin número de teléfono" };
+  }
 
   const digits = raw.includes("@")
     ? raw.split("@")[0]!.replace(/\D/g, "")

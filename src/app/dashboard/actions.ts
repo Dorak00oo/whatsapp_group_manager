@@ -16,14 +16,14 @@ import {
   enqueueAllowlistRemovalForMember,
 } from "@/lib/allowlist-removal";
 import { prisma } from "@/lib/prisma";
-import {
-  normalizePhoneForDirectory,
-  normalizePhoneFreeform,
-} from "@/lib/phone-normalize";
+import { resolveDirectoryWhatsAppContact } from "@/lib/directory-whatsapp-contact";
+import { normalizePhoneFreeform } from "@/lib/phone-normalize";
 import { parseGamertagsFromInactiveLog } from "@/lib/minecraft-inactive-log";
 import {
   isMissingDisplayNameColumnError,
+  isMissingWhatsAppUsernameColumnError,
   MISSING_DISPLAY_NAME_COLUMN_MESSAGE,
+  MISSING_WHATSAPP_USERNAME_COLUMN_MESSAGE,
 } from "@/lib/prisma-migration-hints";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { blacklistMinecraftGamertagOnAllWorlds, syncDirectoryMembersFromMinecraftTable } from "@/lib/minecraft-directory-sync";
@@ -45,6 +45,7 @@ export async function createDirectoryMember(
 
   const gamertag = String(formData.get("gamertag") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "").trim();
+  const usernameRaw = String(formData.get("whatsappUsername") ?? "").trim();
   const phoneIso = String(formData.get("phoneCountry") ?? "")
     .trim()
     .toUpperCase();
@@ -57,19 +58,21 @@ export async function createDirectoryMember(
   const permanentlyActive = formData.get("permanentlyActive") === "on";
 
   if (!gamertag) return { error: "El gamertag es obligatorio" };
-  const normalized = normalizePhoneForDirectory(phoneIso, phoneNational);
-  if (!normalized.ok) {
-    return { error: normalized.error };
-  }
-  const { phone, phoneCountry } = normalized;
+  const contact = resolveDirectoryWhatsAppContact({
+    phoneIso,
+    phoneNational,
+    usernameRaw,
+  });
+  if (!contact.ok) return { error: contact.error };
 
   try {
     await prisma.directoryMember.create({
       data: {
         gamertag,
         displayName: displayName || null,
-        phone,
-        phoneCountry,
+        phone: contact.phone,
+        phoneCountry: contact.phoneCountry,
+        whatsappUsername: contact.whatsappUsername,
         active: markedLeft ? false : active || permanentlyActive,
         leftAt: markedLeft ? new Date() : null,
         isAdmin,
@@ -85,6 +88,9 @@ export async function createDirectoryMember(
   } catch (e) {
     if (isMissingDisplayNameColumnError(e)) {
       return { error: MISSING_DISPLAY_NAME_COLUMN_MESSAGE };
+    }
+    if (isMissingWhatsAppUsernameColumnError(e)) {
+      return { error: MISSING_WHATSAPP_USERNAME_COLUMN_MESSAGE };
     }
     throw e;
   }
@@ -242,6 +248,7 @@ export async function updateDirectoryMemberNotes(
   const notes = String(formData.get("notes") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "").trim();
   const gamertag = String(formData.get("gamertag") ?? "").trim();
+  const usernameRaw = String(formData.get("whatsappUsername") ?? "").trim();
   const phoneIso = String(formData.get("phoneCountry") ?? "")
     .trim()
     .toUpperCase();
@@ -249,11 +256,12 @@ export async function updateDirectoryMemberNotes(
   if (!id) return { error: "Falta el identificador" };
   if (!gamertag) return { error: "El gamertag es obligatorio" };
 
-  const normalized = normalizePhoneForDirectory(phoneIso, phoneNational);
-  if (!normalized.ok) {
-    return { error: normalized.error };
-  }
-  const { phone, phoneCountry } = normalized;
+  const contact = resolveDirectoryWhatsAppContact({
+    phoneIso,
+    phoneNational,
+    usernameRaw,
+  });
+  if (!contact.ok) return { error: contact.error };
 
   try {
     const before = await prisma.directoryMember.findFirst({
@@ -265,8 +273,9 @@ export async function updateDirectoryMemberNotes(
       where: { id, userId },
       data: {
         gamertag,
-        phone,
-        phoneCountry,
+        phone: contact.phone,
+        phoneCountry: contact.phoneCountry,
+        whatsappUsername: contact.whatsappUsername,
         notes: notes || null,
         displayName: displayName || null,
       },
@@ -278,6 +287,9 @@ export async function updateDirectoryMemberNotes(
   } catch (e) {
     if (isMissingDisplayNameColumnError(e)) {
       return { error: MISSING_DISPLAY_NAME_COLUMN_MESSAGE };
+    }
+    if (isMissingWhatsAppUsernameColumnError(e)) {
+      return { error: MISSING_WHATSAPP_USERNAME_COLUMN_MESSAGE };
     }
     throw e;
   }

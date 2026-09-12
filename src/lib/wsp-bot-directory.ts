@@ -82,9 +82,40 @@ export function displayNameForRestore(
   return next || undefined;
 }
 
-export function findMemberByPhone<T extends { phone: string }>(
+function usernameKey(raw: string | null | undefined): string {
+  return String(raw ?? "")
+    .trim()
+    .replace(/^@+/, "")
+    .toLowerCase();
+}
+
+export function findMemberByPhone<T extends { phone: string | null }>(
   members: T[],
-  incomingPhone: string,
+  incomingPhone: string | null | undefined,
 ): T | undefined {
-  return members.find((m) => phonesLikelySame(m.phone, incomingPhone));
+  if (!incomingPhone?.trim()) return undefined;
+  return members.find(
+    (m) => Boolean(m.phone) && phonesLikelySame(m.phone as string, incomingPhone),
+  );
+}
+
+export function findMemberByUsername<T extends { whatsappUsername?: string | null }>(
+  members: T[],
+  incoming: string | null | undefined,
+): T | undefined {
+  const n = usernameKey(incoming);
+  if (!n) return undefined;
+  return members.find((m) => usernameKey(m.whatsappUsername) === n);
+}
+
+export function findMemberByWhatsAppIdentity<
+  T extends { phone: string | null; whatsappUsername?: string | null },
+>(
+  members: T[],
+  identity: { phone?: string | null; username?: string | null },
+): T | undefined {
+  return (
+    findMemberByPhone(members, identity.phone) ??
+    findMemberByUsername(members, identity.username)
+  );
 }

@@ -69,10 +69,14 @@ export function normalizePhoneForDirectory(
 
 /** Valores por defecto para el formulario de edición (país + número nacional). */
 export function splitPhoneForDirectoryForm(
-  phone: string,
+  phone: string | null | undefined,
   phoneCountry: string | null,
 ): { iso: string; national: string } {
-  const parsed = parsePhoneNumberFromString(phone.trim());
+  const raw = (phone ?? "").trim();
+  if (!raw) {
+    return { iso: (phoneCountry ?? "MX").trim().toUpperCase() || "MX", national: "" };
+  }
+  const parsed = parsePhoneNumberFromString(raw);
   if (parsed?.country) {
     return {
       iso: parsed.country,
@@ -80,15 +84,15 @@ export function splitPhoneForDirectoryForm(
     };
   }
   const iso = (phoneCountry ?? "MX").trim().toUpperCase() || "MX";
-  const digits = phone.replace(/\D/g, "");
+  const digits = raw.replace(/\D/g, "");
   try {
     const cc = getCountryCallingCode(iso as CountryCode);
     const national = digits.startsWith(cc)
       ? digits.slice(cc.length)
       : digits;
-    return { iso, national: national || phone };
+    return { iso, national: national || raw };
   } catch {
-    return { iso, national: phone };
+    return { iso, national: raw };
   }
 }
 

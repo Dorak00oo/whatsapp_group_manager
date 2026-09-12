@@ -25,8 +25,13 @@ model DirectoryMember {
   id               String                    @id @default(cuid())
   gamertag         String
   displayName      String?                   @map("display_name")
-  phone            String
+  phone            String?
   phoneCountry     String?                   @map("phone_country")
+  /**
+   * Usuario público de WhatsApp (`drak00_oo`), distinto de displayName.
+   * Identidad alternativa cuando WhatsApp no entrega el celular (LID).
+   */
+  whatsappUsername String?                   @map("whatsapp_username")
   active           Boolean                   @default(true) @map("is_active")
   /**
    * Activo permanente en el roster de WhatsApp: aunque Minecraft marque inactividad,

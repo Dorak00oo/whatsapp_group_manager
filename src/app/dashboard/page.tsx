@@ -113,6 +113,7 @@ export default async function DashboardPage({
     displayName: m.displayName,
     phone: m.phone,
     phoneCountry: m.phoneCountry,
+    whatsappUsername: m.whatsappUsername,
     active: m.active,
     activeOn: activeOnByTag.get(m.gamertag.trim().toLowerCase()) ?? [],
     permanentlyActive: m.permanentlyActive,

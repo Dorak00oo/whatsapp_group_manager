@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { XyzCoordFields } from "@/components/xyz-coord-fields";
+import {
+  isTpPrivilegedOrigin,
+  tpDestinationBlockedReason,
+  tpDestinationOptions,
+} from "@/lib/minecraft-remote-commands";
 
 export type AdminOption = {
   id: string;
@@ -47,6 +52,11 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
     [admins],
   );
 
+  const destOptions = useMemo(
+    () => tpDestinationOptions(onlinePlayers, targetGamertag),
+    [onlinePlayers, targetGamertag],
+  );
+
   const selectedOnline = useMemo(
     () =>
       Boolean(targetGamertag) &&
@@ -83,25 +93,11 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
   }, [refreshOnline]);
 
   useEffect(() => {
-    if (onlinePlayers.length === 0) {
-      setTpTo("");
-      return;
-    }
     setTpTo((prev) => {
-      const candidates = onlinePlayers.filter(
-        (p) => !sameTag(p, targetGamertag),
-      );
-      const pool = candidates.length > 0 ? candidates : onlinePlayers;
-      if (
-        prev &&
-        pool.some((p) => sameTag(p, prev)) &&
-        !sameTag(prev, targetGamertag)
-      ) {
-        return prev;
-      }
-      return pool[0] ?? "";
+      if (destOptions.some((p) => sameTag(p, prev))) return prev;
+      return destOptions[0] ?? "";
     });
-  }, [onlinePlayers, targetGamertag]);
+  }, [destOptions]);
 
   function requireActiveModerator(): boolean {
     const tag = targetGamertag.trim();
@@ -163,6 +159,11 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
         }
         if (sameTag(body.targetGamertag ?? "", to)) {
           setMessage("Origen y destino deben ser distintos.");
+          return;
+        }
+        const blocked = tpDestinationBlockedReason(to);
+        if (blocked) {
+          setMessage(blocked);
           return;
         }
         body.destinationGamertag = to;
@@ -262,6 +263,7 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
                 {onlinePlayers.some((p) => sameTag(p, a.gamertag))
                   ? " · online"
                   : ""}
+                {isTpPrivilegedOrigin(a.gamertag) ? " · TP a todos" : ""}
               </option>
             ))}
           </select>
@@ -341,7 +343,8 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
             </h3>
             <p className="mt-1 text-xs text-zinc-500">
               Usa el moderador de arriba como origen. Destino: otro jugador
-              online o coordenadas (eje vacío = ~). {onlineLabel}.
+              online (nunca drako274) o coordenadas (eje vacío = ~).{" "}
+              {onlineLabel}.
             </p>
           </div>
           <button
@@ -358,6 +361,10 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
             Nadie online reportado. Cuando el addon publique el roster vas a
             poder elegir destino y mandar TP.
           </p>
+        ) : destOptions.length === 0 ? (
+          <p className="mt-3 text-sm text-amber-800 dark:text-amber-200">
+            No hay destinos de TP: drako274 no puede ser destino.
+          </p>
         ) : (
           <div className="mt-3 flex max-w-md flex-col gap-2">
             <label
@@ -372,14 +379,12 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
               onChange={(e) => setTpTo(e.target.value)}
               className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
             >
-              {onlinePlayers
-                .filter((p) => !sameTag(p, targetGamertag))
-                .map((name) => (
-                  <option key={`to-${name}`} value={name}>
-                    {name}
-                    {adminTagsLower.has(name.toLowerCase()) ? " (mod)" : ""}
-                  </option>
-                ))}
+              {destOptions.map((name) => (
+                <option key={`to-${name}`} value={name}>
+                  {name}
+                  {adminTagsLower.has(name.toLowerCase()) ? " (mod)" : ""}
+                </option>
+              ))}
             </select>
           </div>
         )}
@@ -387,7 +392,10 @@ export function MinecraftRemoteCommandsPanel({ admins }: Props) {
         <button
           type="button"
           disabled={
-            needsModerator || !tpTo || sameTag(targetGamertag, tpTo)
+            needsModerator ||
+            destOptions.length === 0 ||
+            !tpTo ||
+            sameTag(targetGamertag, tpTo)
           }
           onClick={() => void send("tp")}
           className="mt-4 rounded-lg bg-sky-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-sky-700 disabled:opacity-50"

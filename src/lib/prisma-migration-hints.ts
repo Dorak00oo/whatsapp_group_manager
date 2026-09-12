@@ -12,3 +12,15 @@ export function isMissingDisplayNameColumnError(e: unknown): boolean {
     (/does not exist/i.test(msg) || /Unknown column/i.test(msg))
   );
 }
+
+export const MISSING_WHATSAPP_USERNAME_COLUMN_MESSAGE =
+  "La base de datos no está al día: falta la columna whatsapp_username (y phone puede ser null). " +
+  "Ejecuta: npx prisma migrate deploy";
+
+export function isMissingWhatsAppUsernameColumnError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return (
+    /whatsapp_username/i.test(msg) &&
+    (/does not exist/i.test(msg) || /Unknown column/i.test(msg) || /Unknown argument/i.test(msg))
+  );
+}

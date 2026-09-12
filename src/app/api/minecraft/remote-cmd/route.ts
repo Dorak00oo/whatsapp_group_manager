@@ -23,11 +23,13 @@ import {
   REMOTE_CMD_ACTIONS,
   asRemoteCmdQueueData,
   isRemoteCmdAction,
+  isTpPrivilegedOrigin,
   parseTpCoords,
   remoteCmdActionForAddon,
   remoteCmdNeedsDestination,
   remoteCmdNeedsTarget,
   remoteCmdNeedsTargetList,
+  tpDestinationBlockedReason,
   type RemoteCmdAction,
 } from "@/lib/minecraft-remote-commands";
 import { prisma } from "@/lib/prisma";
@@ -148,7 +150,8 @@ export async function POST(request: Request) {
             : "targetGamertag es obligatorio para spectator/survival",
       );
     }
-    if (!(await isAdminGamertag(t))) {
+    const privilegedTpOrigin = action === "tp" && isTpPrivilegedOrigin(t);
+    if (!(await isAdminGamertag(t)) && !privilegedTpOrigin) {
       return badRequest(
         "Solo se puede elegir un gamertag marcado como admin en el directorio",
       );
@@ -191,6 +194,8 @@ export async function POST(request: Request) {
           "Origen y destino del tp deben ser jugadores distintos",
         );
       }
+      const blocked = tpDestinationBlockedReason(d);
+      if (blocked) return badRequest(blocked);
       destinationGamertag = d;
     }
   }

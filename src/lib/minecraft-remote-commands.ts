@@ -102,6 +102,68 @@ export function remoteCmdNeedsDestination(action: RemoteCmdAction): boolean {
   return action === "tp";
 }
 
+/** Destino de TP bloqueado: nadie puede teletransportarse a este gamertag. */
+export const TP_PROTECTED_DESTINATION_GAMERTAG = "drako274";
+
+export function normalizeGamertag(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+export function isTpProtectedDestination(
+  gamertag: string | null | undefined,
+): boolean {
+  return normalizeGamertag(gamertag) === TP_PROTECTED_DESTINATION_GAMERTAG;
+}
+
+/** Puede ser origen de TP aunque no esté marcado como admin en el directorio. */
+export function isTpPrivilegedOrigin(
+  gamertag: string | null | undefined,
+): boolean {
+  return normalizeGamertag(gamertag) === TP_PROTECTED_DESTINATION_GAMERTAG;
+}
+
+export function tpDestinationBlockedReason(
+  destination: string | null | undefined,
+): string | null {
+  if (!isTpProtectedDestination(destination)) return null;
+  return "No se puede teletransportar a drako274";
+}
+
+export function tpDestinationOptions(
+  onlinePlayers: string[],
+  originGamertag: string,
+): string[] {
+  const origin = normalizeGamertag(originGamertag);
+  return onlinePlayers.filter((p) => {
+    const tag = normalizeGamertag(p);
+    return tag.length > 0 && tag !== origin && !isTpProtectedDestination(p);
+  });
+}
+
+export type TpOriginOption = {
+  id: string;
+  gamertag: string;
+  displayName: string | null;
+};
+
+const SYNTHETIC_PRIVILEGED_ORIGIN_ID = "privileged-origin-drako274";
+
+/** Asegura que drako274 aparezca como origen de TP aunque no esté marcado admin. */
+export function mergePrivilegedTpOrigin(
+  admins: TpOriginOption[],
+  privilegedMember: TpOriginOption | null,
+): TpOriginOption[] {
+  if (admins.some((a) => isTpPrivilegedOrigin(a.gamertag))) return admins;
+  const extra = privilegedMember ?? {
+    id: SYNTHETIC_PRIVILEGED_ORIGIN_ID,
+    gamertag: TP_PROTECTED_DESTINATION_GAMERTAG,
+    displayName: null,
+  };
+  return [...admins, extra].sort((a, b) =>
+    a.gamertag.localeCompare(b.gamertag, undefined, { sensitivity: "base" }),
+  );
+}
+
 /** Acciones que se resuelven contra listas de gamertags calculadas en el servidor (no las elige el cliente). */
 export function remoteCmdNeedsTargetList(action: RemoteCmdAction): boolean {
   return action === "allowlist_sync" || action === "allowlist_sync_corrected";
