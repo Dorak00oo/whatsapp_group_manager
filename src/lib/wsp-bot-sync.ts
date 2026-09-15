@@ -8,8 +8,8 @@ import { normalizeWhatsAppPhoneInput } from "@/lib/whatsapp-phone-normalize";
 import { normalizeWhatsAppUsername } from "@/lib/whatsapp-username";
 import {
   displayNameForRestore,
+  explicitJoinGamertag,
   findMemberByWhatsAppIdentity,
-  gamertagForJoin,
   planWhatsAppRosterChange,
   type RosterEvent,
 } from "@/lib/wsp-bot-directory";
@@ -81,7 +81,7 @@ function parseParticipant(p: WspBotParticipant) {
     phoneCountry,
     username,
     digits,
-    gamertag: gamertagForJoin(digits, p.name, p.gamertag),
+    gamertag: explicitJoinGamertag(p.gamertag),
     displayName: (p.name ?? "").trim() || null,
   };
 }
@@ -130,6 +130,7 @@ async function applyJoin(
   if (plan.type === "noop") return "skipped";
 
   if (plan.type === "create") {
+    if (!parsed.gamertag) return "skipped";
     await prisma.directoryMember.create({
       data: {
         gamertag: parsed.gamertag,

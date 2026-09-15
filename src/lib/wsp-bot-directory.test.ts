@@ -10,6 +10,7 @@ import {
   findMemberByUsername,
   findMemberByWhatsAppIdentity,
   gamertagForJoin,
+  explicitJoinGamertag,
   phonesLikelySame,
   placeholderGamertag,
   planWhatsAppRosterChange,
@@ -72,13 +73,15 @@ test("gamertag placeholder no usa un nombre que es solo el número", () => {
   assert.equal(placeholderGamertag("573001112233", "Drako"), "Drako");
 });
 
-test("join usa gamertag explícito si viene; si no, el placeholder", () => {
+test("join solo usa gamertag explícito; sin comando no hay placeholder", () => {
   assert.equal(
     gamertagForJoin("573001112233", "Carlos", "Steve123"),
     "Steve123",
   );
-  assert.equal(gamertagForJoin("573001112233", "Carlos"), "Carlos");
-  assert.equal(gamertagForJoin("573001112233", ""), "wa-573001112233");
+  assert.equal(gamertagForJoin("573001112233", "Carlos"), null);
+  assert.equal(gamertagForJoin("573001112233", ""), null);
+  assert.equal(explicitJoinGamertag("  Steve123  "), "Steve123");
+  assert.equal(explicitJoinGamertag(""), null);
 });
 
 test("restore rellena displayName vacío y no pisa uno existente", () => {

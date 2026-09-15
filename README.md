@@ -76,9 +76,8 @@ Aplicación web para gestionar un **directorio de personas** (gamertag, teléfon
   - Sin `+` en el número hace falta columna de **país** (ISO2, ej. `MX`) o número en formato internacional.
 - **Minecraft** (`/dashboard/minecraft`, parcela, monitoreo, comandos, **ajustes**): dos mundos Bedrock (Vanilla y Mods).
   - El selector cambia roster, parcelas, monitoreo y comandos del mundo elegido.
-  - Ajustes: conexión en vivo de los dos BDS, umbrales e ítems baneados del mundo seleccionado. **Sincronizar ajustes** empuja esa config al addon.
-  - **Sincronizar listas** está en Jugadores → Listas (blacklist/whitelist del mundo elegido).
-  - Cómo copiar el addon al segundo servidor: [MINECRAFT.md](./MINECRAFT.md).
+  - Ajustes: conexión en vivo de los dos BDS (asignar o **borrar** el UUID si cambiás el mundo), umbrales e ítems baneados del mundo seleccionado. **Sincronizar ajustes** empuja esa config al addon.
+  - **Sincronizar listas** está en Jugadores → Listas (blacklist/whitelist del mundo elegido). La blacklist automática por inactividad la decide el **panel** (`daysBlacklist`); el addon no re-banea a quien desbaneaste en la web. Cómo copiar el addon: [MINECRAFT.md](./MINECRAFT.md).
 
 ## Migrar la base Neon → Supabase
 

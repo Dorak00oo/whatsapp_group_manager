@@ -58,15 +58,22 @@ export function placeholderGamertag(digits: string, name?: string): string {
   return `wa-${digits}`;
 }
 
-/** Gamertag del comando `.addwsp`; si no viene, el placeholder del join automático. */
+/** Gamertag que mandó `.addwsp`. Vacío / solo espacios = no hay alta. */
+export function explicitJoinGamertag(raw?: string | null): string | null {
+  const tag = (raw ?? "").trim().slice(0, 64);
+  return tag || null;
+}
+
+/**
+ * Gamertag para un alta. Solo el del comando `.addwsp`.
+ * Sin gamertag no se crea ficha (el join del grupo ya no da de alta).
+ */
 export function gamertagForJoin(
-  digits: string,
-  name?: string,
+  _digits: string,
+  _name?: string,
   gamertag?: string,
-): string {
-  const explicit = (gamertag ?? "").trim().slice(0, 64);
-  if (explicit) return explicit;
-  return placeholderGamertag(digits, name);
+): string | null {
+  return explicitJoinGamertag(gamertag);
 }
 
 /**
