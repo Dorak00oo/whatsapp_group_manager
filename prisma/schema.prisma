@@ -154,6 +154,7 @@ model MinecraftPlayer {
   daysInactive     Int                       @default(0) @map("days_inactive")
   isBlacklisted    Boolean                   @default(false) @map("is_blacklisted")
   isWhitelisted    Boolean                   @default(false) @map("is_whitelisted")
+  inactivityBlacklistExemptUntilSeen Boolean @default(false) @map("inactivity_blacklist_exempt_until_seen")
   auditSuggestions GamertagAuditSuggestion[]
   createdAt        DateTime                  @default(now()) @map("created_at")
   updatedAt        DateTime                  @updatedAt @map("updated_at")

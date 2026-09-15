@@ -5,6 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { isActiveByDaysInactive } from "@/lib/minecraft-active";
 import { requireMinecraftAddon } from "@/lib/minecraft-api-context";
 import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
+import {
+  accessListGamertags,
+  mergeMinecraftListState,
+} from "@/lib/minecraft-list-merge";
 import { ensureMinecraftConfig } from "@/lib/minecraft-servers-db";
 import { purgeOldMinecraftSnapshots } from "@/lib/minecraft-snapshot-purge";
 
@@ -35,13 +39,6 @@ type MinecraftStatusPayload = {
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
-
-/**
- * Evita que un POST de estado con blacklist/WL “viejas” (o en cola antes del
- * próximo poll del addon) borre un Unban/Un-WL recién hecho en el panel.
- * Margen amplio por posible desfase de reloj entre BD y el mundo Bedrock.
- */
-const PANEL_LIST_PRIORITY_MS = 60_000;
 
 function snapshotDateFromPayload(timestamp: unknown): Date {
   const n =
@@ -74,6 +71,7 @@ export async function POST(request: Request) {
     const serverSnapshotTime = snapshotDateFromPayload(body.timestamp);
     const config = await ensureMinecraftConfig(serverId);
     const daysInactiveThreshold = config.daysInactive;
+    const daysBlacklist = config.daysBlacklist;
 
     await prisma.minecraftSnapshot.create({
       data: {
@@ -108,23 +106,19 @@ export async function POST(request: Request) {
         },
       });
 
-      const panelListsNewerThanSnapshot =
-        !!existing &&
-        existing.updatedAt.getTime() >
-          serverSnapshotTime.getTime() - PANEL_LIST_PRIORITY_MS;
-
-      let mergedBlacklist: boolean;
-      let mergedWhitelist: boolean;
-      if (panelListsNewerThanSnapshot) {
-        mergedBlacklist = existing!.isBlacklisted;
-        mergedWhitelist = existing!.isWhitelisted;
-      } else if (existing) {
-        mergedBlacklist = existing.isBlacklisted || player.isBlacklisted;
-        mergedWhitelist = existing.isWhitelisted || player.isWhitelisted;
-      } else {
-        mergedBlacklist = player.isBlacklisted;
-        mergedWhitelist = player.isWhitelisted;
-      }
+      const lists = mergeMinecraftListState({
+        existing: existing
+          ? {
+              isBlacklisted: existing.isBlacklisted,
+              isWhitelisted: existing.isWhitelisted,
+              inactivityBlacklistExemptUntilSeen:
+                existing.inactivityBlacklistExemptUntilSeen,
+            }
+          : null,
+        daysInactive: player.daysInactive,
+        daysInactiveThreshold,
+        daysBlacklist,
+      });
 
       const active = isActiveByDaysInactive(
         player.daysInactive,
@@ -138,8 +132,10 @@ export async function POST(request: Request) {
             lastSeen: new Date(player.lastSeen),
             active,
             daysInactive: player.daysInactive,
-            isBlacklisted: mergedBlacklist,
-            isWhitelisted: mergedWhitelist,
+            isBlacklisted: lists.isBlacklisted,
+            isWhitelisted: lists.isWhitelisted,
+            inactivityBlacklistExemptUntilSeen:
+              lists.inactivityBlacklistExemptUntilSeen,
           },
         });
       } else {
@@ -150,8 +146,10 @@ export async function POST(request: Request) {
             lastSeen: new Date(player.lastSeen),
             active,
             daysInactive: player.daysInactive,
-            isBlacklisted: mergedBlacklist,
-            isWhitelisted: mergedWhitelist,
+            isBlacklisted: lists.isBlacklisted,
+            isWhitelisted: lists.isWhitelisted,
+            inactivityBlacklistExemptUntilSeen:
+              lists.inactivityBlacklistExemptUntilSeen,
           },
         });
       }
@@ -189,11 +187,23 @@ export async function POST(request: Request) {
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/minecraft");
 
+    const roster = await prisma.minecraftPlayer.findMany({
+      where: { serverId },
+      select: {
+        gamertag: true,
+        isBlacklisted: true,
+        isWhitelisted: true,
+      },
+    });
+    const lists = accessListGamertags(roster);
+
     return NextResponse.json({
       ok: true,
       serverId,
       processed: body.players.length,
       timestamp: new Date().toISOString(),
+      blacklist: lists.blacklist,
+      whitelist: lists.whitelist,
     });
   } catch (error) {
     console.error("[Minecraft API] Error:", error);

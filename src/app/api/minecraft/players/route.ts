@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { requireMinecraftPanel } from "@/lib/minecraft-api-context";
 import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
+import { enqueueMinecraftPanelCommand } from "@/lib/minecraft-sync-request";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -48,14 +49,17 @@ export async function POST(request: Request) {
     const updateData: {
       isBlacklisted?: boolean;
       isWhitelisted?: boolean;
+      inactivityBlacklistExemptUntilSeen?: boolean;
     } = {};
 
     switch (body.action) {
       case "blacklist":
         updateData.isBlacklisted = true;
+        updateData.inactivityBlacklistExemptUntilSeen = false;
         break;
       case "remove_blacklist":
         updateData.isBlacklisted = false;
+        updateData.inactivityBlacklistExemptUntilSeen = true;
         break;
       case "whitelist":
         updateData.isWhitelisted = true;
@@ -79,6 +83,8 @@ export async function POST(request: Request) {
       await syncDirectoryActiveWithMinecraft(updated.gamertag);
     }
 
+    const sync = await enqueueMinecraftPanelCommand("synclists", serverId);
+
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/minecraft");
 
@@ -89,6 +95,7 @@ export async function POST(request: Request) {
         isBlacklisted: updated.isBlacklisted,
         isWhitelisted: updated.isWhitelisted,
       },
+      syncRequestedAt: sync.requestedAt,
     });
   } catch (error) {
     console.error("[Minecraft Players API] Error:", error);

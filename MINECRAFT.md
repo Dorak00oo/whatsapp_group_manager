@@ -21,7 +21,7 @@ El addon **no** mete a nadie a la blacklist por llevar días sin entrar. Solo gu
 | Umbral (Ajustes, por mundo) | Efecto |
 |-----------------------------|--------|
 | Días para inactivo (7) | Estado en roster / directorio. No kick. |
-| Días para blacklist automática (14) | El **panel** marca blacklist. El BDS kickea al sincronizar listas. |
+| Días para blacklist automática (14) | El **panel** puede marcar blacklist cuando `AUTO_BLACKLIST_FROM_INACTIVITY` en `src/lib/minecraft-list-merge.ts` esté en `true` (hoy está en **false**). El BDS kickea al sincronizar listas. |
 | Días para purgar en Bedrock (21) | El addon deja de listar esa fila local. No es un ban. |
 
 - **Whitelist** en Jugadores: no entra al auto-ban por inactividad.
