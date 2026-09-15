@@ -92,6 +92,31 @@ export async function assignMinecraftInstall(
   });
 }
 
+/** Quita el UUID emparejado y el último ping. El mundo nuevo vuelve a aparecer como pendiente. */
+export async function clearMinecraftServerConnection(
+  serverId: MinecraftServerId,
+): Promise<void> {
+  await ensureMinecraftServers();
+  await prisma.$transaction(async (tx) => {
+    await tx.minecraftInstall.deleteMany({ where: { serverId } });
+    await tx.minecraftServer.update({
+      where: { id: serverId },
+      data: {
+        lastSeenAt: null,
+        lastVersion: null,
+        lastWorldName: null,
+      },
+    });
+  });
+}
+
+export async function deleteMinecraftInstall(installId: string): Promise<boolean> {
+  const result = await prisma.minecraftInstall.deleteMany({
+    where: { id: installId, serverId: null },
+  });
+  return result.count > 0;
+}
+
 export async function resolveAddonIdentityFromRequest(
   request: Request,
   body?: {

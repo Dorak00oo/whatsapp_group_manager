@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { assignMinecraftInstallAction } from "@/app/dashboard/minecraft-install-actions";
+import {
+  assignMinecraftInstallAction,
+  clearMinecraftServerConnectionAction,
+  deleteMinecraftInstallAction,
+} from "@/app/dashboard/minecraft-install-actions";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
 import {
   MINECRAFT_SERVER_IDS,
@@ -70,6 +75,10 @@ function shortInstallId(id: string) {
   return id.slice(0, 8);
 }
 
+type ConfirmClear =
+  | { kind: "world"; serverId: MinecraftServerId; name: string }
+  | { kind: "install"; installId: string; label: string };
+
 export function MinecraftServersConnection({
   selectedWorld,
   initialServers,
@@ -80,6 +89,7 @@ export function MinecraftServersConnection({
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmClear | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -156,6 +166,45 @@ export function MinecraftServersConnection({
     }
   };
 
+  const clearWorld = async (serverId: MinecraftServerId) => {
+    setBusyId(`world:${serverId}`);
+    try {
+      const result = await clearMinecraftServerConnectionAction(serverId);
+      if ("error" in result && result.error) {
+        setError(result.error);
+        return;
+      }
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const discardInstall = async (installId: string) => {
+    setBusyId(installId);
+    try {
+      const result = await deleteMinecraftInstallAction(installId);
+      if ("error" in result && result.error) {
+        setError(result.error);
+        return;
+      }
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const runConfirm = () => {
+    const next = confirm;
+    setConfirm(null);
+    if (!next) return;
+    if (next.kind === "world") {
+      void clearWorld(next.serverId);
+      return;
+    }
+    void discardInstall(next.installId);
+  };
+
   return (
     <div className={softPanel}>
       <div>
@@ -164,8 +213,9 @@ export function MinecraftServersConnection({
         </h3>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           El mismo addon puede ir en los dos BDS. Cada mundo genera un UUIDv4;
-          acá lo asignás a Vanilla o Mods. Hasta que no lo asignes, ese dedicated
-          no escribe jugadores ni comandos.
+          acá lo asignás a Vanilla o Mods. Si cambiás el mundo, borrá la
+          conexión y asigná el UUID nuevo. Hasta que no lo asignes, ese
+          dedicated no escribe jugadores ni comandos.
         </p>
       </div>
 
@@ -206,6 +256,20 @@ export function MinecraftServersConnection({
                         </button>
                       );
                     })}
+                    <button
+                      type="button"
+                      disabled={busyId === row.id}
+                      onClick={() =>
+                        setConfirm({
+                          kind: "install",
+                          installId: row.id,
+                          label: row.lastWorldName ?? shortInstallId(row.id),
+                        })
+                      }
+                      className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800 ring-1 ring-red-200/80 disabled:opacity-50 dark:bg-red-950/40 dark:text-red-200 dark:ring-red-900/60"
+                    >
+                      Descartar
+                    </button>
                   </div>
                 </li>
               );
@@ -223,6 +287,7 @@ export function MinecraftServersConnection({
             : null;
           const selected = id === selectedWorld;
           const linked = assignedByWorld.get(id);
+          const canClear = Boolean(linked || row.lastSeenAt || row.lastWorldName);
           return (
             <li
               key={id}
@@ -271,12 +336,43 @@ export function MinecraftServersConnection({
                   Mundo Bedrock: {row.lastWorldName}
                 </p>
               ) : null}
+              {canClear ? (
+                <button
+                  type="button"
+                  disabled={busyId !== null}
+                  onClick={() =>
+                    setConfirm({ kind: "world", serverId: id, name: row.name })
+                  }
+                  className="mt-3 rounded-xl bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800 ring-1 ring-red-200/80 disabled:opacity-50 dark:bg-red-950/40 dark:text-red-200 dark:ring-red-900/60"
+                >
+                  {busyId === `world:${id}` ? "Borrando…" : "Borrar conexión"}
+                </button>
+              ) : null}
             </li>
           );
         })}
       </ul>
 
       {error ? <p className="text-sm text-red-700 dark:text-red-400">{error}</p> : null}
+
+      <ConfirmDialog
+        open={confirm !== null}
+        title={
+          confirm?.kind === "world"
+            ? `Borrar conexión de ${confirm.name}`
+            : "Descartar dedicated"
+        }
+        message={
+          confirm?.kind === "world"
+            ? `Se suelta el UUID de ${confirm.name}. Si cambiás el mundo, el dedicated nuevo aparece acá para asignarlo de nuevo.`
+            : `¿Descartar ${confirm?.label ?? "este dedicated"}? Si el BDS sigue prendido, vuelve a aparecer al próximo ping.`
+        }
+        confirmLabel="Borrar"
+        cancelLabel="Cancelar"
+        variant="danger"
+        onConfirm={runConfirm}
+        onCancel={() => setConfirm(null)}
+      />
     </div>
   );
 }

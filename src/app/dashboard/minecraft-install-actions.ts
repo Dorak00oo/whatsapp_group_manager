@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
-import { assignMinecraftInstall } from "@/lib/minecraft-installs-db";
+import {
+  assignMinecraftInstall,
+  clearMinecraftServerConnection,
+  deleteMinecraftInstall,
+} from "@/lib/minecraft-installs-db";
 import {
   parseMinecraftInstallId,
   parseMinecraftServerId,
@@ -24,6 +28,29 @@ export async function assignMinecraftInstallAction(
       return { error: "Ese dedicated ya no aparece. Esperá un ping." };
     }
     throw e;
+  }
+  revalidatePath("/dashboard/ajustes");
+  return { ok: true as const };
+}
+
+export async function clearMinecraftServerConnectionAction(serverId: string) {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado" };
+  const world = parseMinecraftServerId(serverId);
+  if (!world) return { error: "Datos inválidos" };
+  await clearMinecraftServerConnection(world);
+  revalidatePath("/dashboard/ajustes");
+  return { ok: true as const };
+}
+
+export async function deleteMinecraftInstallAction(installId: string) {
+  const session = await auth();
+  if (!session?.user) return { error: "No autorizado" };
+  const id = parseMinecraftInstallId(installId);
+  if (!id) return { error: "Datos inválidos" };
+  const deleted = await deleteMinecraftInstall(id);
+  if (!deleted) {
+    return { error: "Ese dedicated ya no aparece." };
   }
   revalidatePath("/dashboard/ajustes");
   return { ok: true as const };
