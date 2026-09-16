@@ -99,10 +99,12 @@ export function MinecraftBannedItemsSection({ initialItems }: Props) {
           Objetos baneados
         </h3>
         <p className="mt-1 text-xs text-zinc-500">
-          El addon los quita del inventario, armadura y segunda mano de
-          jugadores online (admins exentos), cada 0,1 s, sin aviso en el
-          mundo. Guardar no basta: usa sincronizar ahora para aplicar la
-          lista de inmediato.
+          El addon los quita del inventario, armadura y manos de todos los
+          jugadores online (también admins), cada 0,1 s, sin aviso. Al abrir
+          cofre, barril, shulker, hopper, dispenser/dropper, horno, ender chest o
+          cofre/hopper en minecart, también los saca de ese contenedor.
+          Guardar no basta: usa sincronizar ahora para aplicar la lista de
+          inmediato.
         </p>
       </div>
 
