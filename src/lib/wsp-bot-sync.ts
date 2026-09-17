@@ -2,6 +2,7 @@ import {
   cancelPendingAllowlistRemoval,
   enqueueAllowlistRemovalForMember,
 } from "@/lib/allowlist-removal";
+import { parseDirectoryAge } from "@/lib/directory-age";
 import { prisma } from "@/lib/prisma";
 import { withDbRetry } from "@/lib/prisma-retry";
 import { normalizeWhatsAppPhoneInput } from "@/lib/whatsapp-phone-normalize";
@@ -19,6 +20,7 @@ export type WspBotParticipant = {
   username?: string;
   name?: string;
   gamertag?: string;
+  age?: number;
 };
 
 type DirectoryRow = {
@@ -76,6 +78,7 @@ function parseParticipant(p: WspBotParticipant) {
   const phoneCountry = phoneParsed?.ok ? phoneParsed.phoneCountry : null;
   if (!phone && !username) return null;
   const digits = phone ? phone.replace(/\D/g, "") : username ?? "user";
+  const ageParsed = parseDirectoryAge(p.age);
   return {
     phone,
     phoneCountry,
@@ -83,6 +86,7 @@ function parseParticipant(p: WspBotParticipant) {
     digits,
     gamertag: explicitJoinGamertag(p.gamertag),
     displayName: (p.name ?? "").trim() || null,
+    age: ageParsed.ok ? ageParsed.age : null,
   };
 }
 
@@ -135,6 +139,7 @@ async function applyJoin(
       data: {
         gamertag: parsed.gamertag,
         displayName: parsed.displayName,
+        age: parsed.age,
         phone: parsed.phone,
         phoneCountry: parsed.phoneCountry,
         whatsappUsername: parsed.username,
@@ -273,6 +278,7 @@ export async function applyWspBotSync(input: {
         digits: (row.phone ?? "").replace(/\D/g, "") || row.whatsappUsername || "user",
         gamertag: row.gamertag,
         displayName: null,
+        age: null,
       });
       if (result === "left") left++;
     }

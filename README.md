@@ -68,8 +68,8 @@ Aplicación web para gestionar un **directorio de personas** (gamertag, teléfon
 
 ## Funcionalidades del panel
 
-- **Lista** (`/dashboard`): búsqueda, filtros por estado, país, cohortes (nuevos, activos, inactivos, se salieron, admins, protegidos, etc.).
-- **Agregar** (`/dashboard/agregar`): alta manual y bloque **Importar desde Excel o Google Sheets**.
+- **Lista** (`/dashboard`): búsqueda, filtros por estado, país, cohortes (nuevos, activos, inactivos, se salieron, admins, protegidos, etc.). Edad opcional en la tarjeta y en editar. Notas que eran solo la edad (`18`, `18 años`) pasan a esa columna al aplicar la migración.
+- **Agregar** (`/dashboard/agregar`): alta manual (gamertag, nombre, **edad**, celular o @usuario) y bloque **Importar desde Excel o Google Sheets**.
   - Formatos: `.xlsx`, `.xls`, `.csv`, `.tsv`.
   - Se procesan **todas las hojas** del libro que tengan cabeceras reconocibles (jugador + teléfono).
   - Plantillas: `GET /dashboard/agregar/plantilla` (Excel) y `?format=csv` (CSV).

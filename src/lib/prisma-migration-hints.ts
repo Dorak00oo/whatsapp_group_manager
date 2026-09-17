@@ -24,3 +24,15 @@ export function isMissingWhatsAppUsernameColumnError(e: unknown): boolean {
     (/does not exist/i.test(msg) || /Unknown column/i.test(msg) || /Unknown argument/i.test(msg))
   );
 }
+
+export const MISSING_AGE_COLUMN_MESSAGE =
+  "La base de datos no está al día: falta la columna age en directory_members. " +
+  "Ejecuta: npx prisma migrate deploy";
+
+export function isMissingAgeColumnError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return (
+    /\bage\b/i.test(msg) &&
+    (/does not exist/i.test(msg) || /Unknown column/i.test(msg) || /Unknown argument/i.test(msg))
+  );
+}

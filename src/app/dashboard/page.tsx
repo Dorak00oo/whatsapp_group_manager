@@ -111,6 +111,7 @@ export default async function DashboardPage({
     id: m.id,
     gamertag: m.gamertag,
     displayName: m.displayName,
+    age: m.age,
     phone: m.phone,
     phoneCountry: m.phoneCountry,
     whatsappUsername: m.whatsappUsername,
@@ -141,7 +142,7 @@ export default async function DashboardPage({
           Personas
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Gamertag, celular, strikes, baneos y filtros por rol o situación.
+          Gamertag, celular, edad, strikes, baneos y filtros por rol o situación.
         </p>
       </div>
       <DirectorySection

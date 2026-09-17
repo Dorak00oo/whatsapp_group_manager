@@ -10,6 +10,8 @@ export type DirectoryMemberDTO = {
   gamertag: string;
   /** Nombre real u hoja «nombres»; el identificador principal sigue siendo gamertag. */
   displayName: string | null;
+  /** Edad opcional (1–99). */
+  age: number | null;
   phone: string | null;
   phoneCountry: string | null;
   /** Usuario público @usuario, distinto del nombre de perfil. */

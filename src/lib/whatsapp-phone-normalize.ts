@@ -1,4 +1,5 @@
 import { normalizePhoneFreeform } from "@/lib/phone-normalize";
+import { stripMexicoWhatsAppDigits } from "@/lib/mexico-mobile-trunk";
 
 /**
  * Convierte JID de WhatsApp (`54911...@s.whatsapp.net`) o cadena de dígitos
@@ -15,9 +16,10 @@ export function normalizeWhatsAppPhoneInput(input: string):
     return { ok: false, error: "JID sin número de teléfono" };
   }
 
-  const digits = raw.includes("@")
+  const digitsRaw = raw.includes("@")
     ? raw.split("@")[0]!.replace(/\D/g, "")
     : raw.replace(/\D/g, "");
+  const digits = stripMexicoWhatsAppDigits(digitsRaw);
 
   if (digits.length < 8 || digits.length > 15) {
     return { ok: false, error: "Número inválido (longitud)" };

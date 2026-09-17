@@ -12,6 +12,7 @@ import {
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
 import { DirectoryMemberSituationPicker } from "@/components/directory-member-situation-picker";
+import { WhatsAppUsernameField } from "@/components/whatsapp-username-field";
 import { getCallingCodeOptions } from "@/lib/phone-calling-codes";
 import { splitPhoneForDirectoryForm } from "@/lib/phone-normalize";
 import { formatWhatsAppUsername } from "@/lib/whatsapp-username";
@@ -187,21 +188,21 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
             className="mt-10 flex flex-col gap-6"
           >
             <input type="hidden" name="memberId" value={m.id} />
+            <label className="flex min-w-0 flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+              Gamertag{" "}
+              <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                (principal)
+              </span>
+              <input
+                name="gamertag"
+                required
+                autoComplete="nickname"
+                defaultValue={m.gamertag}
+                placeholder="Ej. CabraTNT, minero_feliz"
+                className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+            </label>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-              <label className="flex min-w-0 flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Gamertag{" "}
-                <span className="font-normal text-zinc-500 dark:text-zinc-400">
-                  (principal)
-                </span>
-                <input
-                  name="gamertag"
-                  required
-                  autoComplete="nickname"
-                  defaultValue={m.gamertag}
-                  placeholder="Ej. CabraTNT, minero_feliz"
-                  className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                />
-              </label>
               <label className="flex min-w-0 flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
                 Nombre{" "}
                 <span className="font-normal text-zinc-500 dark:text-zinc-400">
@@ -212,33 +213,38 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                   type="text"
                   defaultValue={m.displayName ?? ""}
                   placeholder="Ej. cómo se presenta en WhatsApp"
-                  className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                  className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+              </label>
+              <label
+                className="flex min-w-0 flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400"
+                htmlFor={`edit-whatsapp-username-${m.id}`}
+              >
+                Usuario de WhatsApp{" "}
+                <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                  (no el nombre de perfil)
+                </span>
+                <WhatsAppUsernameField
+                  id={`edit-whatsapp-username-${m.id}`}
+                  name="whatsappUsername"
+                  defaultValue={m.whatsappUsername ?? ""}
+                  inputClassName="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
                 />
               </label>
             </div>
-            <label className="flex min-w-0 flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Usuario de WhatsApp{" "}
-              <span className="font-normal text-zinc-500 dark:text-zinc-400">
-                (@usuario, no el nombre de perfil)
-              </span>
-              <input
-                name="whatsappUsername"
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                defaultValue={m.whatsappUsername ?? ""}
-                placeholder="Ej. Drak00_oo"
-                className="rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-              />
-            </label>
-            <div className="flex flex-col gap-2 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              <span>
-                Celular{" "}
-                <span className="font-normal text-zinc-500 dark:text-zinc-400">
-                  (o el usuario de arriba)
+            <div className="flex min-w-0 flex-col gap-2">
+              <div className="flex min-w-0 items-end gap-3">
+                <span className="min-w-0 flex-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  Celular{" "}
+                  <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                    (o el @)
+                  </span>
                 </span>
-              </span>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                <span className="w-[8.5rem] shrink-0 text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:w-[9.5rem]">
+                  Edad
+                </span>
+              </div>
+              <div className="flex min-w-0 items-stretch gap-2">
                 <label className="sr-only" htmlFor={`edit-phone-country-${m.id}`}>
                   País y prefijo
                 </label>
@@ -246,7 +252,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                   id={`edit-phone-country-${m.id}`}
                   name="phoneCountry"
                   defaultValue={phoneDefaults.iso}
-                  className={`${softSelectNeutral} shrink-0 sm:max-w-[min(100%,14rem)]`}
+                  className={`${softSelectNeutral} w-[min(100%,12.5rem)] shrink-0`}
                 >
                   {phoneCountryOptions.map(({ iso, label }) => (
                     <option key={iso} value={iso}>
@@ -260,8 +266,19 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                   inputMode="tel"
                   autoComplete="tel-national"
                   defaultValue={phoneDefaults.national}
-                  placeholder="Ej. 55 1234 5678"
+                  placeholder="55 1234 5678"
                   className={`${softInputNeutral} min-w-0 flex-1`}
+                />
+                <input
+                  name="age"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={99}
+                  defaultValue={m.age ?? ""}
+                  placeholder="18"
+                  aria-label="Edad"
+                  className="w-[8.5rem] shrink-0 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 sm:w-[9.5rem] dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
                 />
               </div>
             </div>

@@ -16,12 +16,15 @@ import {
   enqueueAllowlistRemovalForMember,
 } from "@/lib/allowlist-removal";
 import { prisma } from "@/lib/prisma";
+import { parseDirectoryAge } from "@/lib/directory-age";
 import { resolveDirectoryWhatsAppContact } from "@/lib/directory-whatsapp-contact";
 import { normalizePhoneFreeform } from "@/lib/phone-normalize";
 import { parseGamertagsFromInactiveLog } from "@/lib/minecraft-inactive-log";
 import {
+  isMissingAgeColumnError,
   isMissingDisplayNameColumnError,
   isMissingWhatsAppUsernameColumnError,
+  MISSING_AGE_COLUMN_MESSAGE,
   MISSING_DISPLAY_NAME_COLUMN_MESSAGE,
   MISSING_WHATSAPP_USERNAME_COLUMN_MESSAGE,
 } from "@/lib/prisma-migration-hints";
@@ -51,6 +54,8 @@ export async function createDirectoryMember(
     .toUpperCase();
   const phoneNational = String(formData.get("phoneNational") ?? "");
   const notesRaw = String(formData.get("notes") ?? "").trim();
+  const ageParsed = parseDirectoryAge(formData.get("age"));
+  if (!ageParsed.ok) return { error: ageParsed.error };
   const markedLeft = formData.get("markedLeft") === "on";
   const active = !markedLeft && formData.get("active") === "on";
   const isAdmin = formData.get("isAdmin") === "on";
@@ -70,6 +75,7 @@ export async function createDirectoryMember(
       data: {
         gamertag,
         displayName: displayName || null,
+        age: ageParsed.age,
         phone: contact.phone,
         phoneCountry: contact.phoneCountry,
         whatsappUsername: contact.whatsappUsername,
@@ -91,6 +97,9 @@ export async function createDirectoryMember(
     }
     if (isMissingWhatsAppUsernameColumnError(e)) {
       return { error: MISSING_WHATSAPP_USERNAME_COLUMN_MESSAGE };
+    }
+    if (isMissingAgeColumnError(e)) {
+      return { error: MISSING_AGE_COLUMN_MESSAGE };
     }
     throw e;
   }
@@ -253,6 +262,8 @@ export async function updateDirectoryMemberNotes(
     .trim()
     .toUpperCase();
   const phoneNational = String(formData.get("phoneNational") ?? "");
+  const ageParsed = parseDirectoryAge(formData.get("age"));
+  if (!ageParsed.ok) return { error: ageParsed.error };
   if (!id) return { error: "Falta el identificador" };
   if (!gamertag) return { error: "El gamertag es obligatorio" };
 
@@ -278,6 +289,7 @@ export async function updateDirectoryMemberNotes(
         whatsappUsername: contact.whatsappUsername,
         notes: notes || null,
         displayName: displayName || null,
+        age: ageParsed.age,
       },
     });
 
@@ -290,6 +302,9 @@ export async function updateDirectoryMemberNotes(
     }
     if (isMissingWhatsAppUsernameColumnError(e)) {
       return { error: MISSING_WHATSAPP_USERNAME_COLUMN_MESSAGE };
+    }
+    if (isMissingAgeColumnError(e)) {
+      return { error: MISSING_AGE_COLUMN_MESSAGE };
     }
     throw e;
   }

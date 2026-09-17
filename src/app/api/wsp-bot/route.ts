@@ -5,6 +5,7 @@ import {
   wspBotSecretMissing,
   wspBotUnauthorized,
 } from "@/lib/wsp-bot-auth";
+import { parseDirectoryAge } from "@/lib/directory-age";
 import { applyWspBotEvent, applyWspBotSync } from "@/lib/wsp-bot-sync";
 
 export const runtime = "nodejs";
@@ -15,7 +16,16 @@ function badRequest(message: string) {
 
 function asParticipant(
   value: unknown,
-): { jid?: string; username?: string; name?: string; gamertag?: string } | null {
+):
+  | { error: string }
+  | {
+      jid?: string;
+      username?: string;
+      name?: string;
+      gamertag?: string;
+      age?: number;
+    }
+  | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const jidRaw = (value as { jid?: unknown }).jid;
   const usernameRaw = (value as { username?: unknown }).username;
@@ -24,11 +34,14 @@ function asParticipant(
   if (!jid && !username) return null;
   const name = (value as { name?: unknown }).name;
   const gamertag = (value as { gamertag?: unknown }).gamertag;
+  const ageParsed = parseDirectoryAge((value as { age?: unknown }).age);
+  if (!ageParsed.ok) return { error: ageParsed.error };
   return {
     ...(jid ? { jid } : {}),
     ...(username ? { username } : {}),
     name: typeof name === "string" ? name : undefined,
     gamertag: typeof gamertag === "string" ? gamertag : undefined,
+    ...(ageParsed.age != null ? { age: ageParsed.age } : {}),
   };
 }
 
@@ -60,6 +73,7 @@ export async function POST(request: Request) {
   if (action === "join" || action === "leave") {
     const participant = asParticipant((body as { participant?: unknown }).participant);
     if (!participant) return badRequest("Falta participant.jid o participant.username");
+    if ("error" in participant) return badRequest(participant.error);
     const result = await applyWspBotEvent({ action, participant });
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: result.status });
@@ -73,7 +87,8 @@ export async function POST(request: Request) {
     const participants = [];
     for (const row of raw) {
       const p = asParticipant(row);
-      if (p) participants.push(p);
+      if (!p || "error" in p) continue;
+      participants.push(p);
     }
     const markMissingAsLeft = Boolean(
       (body as { markMissingAsLeft?: unknown }).markMissingAsLeft,

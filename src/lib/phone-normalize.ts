@@ -3,6 +3,7 @@ import {
   getCountryCallingCode,
   parsePhoneNumberFromString,
 } from "libphonenumber-js/max";
+import { stripMexicoNationalTrunk } from "@/lib/mexico-mobile-trunk";
 
 /**
  * Normaliza el teléfono para guardarlo. Prioriza formato internacional de
@@ -21,7 +22,10 @@ export function normalizePhoneForDirectory(
   }
 
   // Acepta espacios, guiones, puntos, etc.; solo los dígitos cuentan para validar.
-  const digits = nationalRaw.replace(/\D/g, "");
+  const digits = stripMexicoNationalTrunk(
+    upper,
+    nationalRaw.replace(/\D/g, ""),
+  );
   if (!digits) {
     return { ok: false, error: "Escribe el número de celular" };
   }

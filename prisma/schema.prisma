@@ -25,6 +25,8 @@ model DirectoryMember {
   id               String                    @id @default(cuid())
   gamertag         String
   displayName      String?                   @map("display_name")
+  /** Edad opcional (antes se escribía en notes). */
+  age              Int?
   phone            String?
   phoneCountry     String?                   @map("phone_country")
   /**

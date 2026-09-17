@@ -161,6 +161,11 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
                 {m.displayName ? (
                   <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
                     {m.displayName.trim()}
+                    {m.age != null ? ` · ${m.age} años` : ""}
+                  </p>
+                ) : m.age != null ? (
+                  <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
+                    {m.age} años
                   </p>
                 ) : null}
                 {m.activeOn.length > 0 ? (

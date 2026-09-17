@@ -15,7 +15,7 @@ export default function DashboardAgregarPage() {
           Agregar persona
         </h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Gamertag, celular o @usuario de WhatsApp, y situación en la comunidad. Luego podrás editar
+          Gamertag, celular o @usuario de WhatsApp, edad opcional y situación en la comunidad. Luego podrás editar
           strikes y baneos desde la lista. Para administración del allowlist y
           strikes usa{" "}
           <Link
