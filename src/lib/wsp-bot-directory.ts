@@ -89,6 +89,46 @@ export function displayNameForRestore(
   return next || undefined;
 }
 
+/** Rellena teléfono / @ / nombre solo si estaban vacíos. No pisa lo que ya hay. */
+export function fillEmptyWhatsAppIdentity(
+  existing: {
+    phone?: string | null;
+    whatsappUsername?: string | null;
+    displayName?: string | null;
+  },
+  incoming: {
+    phone?: string | null;
+    phoneCountry?: string | null;
+    username?: string | null;
+    displayName?: string | null;
+  },
+): {
+  phone?: string | null;
+  phoneCountry?: string | null;
+  whatsappUsername?: string | null;
+  displayName?: string | null;
+} {
+  const data: {
+    phone?: string | null;
+    phoneCountry?: string | null;
+    whatsappUsername?: string | null;
+    displayName?: string | null;
+  } = {};
+  if (!existing.phone && incoming.phone) {
+    data.phone = incoming.phone;
+    data.phoneCountry = incoming.phoneCountry ?? null;
+  }
+  if (!existing.whatsappUsername && incoming.username) {
+    data.whatsappUsername = incoming.username;
+  }
+  const displayName = displayNameForRestore(
+    existing.displayName,
+    incoming.displayName,
+  );
+  if (displayName !== undefined) data.displayName = displayName;
+  return data;
+}
+
 function usernameKey(raw: string | null | undefined): string {
   return String(raw ?? "")
     .trim()

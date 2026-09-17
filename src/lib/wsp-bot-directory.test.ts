@@ -6,6 +6,7 @@ import {
 } from "./whatsapp-username.ts";
 import {
   displayNameForRestore,
+  fillEmptyWhatsAppIdentity,
   findMemberByPhone,
   findMemberByUsername,
   findMemberByWhatsAppIdentity,
@@ -89,6 +90,38 @@ test("restore rellena displayName vacío y no pisa uno existente", () => {
   assert.equal(displayNameForRestore("", "Carlos"), "Carlos");
   assert.equal(displayNameForRestore("Ana", "Carlos"), undefined);
   assert.equal(displayNameForRestore(null, ""), undefined);
+});
+
+test("un addwsp repetido rellena nombre y @ vacíos sin pisar lo que ya hay", () => {
+  const fill = fillEmptyWhatsAppIdentity(
+    {
+      phone: "+57 300 111 2233",
+      whatsappUsername: null,
+      displayName: null,
+    },
+    {
+      phone: "+57 300 111 2233",
+      username: "drak00_oo",
+      displayName: "Carlos",
+    },
+  );
+  assert.equal(fill.whatsappUsername, "drak00_oo");
+  assert.equal(fill.displayName, "Carlos");
+  assert.equal(fill.phone, undefined);
+
+  const keep = fillEmptyWhatsAppIdentity(
+    {
+      phone: "+57 300 111 2233",
+      whatsappUsername: "ya_esta",
+      displayName: "Ana",
+    },
+    {
+      phone: "+57 300 111 2233",
+      username: "drak00_oo",
+      displayName: "Carlos",
+    },
+  );
+  assert.deepEqual(keep, {});
 });
 
 test("usuario de WhatsApp normaliza @ y mayúsculas; no es el nombre de perfil", () => {

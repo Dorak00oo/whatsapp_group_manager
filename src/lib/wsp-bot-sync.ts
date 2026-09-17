@@ -8,8 +8,8 @@ import { withDbRetry } from "@/lib/prisma-retry";
 import { normalizeWhatsAppPhoneInput } from "@/lib/whatsapp-phone-normalize";
 import { normalizeWhatsAppUsername } from "@/lib/whatsapp-username";
 import {
-  displayNameForRestore,
   explicitJoinGamertag,
+  fillEmptyWhatsAppIdentity,
   findMemberByWhatsAppIdentity,
   planWhatsAppRosterChange,
   type RosterEvent,
@@ -94,25 +94,7 @@ function identityFill(
   existing: DirectoryRow,
   parsed: NonNullable<ReturnType<typeof parseParticipant>>,
 ) {
-  const data: {
-    phone?: string | null;
-    phoneCountry?: string | null;
-    whatsappUsername?: string | null;
-    displayName?: string | null;
-  } = {};
-  if (!existing.phone && parsed.phone) {
-    data.phone = parsed.phone;
-    data.phoneCountry = parsed.phoneCountry;
-  }
-  if (!existing.whatsappUsername && parsed.username) {
-    data.whatsappUsername = parsed.username;
-  }
-  const displayName = displayNameForRestore(
-    existing.displayName,
-    parsed.displayName,
-  );
-  if (displayName !== undefined) data.displayName = displayName;
-  return data;
+  return fillEmptyWhatsAppIdentity(existing, parsed);
 }
 
 async function applyJoin(
@@ -131,7 +113,18 @@ async function applyJoin(
     "join",
   );
 
-  if (plan.type === "noop") return "skipped";
+  if (plan.type === "noop") {
+    if (existing) {
+      const fill = identityFill(existing, parsed);
+      if (Object.keys(fill).length > 0) {
+        await prisma.directoryMember.updateMany({
+          where: { id: existing.id, userId },
+          data: fill,
+        });
+      }
+    }
+    return "skipped";
+  }
 
   if (plan.type === "create") {
     if (!parsed.gamertag) return "skipped";
