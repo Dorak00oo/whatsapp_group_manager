@@ -19,3 +19,25 @@ export function memberRosterSituation(
   if (m.active) return "normal";
   return "inactive";
 }
+
+/** Campos de roster al cambiar de situación. Ausente no mueve de columna. */
+export function rosterFieldsForSituation(
+  situation: DirectoryRosterSituation,
+  beforeActive: boolean,
+  absentReason: string,
+) {
+  const stayOnRoster =
+    situation === "normal" || situation === "permanent";
+  const nextActive =
+    situation === "absent" ? beforeActive : stayOnRoster;
+
+  return {
+    active: nextActive,
+    permanentlyActive: situation === "permanent",
+    absentWithCause: situation === "absent",
+    absentReason: situation === "absent" ? absentReason : null,
+    activeHoldFromMc: stayOnRoster || situation === "absent",
+    reactivated: nextActive && !beforeActive,
+    deactivated: !nextActive && beforeActive,
+  };
+}

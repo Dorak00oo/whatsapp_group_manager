@@ -3,15 +3,11 @@
 import { useActionState } from "react";
 import { createDirectoryMember } from "@/app/dashboard/actions";
 import { DirectoryFormSituation } from "@/components/directory-form-situation";
+import { DirectoryPhoneAgeFields } from "@/components/directory-phone-age-fields";
 import { FormSwitch } from "@/components/form-switch";
 import { WhatsAppUsernameField } from "@/components/whatsapp-username-field";
 import type { CallingCodeOption } from "@/lib/phone-calling-codes";
-import {
-  softBtnPrimary,
-  softInputNeutral,
-  softPanel,
-  softSelectNeutral,
-} from "@/lib/soft-ui";
+import { softBtnPrimary, softInputNeutral, softPanel } from "@/lib/soft-ui";
 
 type Props = { phoneCountryOptions: CallingCodeOption[] };
 
@@ -72,54 +68,10 @@ export function DirectoryForm({ phoneCountryOptions }: Props) {
           />
         </label>
       </div>
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <div className="flex min-w-0 items-end gap-3">
-          <span className="min-w-0 flex-1 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-            Celular{" "}
-            <span className="font-normal text-zinc-500 dark:text-zinc-400">
-              (o el @)
-            </span>
-          </span>
-          <span className="w-[8.5rem] shrink-0 text-xs font-semibold text-zinc-800 dark:text-zinc-200 sm:w-[9.5rem]">
-            Edad
-          </span>
-        </div>
-        <div className="flex min-w-0 items-stretch gap-2">
-          <label className="sr-only" htmlFor="directory-phone-country">
-            País y prefijo
-          </label>
-          <select
-            id="directory-phone-country"
-            name="phoneCountry"
-            defaultValue="MX"
-            className={`${softSelectNeutral} w-[min(100%,12.5rem)] shrink-0`}
-          >
-            {phoneCountryOptions.map(({ iso, label }) => (
-              <option key={iso} value={iso}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <input
-            name="phoneNational"
-            type="tel"
-            inputMode="tel"
-            autoComplete="tel-national"
-            placeholder="55 1234 5678"
-            className={`${softInputNeutral} min-w-0 flex-1`}
-          />
-          <input
-            name="age"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={99}
-            placeholder="18"
-            aria-label="Edad"
-            className={`${softInputNeutral} w-[8.5rem] shrink-0 sm:w-[9.5rem]`}
-          />
-        </div>
-      </div>
+      <DirectoryPhoneAgeFields
+        countrySelectId="directory-phone-country"
+        phoneCountryOptions={phoneCountryOptions}
+      />
       <p className="text-xs font-normal text-zinc-500 dark:text-zinc-400">
         Hace falta el celular o el @usuario. El usuario de WhatsApp es único y
         no se puede cambiar; no uses el nombre que aparece en el chat.

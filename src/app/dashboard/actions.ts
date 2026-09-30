@@ -32,7 +32,10 @@ import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { blacklistMinecraftGamertagOnAllWorlds, syncDirectoryMembersFromMinecraftTable } from "@/lib/minecraft-directory-sync";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import { parseMemberSpreadsheet } from "@/lib/spreadsheet-members";
-import type { DirectoryRosterSituation } from "@/lib/directory-situation";
+import {
+  rosterFieldsForSituation,
+  type DirectoryRosterSituation,
+} from "@/lib/directory-situation";
 
 const STALE_SESSION_ERROR =
   "Sesión desactualizada respecto a la base de datos. Cierra sesión y vuelve a entrar.";
@@ -364,21 +367,17 @@ export async function setDirectoryMemberSituation(
     return { error: "La causa de la ausencia es obligatoria" };
   }
 
-  const stayOnRoster =
-    situation === "normal" ||
-    situation === "permanent" ||
-    situation === "absent";
-  const reactivated = stayOnRoster && !before.active;
-  const deactivated = situation === "inactive" && before.active;
+  const next = rosterFieldsForSituation(situation, before.active, reason);
+  const { reactivated, deactivated } = next;
 
   await prisma.directoryMember.updateMany({
     where: { id, userId },
     data: {
-      active: stayOnRoster,
-      permanentlyActive: situation === "permanent",
-      absentWithCause: situation === "absent",
-      absentReason: situation === "absent" ? reason : null,
-      activeHoldFromMc: stayOnRoster,
+      active: next.active,
+      permanentlyActive: next.permanentlyActive,
+      absentWithCause: next.absentWithCause,
+      absentReason: next.absentReason,
+      activeHoldFromMc: next.activeHoldFromMc,
       ...(reactivated
         ? { allowlistAddPending: true, allowlistRemovedAt: null }
         : deactivated
@@ -714,7 +713,7 @@ export async function bulkMarkInactiveFromMinecraftLog(
           skippedLeft++;
           continue;
         }
-        if (row.permanentlyActive || row.absentWithCause) {
+        if (row.permanentlyActive) {
           continue;
         }
         if (!row.active) {

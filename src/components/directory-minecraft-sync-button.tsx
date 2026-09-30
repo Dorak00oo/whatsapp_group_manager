@@ -63,7 +63,9 @@ export function DirectoryMinecraftSyncButton() {
             Minecraft
           </Link>{" "}
           (mismo gamertag: activo/inactivo y blacklist; no cambia a quienes se
-          salieron del grupo ni a los de activo permanente).
+          salieron del grupo ni a los de activo permanente. Los ausentes con
+          causa se quedan ausentes, pero sí pasan a activos o inactivos según
+          Minecraft).
         </p>
         <button
           type="button"

@@ -77,7 +77,7 @@ export function directoryMemberWhere(
       parts.push({ banExempt: true });
       break;
     case "roster":
-      parts.push({ active: true, leftAt: null, absentWithCause: false });
+      parts.push({ active: true, leftAt: null });
       break;
     case "new": {
       const cutoff = new Date(now);
@@ -86,7 +86,7 @@ export function directoryMemberWhere(
       break;
     }
     case "inactive":
-      parts.push({ active: false, leftAt: null, absentWithCause: false });
+      parts.push({ active: false, leftAt: null });
       break;
     case "absent":
       parts.push({ absentWithCause: true, leftAt: null });

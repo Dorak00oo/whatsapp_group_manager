@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import {
   deleteDirectoryMember,
   setDirectoryMemberBan,
@@ -12,11 +13,13 @@ import {
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
 import { DirectoryMemberSituationPicker } from "@/components/directory-member-situation-picker";
+import { DirectoryPhoneAgeFields } from "@/components/directory-phone-age-fields";
 import { WhatsAppUsernameField } from "@/components/whatsapp-username-field";
 import { getCallingCodeOptions } from "@/lib/phone-calling-codes";
 import { splitPhoneForDirectoryForm } from "@/lib/phone-normalize";
 import { formatWhatsAppUsername } from "@/lib/whatsapp-username";
-import { softBtnMint, softInputNeutral, softSelectNeutral } from "@/lib/soft-ui";
+import { DASHBOARD_MOBILE_EDITOR_ROOT_ID } from "@/lib/dashboard-mobile-top-nav";
+import { softBtnMint, softInputNeutral } from "@/lib/soft-ui";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
 function regionLabel(code: string | null): string | null {
@@ -34,7 +37,20 @@ type Props = {
   onClose: () => void;
 };
 
+function useMdUp() {
+  const [md, setMd] = useState(false);
+  useLayoutEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const apply = () => setMd(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return md;
+}
+
 export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
+  const mdUp = useMdUp();
   const [pending, startTransition] = useTransition();
   const [profileState, profileAction, profilePending] = useActionState(
     updateDirectoryMemberNotes,
@@ -93,8 +109,14 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-8 lg:p-10">
+  const shell = (
+    <div
+      className={
+        mdUp
+          ? "fixed inset-0 z-50 flex items-center justify-center p-8 lg:p-10"
+          : "pointer-events-auto flex h-full min-h-0 w-full flex-col"
+      }
+    >
       <button
         type="button"
         className="absolute inset-0 bg-zinc-950/55 backdrop-blur-[2px] transition-opacity dark:bg-black/65"
@@ -105,22 +127,22 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
         role="dialog"
         aria-modal
         aria-labelledby={`member-edit-title-${m.id}`}
-        className="relative z-10 flex max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden rounded-t-[1.75rem] bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-lg shadow-zinc-900/10 ring-1 ring-zinc-200/90 sm:max-h-[min(94vh,1100px)] sm:min-h-[min(82vh,760px)] sm:rounded-[1.75rem] sm:pb-0 dark:bg-zinc-900 dark:shadow-none dark:ring-zinc-700/60"
+        className="relative z-10 flex h-full min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-none bg-white pb-[env(safe-area-inset-bottom,0px)] shadow-none ring-0 md:h-auto md:max-h-[min(94vh,1100px)] md:min-h-[min(82vh,760px)] md:rounded-[1.75rem] md:pb-0 md:shadow-lg md:shadow-zinc-900/10 md:ring-1 md:ring-zinc-200/90 dark:bg-zinc-900 md:dark:ring-zinc-700/60"
       >
-        <header className="flex shrink-0 items-start justify-between gap-6 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800 sm:px-10 sm:py-7">
-          <div className="min-w-0">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-200 px-4 py-4 dark:border-zinc-800 sm:gap-6 sm:px-10 sm:py-7">
+          <div className="min-w-0 flex-1">
             <h2
               id={`member-edit-title-${m.id}`}
-              className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50"
+              className="break-words text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl"
             >
               Editar — {m.gamertag}
             </h2>
             {m.displayName ? (
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+              <p className="mt-1 break-words text-sm text-zinc-600 dark:text-zinc-300">
                 Nombre: {m.displayName}
               </p>
             ) : null}
-            <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1.5 break-words text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
               {country ? `${country} · ` : null}
               {m.phone ? (
                 <a
@@ -153,7 +175,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8 sm:px-10 sm:py-10">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-10 sm:py-10">
           <DirectoryMemberRoleChips m={m} />
           <DirectoryMemberSituationPicker
             m={m}
@@ -232,56 +254,13 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
                 />
               </label>
             </div>
-            <div className="flex min-w-0 flex-col gap-2">
-              <div className="flex min-w-0 items-end gap-3">
-                <span className="min-w-0 flex-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                  Celular{" "}
-                  <span className="font-normal text-zinc-500 dark:text-zinc-400">
-                    (o el @)
-                  </span>
-                </span>
-                <span className="w-[8.5rem] shrink-0 text-xs font-medium text-zinc-600 dark:text-zinc-400 sm:w-[9.5rem]">
-                  Edad
-                </span>
-              </div>
-              <div className="flex min-w-0 items-stretch gap-2">
-                <label className="sr-only" htmlFor={`edit-phone-country-${m.id}`}>
-                  País y prefijo
-                </label>
-                <select
-                  id={`edit-phone-country-${m.id}`}
-                  name="phoneCountry"
-                  defaultValue={phoneDefaults.iso}
-                  className={`${softSelectNeutral} w-[min(100%,12.5rem)] shrink-0`}
-                >
-                  {phoneCountryOptions.map(({ iso, label }) => (
-                    <option key={iso} value={iso}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  name="phoneNational"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel-national"
-                  defaultValue={phoneDefaults.national}
-                  placeholder="55 1234 5678"
-                  className={`${softInputNeutral} min-w-0 flex-1`}
-                />
-                <input
-                  name="age"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={99}
-                  defaultValue={m.age ?? ""}
-                  placeholder="18"
-                  aria-label="Edad"
-                  className="w-[8.5rem] shrink-0 rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none ring-emerald-500/30 focus:ring-2 sm:w-[9.5rem] dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                />
-              </div>
-            </div>
+            <DirectoryPhoneAgeFields
+              countrySelectId={`edit-phone-country-${m.id}`}
+              phoneCountryOptions={phoneCountryOptions}
+              defaultIso={phoneDefaults.iso}
+              defaultNational={phoneDefaults.national}
+              defaultAge={m.age}
+            />
             <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
               Nota
             </label>
@@ -438,4 +417,10 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
       />
     </div>
   );
+
+  if (!mdUp) {
+    const root = document.getElementById(DASHBOARD_MOBILE_EDITOR_ROOT_ID);
+    if (root) return createPortal(shell, root);
+  }
+  return shell;
 }

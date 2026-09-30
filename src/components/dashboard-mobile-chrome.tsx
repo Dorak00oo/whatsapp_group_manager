@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useLayoutEffect, useRef } from "react";
 import { DashboardMobileMoreDrawer } from "@/components/dashboard-mobile-more-drawer";
 import { DashboardMobileTabNav } from "@/components/dashboard-navigation";
 import { MinecraftWorldSwitcher } from "@/components/minecraft-world-switcher";
+import { DASH_MOBILE_NAV_H_VAR, DASHBOARD_MOBILE_EDITOR_ROOT_ID } from "@/lib/dashboard-mobile-top-nav";
 import type { MinecraftServerId } from "@/lib/minecraft-server";
 
 type Props = {
@@ -17,8 +18,32 @@ export function DashboardMobileChrome({
   selectedWorld,
   worldNames,
 }: Props) {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const apply = () => {
+      const bottom = el.getBoundingClientRect().bottom;
+      document.documentElement.style.setProperty(
+        DASH_MOBILE_NAV_H_VAR,
+        `${Math.round(bottom)}px`,
+      );
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(el);
+    window.addEventListener("resize", apply);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", apply);
+      document.documentElement.style.removeProperty(DASH_MOBILE_NAV_H_VAR);
+    };
+  }, []);
+
   return (
     <div
+      ref={rootRef}
       className="fixed inset-x-0 top-0 z-[100] flex flex-col overflow-visible border-b border-zinc-200/90 bg-background/95 pb-1.5 pl-[max(0.25rem,env(safe-area-inset-left,0px))] pr-[max(0.25rem,env(safe-area-inset-right,0px))] pt-[max(0.5rem,env(safe-area-inset-top,0px))] backdrop-blur-md dark:border-zinc-800/90 md:hidden"
       role="presentation"
     >
@@ -39,6 +64,10 @@ export function DashboardMobileChrome({
           />
         </Suspense>
       </div>
+      <div
+        id={DASHBOARD_MOBILE_EDITOR_ROOT_ID}
+        className="pointer-events-none absolute inset-x-0 top-full z-[90] -mt-px h-[calc(100dvh-100%+1px)] md:hidden"
+      />
     </div>
   );
 }

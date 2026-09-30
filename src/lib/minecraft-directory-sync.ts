@@ -17,18 +17,6 @@ import {
 } from "@/lib/minecraft-server";
 import { ensureMinecraftServers } from "@/lib/minecraft-servers-db";
 
-function directoryMayReceiveMcInactive(): {
-  permanentlyActive: false;
-  activeHoldFromMc: false;
-  absentWithCause: false;
-} {
-  return {
-    permanentlyActive: false,
-    activeHoldFromMc: false,
-    absentWithCause: false,
-  };
-}
-
 async function worldRowsForGamertag(gamertag: string): Promise<WorldActivityRow[]> {
   const tag = gamertag.trim();
   if (!tag) return [];
@@ -46,7 +34,8 @@ async function worldRowsForGamertag(gamertag: string): Promise<WorldActivityRow[
 /**
  * Alinea `DirectoryMember.active` con la unión de mundos (activo y sin
  * blacklist en al menos uno). No modifica filas con `leftAt`.
- * Respeta `permanentlyActive`, `absentWithCause` y `activeHoldFromMc` al bajar a inactivo.
+ * Respeta `permanentlyActive` y `activeHoldFromMc` al bajar a inactivo.
+ * Los ausentes con causa sí cambian de columna (siguen ausentes).
  */
 export async function syncDirectoryActiveWithMinecraft(
   gamertag: string,
@@ -75,7 +64,7 @@ export async function syncDirectoryActiveWithMinecraft(
 
   if (minecraftActive) {
     await prisma.directoryMember.updateMany({
-      where: { ...baseWhere, absentWithCause: false },
+      where: baseWhere,
       data: { active: true },
     });
     return;
@@ -84,7 +73,8 @@ export async function syncDirectoryActiveWithMinecraft(
   await prisma.directoryMember.updateMany({
     where: {
       ...baseWhere,
-      ...directoryMayReceiveMcInactive(),
+      permanentlyActive: false,
+      OR: [{ activeHoldFromMc: false }, { absentWithCause: true }],
     },
     data: { active: false },
   });
@@ -152,7 +142,8 @@ async function unionActivityByGamertag(): Promise<Map<string, WorldActivityRow[]
 /**
  * Alinea el directorio con el roster de Minecraft (unión de mundos:
  * activo en MC y sin blacklist en al menos uno).
- * Solo filas del panel sin `leftAt`. El activo permanente y el ausente con causa no se bajan.
+ * Solo filas del panel sin `leftAt`. El activo permanente no se baja.
+ * Los ausentes con causa siguen ausentes, pero sí cambian de columna.
  * Esta acción de panel ignora `activeHoldFromMc` (si no, casi nadie se inactiva).
  */
 export async function syncDirectoryMembersFromMinecraftTable(
@@ -193,7 +184,6 @@ export async function syncDirectoryMembersFromMinecraftTable(
     if (mcActive) matchedGamertags += 1;
 
     const shouldBeActive = m.permanentlyActive || mcActive;
-    if (m.absentWithCause) continue;
     if (m.active === shouldBeActive) continue;
     if (shouldBeActive) {
       toActivate.push(m.id);

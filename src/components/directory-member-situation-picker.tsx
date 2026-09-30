@@ -34,7 +34,7 @@ const options: {
   {
     value: "absent",
     label: "Ausente con causa",
-    hint: "Sigue en comunidad y en allowlist; el sync de Minecraft no lo mueve. Hay que indicar la causa.",
+    hint: "Sigue ausente (card azul). Actualizar desde Minecraft sí lo mueve de activos a inactivos o al revés. Hay que indicar la causa.",
     selected:
       "border-cyan-400 bg-cyan-100 text-cyan-950 dark:border-cyan-600 dark:bg-cyan-950/55 dark:text-cyan-50",
     idle: "border-zinc-300 bg-white text-zinc-700 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300",

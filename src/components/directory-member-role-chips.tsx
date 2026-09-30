@@ -50,6 +50,21 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       short: "Ausente",
       className: `${base} bg-sky-200 text-sky-950 ring-sky-400/85 dark:bg-sky-950/75 dark:text-sky-100 dark:ring-sky-600/65`,
     });
+    if (!m.active) {
+      chips.push({
+        key: "inactive",
+        label: "Los inactivos",
+        short: "Inactivo",
+        className: `${base} bg-slate-200 text-slate-900 ring-slate-400/90 dark:bg-slate-800/90 dark:text-slate-100 dark:ring-slate-500/70`,
+      });
+    } else {
+      chips.push({
+        key: "absent-active",
+        label: "Activo en Minecraft",
+        short: "Activo",
+        className: `${base} bg-emerald-200 text-emerald-950 ring-emerald-500/95 dark:bg-emerald-950/85 dark:text-emerald-50 dark:ring-emerald-500`,
+      });
+    }
   } else if (situation === "permanent") {
     chips.push({
       key: "permanent",
