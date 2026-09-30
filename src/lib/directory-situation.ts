@@ -1,5 +1,10 @@
 import type { DirectoryMemberDTO } from "@/types/directory";
 
+/** Días seguidos en Activos para quitar Ausente y pasar a activo normal. */
+export const DIRECTORY_ABSENT_ACTIVE_DAYS = 7;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 /** Situación de roster que se elige a mano en la ficha. */
 export type DirectoryRosterSituation =
   | "normal"
@@ -39,5 +44,45 @@ export function rosterFieldsForSituation(
     activeHoldFromMc: stayOnRoster || situation === "absent",
     reactivated: nextActive && !beforeActive,
     deactivated: !nextActive && beforeActive,
+  };
+}
+
+/** Reloj de 7 días: solo corre si sigue ausente y en la columna de activos. */
+export function absentActiveSinceForSituation(
+  situation: DirectoryRosterSituation,
+  nextActive: boolean,
+  now: Date,
+): Date | null {
+  if (situation !== "absent" || !nextActive) return null;
+  return now;
+}
+
+export function shouldPromoteAbsentToNormal(
+  m: {
+    absentWithCause: boolean;
+    active: boolean;
+    leftAt: Date | string | null;
+    absentActiveSince: Date | string | null;
+  },
+  now: Date = new Date(),
+): boolean {
+  if (!m.absentWithCause || !m.active || m.leftAt || !m.absentActiveSince) {
+    return false;
+  }
+  const sinceMs = new Date(m.absentActiveSince).getTime();
+  if (Number.isNaN(sinceMs)) return false;
+  return now.getTime() - sinceMs >= DIRECTORY_ABSENT_ACTIVE_DAYS * MS_PER_DAY;
+}
+
+/** Misma ficha que elegir activo normal a mano, ya estando en Activos. */
+export function fieldsForExpiredAbsentToNormal() {
+  const next = rosterFieldsForSituation("normal", true, "");
+  return {
+    active: next.active,
+    permanentlyActive: next.permanentlyActive,
+    absentWithCause: next.absentWithCause,
+    absentReason: next.absentReason,
+    activeHoldFromMc: next.activeHoldFromMc,
+    absentActiveSince: null as Date | null,
   };
 }

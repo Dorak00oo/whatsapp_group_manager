@@ -32,7 +32,9 @@ import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { blacklistMinecraftGamertagOnAllWorlds, syncDirectoryMembersFromMinecraftTable } from "@/lib/minecraft-directory-sync";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import { parseMemberSpreadsheet } from "@/lib/spreadsheet-members";
+import { reconcileDirectoryAbsentActive } from "@/lib/directory-absent-clock";
 import {
+  absentActiveSinceForSituation,
   rosterFieldsForSituation,
   type DirectoryRosterSituation,
 } from "@/lib/directory-situation";
@@ -355,6 +357,7 @@ export async function setDirectoryMemberSituation(
       permanentlyActive: true,
       absentWithCause: true,
       absentReason: true,
+      absentActiveSince: true,
       gamertag: true,
       allowlistSyncedAt: true,
       allowlistRemovedAt: true,
@@ -369,6 +372,16 @@ export async function setDirectoryMemberSituation(
 
   const next = rosterFieldsForSituation(situation, before.active, reason);
   const { reactivated, deactivated } = next;
+  const now = new Date();
+  const keepAbsentClock =
+    situation === "absent" &&
+    next.active &&
+    before.absentWithCause &&
+    before.active &&
+    before.absentActiveSince;
+  const absentActiveSince = keepAbsentClock
+    ? before.absentActiveSince
+    : absentActiveSinceForSituation(situation, next.active, now);
 
   await prisma.directoryMember.updateMany({
     where: { id, userId },
@@ -377,6 +390,7 @@ export async function setDirectoryMemberSituation(
       permanentlyActive: next.permanentlyActive,
       absentWithCause: next.absentWithCause,
       absentReason: next.absentReason,
+      absentActiveSince,
       activeHoldFromMc: next.activeHoldFromMc,
       ...(reactivated
         ? { allowlistAddPending: true, allowlistRemovedAt: null }
@@ -613,12 +627,14 @@ export async function setDirectoryMemberLeft(id: string, left: boolean) {
           allowlistAddPending: false,
           absentWithCause: false,
           absentReason: null,
+          absentActiveSince: null,
         }
       : {
           leftAt: null,
           active: true,
           absentWithCause: false,
           absentReason: null,
+          absentActiveSince: null,
           activeHoldFromMc: true,
         },
   });
@@ -734,6 +750,7 @@ export async function bulkMarkInactiveFromMinecraftLog(
         },
         data: { active: false },
       });
+      await reconcileDirectoryAbsentActive(userId);
     }
 
     const notFound = gamertags.filter((g) => !matchedLogTags.has(g.toLowerCase()));

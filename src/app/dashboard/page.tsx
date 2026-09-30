@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { DirectorySection } from "@/components/directory-section";
+import { reconcileDirectoryAbsentActive } from "@/lib/directory-absent-clock";
 import {
   directoryMemberWhere,
   directoryMemberWhereIgnoringListStatus,
@@ -51,6 +52,7 @@ export default async function DashboardPage({
   let activeOnByTag = new Map<string, ("vanilla" | "mods")[]>();
 
   try {
+    await reconcileDirectoryAbsentActive(userId);
     const [raw, countries, counts, onMap] = await Promise.all([
       prisma.directoryMember.findMany({
         where: whereMembers,

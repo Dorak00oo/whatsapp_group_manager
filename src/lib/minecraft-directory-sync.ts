@@ -1,3 +1,4 @@
+import { reconcileDirectoryAbsentActive } from "@/lib/directory-absent-clock";
 import { prisma } from "@/lib/prisma";
 import {
   buildRosterFromSnapshot,
@@ -67,17 +68,17 @@ export async function syncDirectoryActiveWithMinecraft(
       where: baseWhere,
       data: { active: true },
     });
-    return;
+  } else {
+    await prisma.directoryMember.updateMany({
+      where: {
+        ...baseWhere,
+        permanentlyActive: false,
+        OR: [{ activeHoldFromMc: false }, { absentWithCause: true }],
+      },
+      data: { active: false },
+    });
   }
-
-  await prisma.directoryMember.updateMany({
-    where: {
-      ...baseWhere,
-      permanentlyActive: false,
-      OR: [{ activeHoldFromMc: false }, { absentWithCause: true }],
-    },
-    data: { active: false },
-  });
+  await reconcileDirectoryAbsentActive(owner.id);
 }
 
 export type SyncDirectoryFromMinecraftSummary = {
@@ -213,6 +214,8 @@ export async function syncDirectoryMembersFromMinecraftTable(
     });
     updatedRows += r.count;
   }
+
+  await reconcileDirectoryAbsentActive(userId);
 
   const minecraftCount = [...byTag.values()].filter((worlds) =>
     isCommunityActiveFromWorlds(worlds),

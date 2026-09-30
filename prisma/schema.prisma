@@ -47,6 +47,12 @@ model DirectoryMember {
   absentWithCause Boolean                    @default(false) @map("absent_with_cause")
   absentReason     String?                   @map("absent_reason")
   /**
+   * Desde cuándo un ausente está en la columna de activos.
+   * A los 7 días se quita Ausente y pasa a activo normal.
+   * Los ausentes que ya estaban en activos al desplegar arrancan el reloj ahora.
+   */
+  absentActiveSince DateTime?                @map("absent_active_since")
+  /**
    * Tras marcar activo a mano, el sync de Minecraft no vuelve a poner inactivo
    * hasta que lo marques inactivo otra vez (salvo activo permanente).
    */

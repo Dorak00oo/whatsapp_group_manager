@@ -152,6 +152,7 @@ async function applyJoin(
       active: true,
       absentWithCause: false,
       absentReason: null,
+      absentActiveSince: null,
       activeHoldFromMc: true,
       ...fill,
     },
@@ -187,6 +188,7 @@ async function applyLeave(
       allowlistAddPending: false,
       absentWithCause: false,
       absentReason: null,
+      absentActiveSince: null,
     },
   });
   await enqueueAllowlistRemovalForMember(userId, existing);
