@@ -17,15 +17,13 @@ export type GamertagAuditCandidate = {
 
 /**
  * Detecta pares (miembro del directorio, jugador de Minecraft) donde el
- * gamertag "es la misma persona" (mismas letras y espacios, ignorando
- * mayúsculas, y a lo sumo cambia el sufijo numérico final) pero el gamertag
- * del directorio no es un calco exacto carácter por carácter del real de
- * Minecraft — ya sea por mayúsculas distintas, por el sufijo numérico, o por
- * ambos. Minecraft distingue mayúsculas, así que una diferencia de caso
- * también hace falta corregirla para que el allowlist del servidor funcione.
- * No se corrigen errores de tipeo en las letras, para no fusionar por error a
- * dos jugadores distintos con nombres parecidos. Solo considera jugadores de
- * Minecraft que no tengan ya una coincidencia EXACTA (carácter por carácter,
+ * gamertag "es la misma persona": primero la base 1 a 1 (mismas letras y
+ * espacios, ignorando mayúsculas, y a lo sumo cambia el sufijo numérico). Si
+ * eso no coincide, uno cercano que solo cambia espacios o guiones bajos
+ * ("Sung JW1883" ~ "SungJW1883", "Luxen py" ~ "luxen_py"). Si tampoco, un
+ * error de hasta dos letras en un nombre largo ("Luxen py" ~ "luxen_pz").
+ * El del directorio no es un calco exacto del real de Minecraft. Solo
+ * considera jugadores de Minecraft que no tengan ya una coincidencia EXACTA (carácter por carácter,
  * mayúsculas incluidas) en el directorio, y asigna cada miembro/jugador a lo
  * sumo una vez (asignación voraz uno-a-uno).
  */
@@ -246,13 +244,13 @@ export async function runGamertagAuditWithLog(
     `Descartando jugadores con coincidencia exacta en WhatsApp (mayúsculas incluidas)... ${exactMatchCount} descartado(s)`,
   );
   log(
-    `Comparando ${withoutExactMatch.length} jugador(es) restante(s) (mismo nombre ignorando mayúsculas, con sufijo numérico o mayúsculas distintas)...`,
+    `Comparando ${withoutExactMatch.length} jugador(es) restante(s) (1 a 1, espacio o guion bajo, o hasta dos letras)...`,
   );
 
   const candidates = findGamertagAuditCandidates(members, players);
 
   if (candidates.length === 0) {
-    log("  -> ninguna coincidencia (ni por mayúsculas ni por sufijo numérico)");
+    log("  -> ninguna coincidencia (ni 1 a 1, ni espacio, ni un par de letras)");
   } else {
     for (const c of candidates) {
       log(

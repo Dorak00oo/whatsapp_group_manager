@@ -172,14 +172,12 @@ export function GamertagAuditPanel() {
         <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
           Compara cada jugador visto en Minecraft (sin coincidencia exacta,
           mayúsculas incluidas) contra los gamertags activos del grupo de
-          WhatsApp. Solo detecta casos muy concretos: mismas letras y espacios
-          (ignorando mayúsculas) pero con mayúsculas distintas, números al
-          final que faltan o son distintos, o ambas cosas a la vez. Minecraft
-          sí distingue mayúsculas, así que esa diferencia también hace falta
-          corregirla para que el allowlist del servidor funcione. No corrige
-          errores de tipeo en las letras, para no confundir a dos jugadores
-          distintos con nombres parecidos. Nada se corrige solo: hace falta
-          aprobar el cambio manualmente.
+          WhatsApp. Primero busca el mismo nombre 1 a 1, ignorando mayúsculas
+          y el número del final. Si no lo encuentra, busca uno cercano que
+          solo cambie espacios o guiones bajos, como Sung JW1883 frente a
+          SungJW1883, o Luxen py frente a luxen_py. Si tampoco, acepta un
+          error de hasta dos letras en el nombre. Nada se corrige solo: hace
+          falta aprobar el cambio.
         </p>
       </div>
 

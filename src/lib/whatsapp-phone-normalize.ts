@@ -16,9 +16,8 @@ export function normalizeWhatsAppPhoneInput(input: string):
     return { ok: false, error: "JID sin número de teléfono" };
   }
 
-  const digitsRaw = raw.includes("@")
-    ? raw.split("@")[0]!.replace(/\D/g, "")
-    : raw.replace(/\D/g, "");
+  const userPart = raw.includes("@") ? raw.split("@")[0]! : raw;
+  const digitsRaw = userPart.split(":")[0]!.replace(/\D/g, "");
   const digits = stripMexicoWhatsAppDigits(digitsRaw);
 
   if (digits.length < 8 || digits.length > 15) {

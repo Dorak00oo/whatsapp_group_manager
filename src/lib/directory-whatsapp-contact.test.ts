@@ -3,6 +3,14 @@ import { test } from "node:test";
 import { normalizeWhatsAppPhoneInput } from "./whatsapp-phone-normalize.ts";
 import { resolveDirectoryWhatsAppContact } from "./directory-whatsapp-contact.ts";
 
+test("un JID con dispositivo :0 no mete ese 0 en el número", () => {
+  const parsed = normalizeWhatsAppPhoneInput("5493884531059:0@s.whatsapp.net");
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.phone.replace(/\D/g, ""), "5493884531059");
+  }
+});
+
 test("un JID @lid no se trata como teléfono", () => {
   const parsed = normalizeWhatsAppPhoneInput("123456789012345@lid");
   assert.equal(parsed.ok, false);
