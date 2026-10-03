@@ -9,6 +9,11 @@ import {
   runGamertagAudit,
 } from "@/app/dashboard/gamertag-audit-actions";
 import type { PendingGamertagAuditSuggestion } from "@/lib/gamertag-audit";
+import {
+  GAMERTAG_LETTER_MATCH_SCORE,
+  GAMERTAG_SEPARATOR_MATCH_SCORE,
+  gamertagSimilarity,
+} from "@/lib/gamertag-similarity";
 import { softBtnMint, softBtnPrimary, softPanel } from "@/lib/soft-ui";
 
 type Phase = "idle" | "running" | "done";
@@ -25,6 +30,13 @@ function splitSuffix(raw: string): { base: string; suffix: string } {
 
 /** Describe en qué se diferencian dos gamertags que "son la misma persona" (mayúsculas y/o sufijo numérico). */
 function describeGamertagDiff(current: string, suggested: string): string {
+  const score = gamertagSimilarity(current, suggested);
+  if (score === GAMERTAG_SEPARATOR_MATCH_SCORE) {
+    return "Mismas letras, pero cambia un espacio o un guion bajo.";
+  }
+  if (score === GAMERTAG_LETTER_MATCH_SCORE) {
+    return "Difieren en pocos caracteres (hasta 4 letras o números). Mayúsculas y espacios no cuentan.";
+  }
   const a = splitSuffix(current);
   const b = splitSuffix(suggested);
   const caseDiffers = a.base !== b.base;
@@ -175,9 +187,12 @@ export function GamertagAuditPanel() {
           WhatsApp. Primero busca el mismo nombre 1 a 1, ignorando mayúsculas
           y el número del final. Si no lo encuentra, busca uno cercano que
           solo cambie espacios o guiones bajos, como Sung JW1883 frente a
-          SungJW1883, o Luxen py frente a luxen_py. Si tampoco, acepta un
-          error de hasta dos letras en el nombre. Nada se corrige solo: hace
-          falta aprobar el cambio.
+          SungJW1883, o Luxen py frente a luxen_py. Si tampoco, acepta hasta
+          4 caracteres de letras o números. Las mayúsculas y los espacios no
+          cuentan: pueden cambiar todos. Un nombre distinto con otro número,
+          como Drako274 frente a Draks1780, no se sugiere. Si el gamertag de
+          Minecraft ya está igual, carácter por carácter, ya tiene dueño y no
+          entra a revisar. Nada se corrige solo: hace falta aprobar el cambio.
         </p>
       </div>
 

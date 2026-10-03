@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import {
   GAMERTAG_SIMILARITY_THRESHOLD,
   gamertagSimilarity,
+  shouldSuggestGamertagChange,
 } from "@/lib/gamertag-similarity";
 
 export type AuditDirectoryMember = { id: string; gamertag: string };
@@ -21,11 +22,13 @@ export type GamertagAuditCandidate = {
  * espacios, ignorando mayúsculas, y a lo sumo cambia el sufijo numérico). Si
  * eso no coincide, uno cercano que solo cambia espacios o guiones bajos
  * ("Sung JW1883" ~ "SungJW1883", "Luxen py" ~ "luxen_py"). Si tampoco, un
- * error de hasta dos letras en un nombre largo ("Luxen py" ~ "luxen_pz").
- * El del directorio no es un calco exacto del real de Minecraft. Solo
- * considera jugadores de Minecraft que no tengan ya una coincidencia EXACTA (carácter por carácter,
- * mayúsculas incluidas) en el directorio, y asigna cada miembro/jugador a lo
- * sumo una vez (asignación voraz uno-a-uno).
+ * error de hasta 4 caracteres en el gamertag entero. Un nombre distinto con
+ * otro número no entra ("Drako274" no es "Draks1780"). Si el gamertag de
+ * Minecraft ya está igual, carácter por carácter, en el grupo, ya tiene
+ * dueño: no se compara con nadie más ni entra a revisar. Solo considera
+ * jugadores de Minecraft sin esa coincidencia exacta, y tampoco reasigna a
+ * un miembro del grupo cuyo gamertag ya existe igual en Minecraft. Asigna
+ * cada miembro/jugador a lo sumo una vez.
  */
 export function findGamertagAuditCandidates(
   members: AuditDirectoryMember[],
@@ -35,6 +38,10 @@ export function findGamertagAuditCandidates(
   const exactMemberTags = new Set(
     members.map((m) => m.gamertag.trim()).filter((t) => t.length > 0),
   );
+  const directoryTags = [...exactMemberTags];
+  const minecraftTags = players
+    .map((p) => p.gamertag.trim())
+    .filter((t) => t.length > 0);
 
   type Pair = {
     member: AuditDirectoryMember;
@@ -51,6 +58,14 @@ export function findGamertagAuditCandidates(
     for (const member of members) {
       const memberTag = member.gamertag.trim();
       if (!memberTag) continue;
+      if (
+        !shouldSuggestGamertagChange(memberTag, playerTag, {
+          directoryTags,
+          minecraftTags,
+        })
+      ) {
+        continue;
+      }
       const score = gamertagSimilarity(memberTag, playerTag);
       if (score >= threshold && score < 1) {
         pairs.push({ member, player, score });
@@ -244,13 +259,13 @@ export async function runGamertagAuditWithLog(
     `Descartando jugadores con coincidencia exacta en WhatsApp (mayúsculas incluidas)... ${exactMatchCount} descartado(s)`,
   );
   log(
-    `Comparando ${withoutExactMatch.length} jugador(es) restante(s) (1 a 1, espacio o guion bajo, o hasta dos letras)...`,
+    `Comparando ${withoutExactMatch.length} jugador(es) restante(s) (1 a 1, espacio o guion bajo, o hasta 4 caracteres)...`,
   );
 
   const candidates = findGamertagAuditCandidates(members, players);
 
   if (candidates.length === 0) {
-    log("  -> ninguna coincidencia (ni 1 a 1, ni espacio, ni un par de letras)");
+    log("  -> ninguna coincidencia (ni 1 a 1, ni espacio, ni hasta 4 caracteres)");
   } else {
     for (const c of candidates) {
       log(
