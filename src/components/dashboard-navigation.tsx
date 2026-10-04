@@ -14,6 +14,27 @@ import {
 const iconSm = "size-5";
 const iconSidebar = "size-7";
 
+function IconHome({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className ?? iconSm}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 10.5 12 4l8 6.5" />
+      <path d="M6 10v9h12v-9" />
+      <path d="M10 19v-5h4v5" />
+    </svg>
+  );
+}
+
 function IconList({ className }: { className?: string }) {
   return (
     <svg
@@ -211,9 +232,32 @@ function IconBot({ className }: { className?: string }) {
   );
 }
 
+function IconHistory({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className ?? iconSm}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </svg>
+  );
+}
+
 function useNavActive() {
   const pathname = usePathname();
-  const list = pathname === "/dashboard";
+  const home = pathname === "/dashboard";
+  const list =
+    pathname === "/dashboard/lista" || pathname.startsWith("/dashboard/lista/");
   const add = pathname.startsWith("/dashboard/agregar");
   const bulk = pathname.startsWith("/dashboard/administracion");
   const minecraft = pathname.startsWith("/dashboard/minecraft");
@@ -222,7 +266,20 @@ function useNavActive() {
   const monitoreo = pathname.startsWith("/dashboard/monitoreo");
   const bot = pathname.startsWith("/dashboard/bot");
   const ajustes = pathname.startsWith("/dashboard/ajustes");
-  return { list, add, bulk, minecraft, comandos, parcela, monitoreo, bot, ajustes };
+  const cuentas = pathname.startsWith("/dashboard/cuentas");
+  return {
+    home,
+    list,
+    add,
+    bulk,
+    minecraft,
+    comandos,
+    parcela,
+    monitoreo,
+    bot,
+    ajustes,
+    cuentas,
+  };
 }
 
 type SidebarNavItem = {
@@ -258,14 +315,32 @@ function activeTabCls(on: boolean) {
 
 /** Barra lateral: grupos por función, color solo en la tesela activa. */
 export function DashboardSidebarNav() {
-  const { list, add, bulk, minecraft, comandos, parcela, monitoreo, bot, ajustes } =
-    useNavActive();
+  const {
+    home,
+    list,
+    add,
+    bulk,
+    minecraft,
+    comandos,
+    parcela,
+    monitoreo,
+    bot,
+    ajustes,
+    cuentas,
+  } = useNavActive();
 
   return (
     <nav className="flex w-full flex-col" aria-label="Secciones del panel">
       <div className={navGroupClass} role="group" aria-label="Vista">
         <SidebarNavTile
           href="/dashboard"
+          on={home}
+          title="Inicio"
+          caption="Inicio"
+          icon={<IconHome className={iconSidebar} />}
+        />
+        <SidebarNavTile
+          href="/dashboard/lista"
           on={list}
           title="Lista de personas"
           caption="Lista"
@@ -332,6 +407,13 @@ export function DashboardSidebarNav() {
           title="Ajustes de Minecraft"
           caption="Ajustes"
           icon={<IconSettings className={iconSidebar} />}
+        />
+        <SidebarNavTile
+          href="/dashboard/cuentas"
+          on={cuentas}
+          title="Cuentas e historial"
+          caption="Cuentas"
+          icon={<IconHistory className={iconSidebar} />}
         />
       </div>
     </nav>
@@ -416,8 +498,19 @@ function ScrollSideHint({
 /** Navegación superior móvil: todas las secciones, scroll horizontal. */
 export function DashboardMobileTabNav() {
   const pathname = usePathname();
-  const { list, add, bulk, minecraft, comandos, parcela, monitoreo, bot, ajustes } =
-    useNavActive();
+  const {
+    home,
+    list,
+    add,
+    bulk,
+    minecraft,
+    comandos,
+    parcela,
+    monitoreo,
+    bot,
+    ajustes,
+    cuentas,
+  } = useNavActive();
   const scrollerRef = useRef<HTMLElement>(null);
   const [overflow, setOverflow] = useState({ left: false, right: false });
 
@@ -472,6 +565,14 @@ export function DashboardMobileTabNav() {
       >
         <Link
           href="/dashboard"
+          className={`${tabBase} ${activeTabCls(home)}`}
+          aria-current={home ? "page" : undefined}
+        >
+          <IconHome className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">Inicio</span>
+        </Link>
+        <Link
+          href="/dashboard/lista"
           className={`${tabBase} ${activeTabCls(list)}`}
           aria-current={list ? "page" : undefined}
         >
@@ -549,6 +650,14 @@ export function DashboardMobileTabNav() {
         >
           <IconSettings className="size-[1.125rem] shrink-0" />
           <span className="text-[10px] font-medium leading-none">Ajustes</span>
+        </Link>
+        <Link
+          href="/dashboard/cuentas"
+          className={`${tabBase} ${activeTabCls(cuentas)}`}
+          aria-current={cuentas ? "page" : undefined}
+        >
+          <IconHistory className="size-[1.125rem] shrink-0" />
+          <span className="text-[10px] font-medium leading-none">Cuentas</span>
         </Link>
       </nav>
     </div>

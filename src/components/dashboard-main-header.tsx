@@ -15,6 +15,8 @@ type Props = {
 
 export function DashboardMainHeader({ selectedWorld, worldNames }: Props) {
   const pathname = usePathname();
+  const isHome = pathname === "/dashboard";
+  const isLista = pathname.startsWith("/dashboard/lista");
   const isComandos = pathname.startsWith("/dashboard/comandos");
   const isMinecraft = pathname.startsWith("/dashboard/minecraft");
   const isParcela = pathname.startsWith("/dashboard/parcela");
@@ -22,8 +24,15 @@ export function DashboardMainHeader({ selectedWorld, worldNames }: Props) {
   const isAdministracion = pathname.startsWith("/dashboard/administracion");
   const isBot = pathname.startsWith("/dashboard/bot");
   const isAjustes = pathname.startsWith("/dashboard/ajustes");
+  const isCuentas = pathname.startsWith("/dashboard/cuentas");
 
-  const title = isBot
+  const title = isHome
+    ? "Inicio"
+    : isLista
+      ? "Lista"
+      : isCuentas
+    ? "Cuentas e historial"
+    : isBot
     ? "Bot de WhatsApp"
     : isAjustes
       ? "Ajustes de Minecraft"
@@ -38,7 +47,13 @@ export function DashboardMainHeader({ selectedWorld, worldNames }: Props) {
               : isAdministracion
                 ? "Administración de los usuarios"
                 : "Panel";
-  const subtitle = isBot
+  const subtitle = isHome
+    ? "Conteos, estado del bot y de los mundos, y comandos del mundo seleccionado."
+    : isLista
+      ? "Gamertag, celular, edad, strikes, baneos y filtros por rol o situación."
+      : isCuentas
+    ? "Quién cambió qué y cuándo, y quién puede entrar al panel."
+    : isBot
     ? "QR o código de 8 dígitos para vincular el número, y logs del bot Yuki."
     : isAjustes
       ? "Conexión de Vanilla y Mods, nombre, umbrales e ítems baneados del mundo seleccionado."
@@ -62,7 +77,7 @@ export function DashboardMainHeader({ selectedWorld, worldNames }: Props) {
       <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
         {subtitle}
       </p>
-      {isMinecraftWorldRoute(pathname) ? (
+      {isHome || isMinecraftWorldRoute(pathname) ? (
         <Suspense fallback={null}>
           <MinecraftWorldSwitcher selected={selectedWorld} names={worldNames} />
         </Suspense>

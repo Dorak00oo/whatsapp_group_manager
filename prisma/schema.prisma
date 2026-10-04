@@ -17,67 +17,140 @@ model User {
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
   directoryMembers DirectoryMember[]
+  panelAccounts    PanelAccount[]
 
   @@map("users")
 }
 
 model DirectoryMember {
-  id               String                    @id @default(cuid())
-  gamertag         String
-  displayName      String?                   @map("display_name")
-  /** Edad opcional (antes se escribía en notes). */
-  age              Int?
-  phone            String?
-  phoneCountry     String?                   @map("phone_country")
+  id                     String                      @id @default(cuid())
+  gamertag               String
+  displayName            String?                     @map("display_name")
+  /**
+   * Edad opcional (antes se escribía en notes).
+   */
+  age                    Int?
+  phone                  String?
+  phoneCountry           String?                     @map("phone_country")
   /**
    * Usuario público de WhatsApp (`drak00_oo`), distinto de displayName.
    * Identidad alternativa cuando WhatsApp no entrega el celular (LID).
    */
-  whatsappUsername String?                   @map("whatsapp_username")
-  active           Boolean                   @default(true) @map("is_active")
+  whatsappUsername       String?                     @map("whatsapp_username")
+  active                 Boolean                     @default(true) @map("is_active")
   /**
    * Activo permanente en el roster de WhatsApp: aunque Minecraft marque inactividad,
    * no se baja a «inactivo» mientras esté activado.
    */
-  permanentlyActive Boolean                  @default(false) @map("permanently_active")
+  permanentlyActive      Boolean                     @default(false) @map("permanently_active")
+  /**
+   * Protección de nuevos: mientras esté en el futuro cuenta como activo
+   * permanente (la sync no lo baja a inactivo). Vence sola, sin job.
+   */
+  permanentlyActiveUntil DateTime?                   @map("permanently_active_until")
   /**
    * Ausente con causa: sigue en comunidad y en allowlist, distinto de activo
    * normal y de activo permanente. El sync de Minecraft no le cambia la situación.
    */
-  absentWithCause Boolean                    @default(false) @map("absent_with_cause")
-  absentReason     String?                   @map("absent_reason")
+  absentWithCause        Boolean                     @default(false) @map("absent_with_cause")
+  absentReason           String?                     @map("absent_reason")
   /**
    * Desde cuándo un ausente está en la columna de activos.
    * A los 7 días se quita Ausente y pasa a activo normal.
    * Los ausentes que ya estaban en activos al desplegar arrancan el reloj ahora.
    */
-  absentActiveSince DateTime?                @map("absent_active_since")
+  absentActiveSince      DateTime?                   @map("absent_active_since")
   /**
    * Tras marcar activo a mano, el sync de Minecraft no vuelve a poner inactivo
    * hasta que lo marques inactivo otra vez (salvo activo permanente).
    */
-  activeHoldFromMc Boolean                    @default(false) @map("active_hold_from_mc")
-  /** Pendiente de `allowlist add` (p. ej. reactivación manual inactivo → activo). */
-  allowlistAddPending Boolean                 @default(false) @map("allowlist_add_pending")
-  /** Última vez que su gamertag se dio de alta en el allowlist vía sync web. */
-  allowlistSyncedAt DateTime?                @map("allowlist_synced_at")
-  /** Última vez que su gamertag se quitó del allowlist vía sync web. */
-  allowlistRemovedAt DateTime?               @map("allowlist_removed_at")
-  isAdmin          Boolean                   @default(false) @map("is_admin")
-  banExempt        Boolean                   @default(false) @map("ban_exempt")
-  leftAt           DateTime?                 @map("left_at")
-  banned           Boolean                   @default(false) @map("banned")
-  bannedReason     String?                   @map("banned_reason")
-  notes            String?
-  userId           String                    @map("user_id")
-  user             User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  strikes          DirectoryStrike[]
-  auditSuggestions GamertagAuditSuggestion[]
-  gamertagCorrections PendingGamertagCorrection[]
-  createdAt        DateTime                  @default(now()) @map("created_at")
-  updatedAt        DateTime                  @updatedAt @map("updated_at")
+  activeHoldFromMc       Boolean                     @default(false) @map("active_hold_from_mc")
+  /**
+   * Pendiente de `allowlist add` (p. ej. reactivación manual inactivo → activo).
+   */
+  allowlistAddPending    Boolean                     @default(false) @map("allowlist_add_pending")
+  /**
+   * Última vez que su gamertag se dio de alta en el allowlist vía sync web.
+   */
+  allowlistSyncedAt      DateTime?                   @map("allowlist_synced_at")
+  /**
+   * Última vez que su gamertag se quitó del allowlist vía sync web.
+   */
+  allowlistRemovedAt     DateTime?                   @map("allowlist_removed_at")
+  isAdmin                Boolean                     @default(false) @map("is_admin")
+  banExempt              Boolean                     @default(false) @map("ban_exempt")
+  leftAt                 DateTime?                   @map("left_at")
+  banned                 Boolean                     @default(false) @map("banned")
+  bannedReason           String?                     @map("banned_reason")
+  notes                  String?
+  userId                 String                      @map("user_id")
+  user                   User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strikes                DirectoryStrike[]
+  auditSuggestions       GamertagAuditSuggestion[]
+  gamertagCorrections    PendingGamertagCorrection[]
+  panelAccount           PanelAccount?
+  createdAt              DateTime                    @default(now()) @map("created_at")
+  updatedAt              DateTime                    @updatedAt @map("updated_at")
 
+  @@index([userId, leftAt, active])
+  @@index([userId, gamertag])
+  @@index([userId, phone])
+  @@index([userId, createdAt])
+  @@index([whatsappUsername])
   @@map("directory_members")
+}
+
+/**
+ * Cuenta de admin del panel: el miembro entra con su gamertag actual y la
+ * contraseña grupal. El dueño (PANEL_OWNER_GAMERTAG) no vive en esta tabla.
+ */
+model PanelAccount {
+  id        String          @id @default(cuid())
+  userId    String          @map("user_id")
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memberId  String          @unique @map("member_id")
+  member    DirectoryMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now()) @map("created_at")
+  /**
+   * Gamertag de quien dio de alta la cuenta.
+   */
+  createdBy String          @map("created_by")
+
+  @@index([userId])
+  @@map("panel_accounts")
+}
+
+/**
+ * Historial de cambios con actor. `memberId` sin FK a propósito: el evento
+ * sobrevive al borrado del miembro (`memberGamertag` guarda la copia).
+ */
+model AuditEvent {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  /**
+   * panel | bot | sistema
+   */
+  actorType      String   @map("actor_type")
+  actorGamertag  String?  @map("actor_gamertag")
+  actorPhone     String?  @map("actor_phone")
+  actorName      String?  @map("actor_name")
+  /**
+   * Texto corto: `member.update`, `account.add`, `bot.join`…
+   */
+  action         String
+  memberId       String?  @map("member_id")
+  memberGamertag String?  @map("member_gamertag")
+  /**
+   * `{ campo: { from, to } }`
+   */
+  changes        Json?
+  details        Json?
+
+  @@index([userId, createdAt])
+  @@index([memberId, createdAt])
+  @@index([actorGamertag])
+  @@map("audit_events")
 }
 
 model DirectoryStrike {
@@ -106,9 +179,9 @@ model MinecraftServer {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  players       MinecraftPlayer[]
-  snapshots     MinecraftSnapshot[]
-  config        MinecraftConfig?
+  players                    MinecraftPlayer[]
+  snapshots                  MinecraftSnapshot[]
+  config                     MinecraftConfig?
   parcels                    MinecraftParcel[]
   monitorEvents              MinecraftMonitorEvent[]
   monitorAlerts              MinecraftMonitorAlert[]
@@ -153,19 +226,19 @@ model MinecraftSyncQueue {
  * Registro de actividad de jugadores de Minecraft desde el servidor
  */
 model MinecraftPlayer {
-  id               String                    @id @default(cuid())
-  serverId         String                    @default("vanilla") @map("server_id")
-  server           MinecraftServer           @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  gamertag         String
-  lastSeen         DateTime                  @map("last_seen")
-  active           Boolean                   @default(true)
-  daysInactive     Int                       @default(0) @map("days_inactive")
-  isBlacklisted    Boolean                   @default(false) @map("is_blacklisted")
-  isWhitelisted    Boolean                   @default(false) @map("is_whitelisted")
-  inactivityBlacklistExemptUntilSeen Boolean @default(false) @map("inactivity_blacklist_exempt_until_seen")
-  auditSuggestions GamertagAuditSuggestion[]
-  createdAt        DateTime                  @default(now()) @map("created_at")
-  updatedAt        DateTime                  @updatedAt @map("updated_at")
+  id                                 String                    @id @default(cuid())
+  serverId                           String                    @default("vanilla") @map("server_id")
+  server                             MinecraftServer           @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  gamertag                           String
+  lastSeen                           DateTime                  @map("last_seen")
+  active                             Boolean                   @default(true)
+  daysInactive                       Int                       @default(0) @map("days_inactive")
+  isBlacklisted                      Boolean                   @default(false) @map("is_blacklisted")
+  isWhitelisted                      Boolean                   @default(false) @map("is_whitelisted")
+  inactivityBlacklistExemptUntilSeen Boolean                   @default(false) @map("inactivity_blacklist_exempt_until_seen")
+  auditSuggestions                   GamertagAuditSuggestion[]
+  createdAt                          DateTime                  @default(now()) @map("created_at")
+  updatedAt                          DateTime                  @updatedAt @map("updated_at")
 
   @@unique([serverId, gamertag])
   @@index([serverId, lastSeen])
@@ -176,15 +249,15 @@ model MinecraftPlayer {
  * Snapshot de datos del servidor de Minecraft (histórico)
  */
 model MinecraftSnapshot {
-  id              String           @id @default(cuid())
-  serverId        String           @default("vanilla") @map("server_id")
-  server          MinecraftServer  @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  timestamp       DateTime         @default(now())
-  totalPlayers    Int              @map("total_players")
-  activePlayers   Int              @map("active_players")
-  inactivePlayers Int              @map("inactive_players")
-  data            Json             @default("{}")
-  createdAt       DateTime         @default(now()) @map("created_at")
+  id              String          @id @default(cuid())
+  serverId        String          @default("vanilla") @map("server_id")
+  server          MinecraftServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  timestamp       DateTime        @default(now())
+  totalPlayers    Int             @map("total_players")
+  activePlayers   Int             @map("active_players")
+  inactivePlayers Int             @map("inactive_players")
+  data            Json            @default("{}")
+  createdAt       DateTime        @default(now()) @map("created_at")
 
   @@index([timestamp])
   @@index([serverId, timestamp])
@@ -196,39 +269,39 @@ model MinecraftSnapshot {
  * `id` = serverId (`vanilla` | `mods`). Legacy `default` se migra a `vanilla`.
  */
 model MinecraftConfig {
-  id                    String           @id @default("vanilla")
-  server                MinecraftServer  @relation(fields: [id], references: [id], onDelete: Cascade)
-  daysInactive          Int              @default(7) @map("days_inactive")
-  daysBlacklist         Int              @default(14) @map("days_blacklist")
-  daysPurge             Int              @default(21) @map("days_purge")
+  id                    String          @id @default("vanilla")
+  server                MinecraftServer @relation(fields: [id], references: [id], onDelete: Cascade)
+  daysInactive          Int             @default(7) @map("days_inactive")
+  daysBlacklist         Int             @default(14) @map("days_blacklist")
+  daysPurge             Int             @default(21) @map("days_purge")
   /**
    * Días de historial de snapshots en Neon antes de borrar (no afecta jugadores actuales).
    */
-  snapshotRetentionDays Int      @default(45) @map("snapshot_retention_days")
+  snapshotRetentionDays Int             @default(45) @map("snapshot_retention_days")
   /**
    * Mínimo de snapshots recientes que nunca se purgan por antigüedad.
    */
-  snapshotKeepMinimum   Int      @default(10) @map("snapshot_keep_minimum")
-  parcelEnabled         Boolean  @default(false) @map("parcel_enabled")
-  parcelName            String   @default("Parcela") @map("parcel_name")
-  parcelDimension       String   @default("overworld") @map("parcel_dimension")
-  parcelMinX            Int      @default(0) @map("parcel_min_x")
-  parcelMinY            Int      @default(64) @map("parcel_min_y")
-  parcelMinZ            Int      @default(0) @map("parcel_min_z")
-  parcelMaxX            Int      @default(15) @map("parcel_max_x")
-  parcelMaxY            Int      @default(79) @map("parcel_max_y")
-  parcelMaxZ            Int      @default(15) @map("parcel_max_z")
+  snapshotKeepMinimum   Int             @default(10) @map("snapshot_keep_minimum")
+  parcelEnabled         Boolean         @default(false) @map("parcel_enabled")
+  parcelName            String          @default("Parcela") @map("parcel_name")
+  parcelDimension       String          @default("overworld") @map("parcel_dimension")
+  parcelMinX            Int             @default(0) @map("parcel_min_x")
+  parcelMinY            Int             @default(64) @map("parcel_min_y")
+  parcelMinZ            Int             @default(0) @map("parcel_min_z")
+  parcelMaxX            Int             @default(15) @map("parcel_max_x")
+  parcelMaxY            Int             @default(79) @map("parcel_max_y")
+  parcelMaxZ            Int             @default(15) @map("parcel_max_z")
   /**
    * JSON array de ids de bloque (sin prefijo minecraft:) excluidos del monitoreo place/break.
    * null = usar lista por defecto del código.
    */
-  monitorExcludeJson    String?  @map("monitor_exclude_json") @db.Text
+  monitorExcludeJson    String?         @map("monitor_exclude_json") @db.Text
   /**
    * JSON array de ids de ítem/bloque baneados (sin prefijo minecraft:).
    * null o [] = no banear nada.
    */
-  bannedItemsJson       String?  @map("banned_items_json") @db.Text
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  bannedItemsJson       String?         @map("banned_items_json") @db.Text
+  updatedAt             DateTime        @updatedAt @map("updated_at")
 
   @@map("minecraft_config")
 }
@@ -237,22 +310,22 @@ model MinecraftConfig {
  * Zonas monitoreadas (entrada/salida/cofre). La fila `primary` es la parcela original.
  */
 model MinecraftParcel {
-  id         String                 @id
-  serverId   String                 @default("vanilla") @map("server_id")
-  server     MinecraftServer        @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  name       String                 @default("Parcela")
-  enabled    Boolean                @default(false)
-  dimension  String                 @default("overworld")
-  minX       Int                    @default(0) @map("min_x")
-  minY       Int                    @default(64) @map("min_y")
-  minZ       Int                    @default(0) @map("min_z")
-  maxX       Int                    @default(15) @map("max_x")
-  maxY       Int                    @default(79) @map("max_y")
-  maxZ       Int                    @default(15) @map("max_z")
-  isPrimary  Boolean                @default(false) @map("is_primary")
-  events     MinecraftParcelEvent[]
-  createdAt  DateTime               @default(now()) @map("created_at")
-  updatedAt  DateTime               @updatedAt @map("updated_at")
+  id        String                 @id
+  serverId  String                 @default("vanilla") @map("server_id")
+  server    MinecraftServer        @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  name      String                 @default("Parcela")
+  enabled   Boolean                @default(false)
+  dimension String                 @default("overworld")
+  minX      Int                    @default(0) @map("min_x")
+  minY      Int                    @default(64) @map("min_y")
+  minZ      Int                    @default(0) @map("min_z")
+  maxX      Int                    @default(15) @map("max_x")
+  maxY      Int                    @default(79) @map("max_y")
+  maxZ      Int                    @default(15) @map("max_z")
+  isPrimary Boolean                @default(false) @map("is_primary")
+  events    MinecraftParcelEvent[]
+  createdAt DateTime               @default(now()) @map("created_at")
+  updatedAt DateTime               @updatedAt @map("updated_at")
 
   @@index([isPrimary])
   @@index([serverId])
@@ -265,22 +338,22 @@ model MinecraftParcel {
  * Retención: 6 meses / 180 días (purga en POST/GET).
  */
 model MinecraftMonitorEvent {
-  id            String           @id @default(cuid())
-  serverId      String           @default("vanilla") @map("server_id")
-  server        MinecraftServer  @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  id            String          @id @default(cuid())
+  serverId      String          @default("vanilla") @map("server_id")
+  server        MinecraftServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
   gamertag      String
-  eventType     String           @map("event_type")
-  occurredAt    DateTime         @map("occurred_at")
-  posX          Int?     @map("pos_x")
-  posY          Int?     @map("pos_y")
-  posZ          Int?     @map("pos_z")
-  dimension     String?  @default("overworld")
-  blockType     String?  @map("block_type")
-  itemType      String?  @map("item_type")
-  priority      String   @default("normal")
-  fireId        String?  @map("fire_id")
-  relatedFireId String?  @map("related_fire_id")
-  createdAt     DateTime @default(now()) @map("created_at")
+  eventType     String          @map("event_type")
+  occurredAt    DateTime        @map("occurred_at")
+  posX          Int?            @map("pos_x")
+  posY          Int?            @map("pos_y")
+  posZ          Int?            @map("pos_z")
+  dimension     String?         @default("overworld")
+  blockType     String?         @map("block_type")
+  itemType      String?         @map("item_type")
+  priority      String          @default("normal")
+  fireId        String?         @map("fire_id")
+  relatedFireId String?         @map("related_fire_id")
+  createdAt     DateTime        @default(now()) @map("created_at")
 
   @@index([occurredAt(sort: Desc)])
   @@index([gamertag])
@@ -296,22 +369,26 @@ model MinecraftMonitorEvent {
  * Una alerta abierta por jugador: eventos posteriores suman al contador.
  */
 model MinecraftMonitorAlert {
-  id           String           @id @default(cuid())
-  serverId     String           @default("vanilla") @map("server_id")
-  server       MinecraftServer  @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  gamertag     String
-  /** Clave normalizada para buscar la alerta abierta del jugador. */
-  gamertagKey  String    @map("gamertag_key")
-  eventCount   Int       @default(0) @map("event_count")
-  witherCount  Int       @default(0) @map("wither_count")
-  /** Conteos por eventType crítico, JSON ej. {"block_burn":22,"wither_summon":2}. */
-  countsJson   String    @default("{}") @map("counts_json")
-  windowStart  DateTime  @map("window_start")
-  lastEventAt  DateTime  @map("last_event_at")
-  expiresAt    DateTime  @map("expires_at")
-  dismissedAt  DateTime? @map("dismissed_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id          String          @id @default(cuid())
+  serverId    String          @default("vanilla") @map("server_id")
+  server      MinecraftServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  gamertag    String
+  /**
+   * Clave normalizada para buscar la alerta abierta del jugador.
+   */
+  gamertagKey String          @map("gamertag_key")
+  eventCount  Int             @default(0) @map("event_count")
+  witherCount Int             @default(0) @map("wither_count")
+  /**
+   * Conteos por eventType crítico, JSON ej. {"block_burn":22,"wither_summon":2}.
+   */
+  countsJson  String          @default("{}") @map("counts_json")
+  windowStart DateTime        @map("window_start")
+  lastEventAt DateTime        @map("last_event_at")
+  expiresAt   DateTime        @map("expires_at")
+  dismissedAt DateTime?       @map("dismissed_at")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
 
   @@index([gamertagKey, dismissedAt])
   @@index([expiresAt])
@@ -325,18 +402,18 @@ model MinecraftMonitorAlert {
  * Retención: 6 meses / 180 días (purga en POST/GET).
  */
 model MinecraftParcelEvent {
-  id         String           @id @default(cuid())
+  id         String          @id @default(cuid())
   gamertag   String
-  eventType  String           @map("event_type")
-  occurredAt DateTime         @map("occurred_at")
-  posX       Int?             @map("pos_x")
-  posY       Int?             @map("pos_y")
-  posZ       Int?             @map("pos_z")
+  eventType  String          @map("event_type")
+  occurredAt DateTime        @map("occurred_at")
+  posX       Int?            @map("pos_x")
+  posY       Int?            @map("pos_y")
+  posZ       Int?            @map("pos_z")
   dimension  String?
-  blockType  String?          @map("block_type")
-  parcelId   String           @map("parcel_id")
-  parcel     MinecraftParcel  @relation(fields: [parcelId], references: [id], onDelete: Cascade)
-  createdAt  DateTime         @default(now()) @map("created_at")
+  blockType  String?         @map("block_type")
+  parcelId   String          @map("parcel_id")
+  parcel     MinecraftParcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  createdAt  DateTime        @default(now()) @map("created_at")
 
   @@index([occurredAt(sort: Desc)])
   @@index([gamertag])
@@ -418,8 +495,8 @@ model PendingAllowlistRemoval {
   serverId  String          @default("vanilla") @map("server_id")
   server    MinecraftServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
   gamertag  String
-  syncedAt  DateTime? @map("synced_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  syncedAt  DateTime?       @map("synced_at")
+  createdAt DateTime        @default(now()) @map("created_at")
 
   @@index([userId, syncedAt])
   @@index([userId, serverId, syncedAt])

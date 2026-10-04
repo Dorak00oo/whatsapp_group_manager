@@ -11,12 +11,16 @@ type Props = {
   defaultThemeDark: boolean;
   selectedWorld: MinecraftServerId;
   worldNames: Partial<Record<MinecraftServerId, string>>;
+  gamertag: string;
+  isPanelOwner: boolean;
 };
 
 export function DashboardMobileChrome({
   defaultThemeDark,
   selectedWorld,
   worldNames,
+  gamertag,
+  isPanelOwner,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +56,11 @@ export function DashboardMobileChrome({
           <DashboardMobileTabNav />
         </div>
         <div className="relative z-[1] flex w-[3.25rem] shrink-0 flex-col justify-stretch overflow-visible border-l border-zinc-200/80 dark:border-zinc-800/70">
-          <DashboardMobileMoreDrawer defaultThemeDark={defaultThemeDark} />
+          <DashboardMobileMoreDrawer
+            defaultThemeDark={defaultThemeDark}
+            gamertag={gamertag}
+            isPanelOwner={isPanelOwner}
+          />
         </div>
       </div>
       <div className="px-2 pb-0.5 pt-1">

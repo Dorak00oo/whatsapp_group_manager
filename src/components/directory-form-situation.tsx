@@ -27,8 +27,10 @@ export function DirectoryFormSituation() {
           </span>
         </div>
         <p className="text-[11px] leading-snug text-zinc-600 dark:text-zinc-400">
-          Los primeros {DIRECTORY_NEW_MEMBER_DAYS} días tras guardar contará en el
-          filtro y en la ficha como «Los nuevos».
+          Los primeros {DIRECTORY_NEW_MEMBER_DAYS} días queda como nuevo y como
+          activo permanente temporal: la sync con Minecraft no lo pasa a inactivo
+          aunque no entre. Al día {DIRECTORY_NEW_MEMBER_DAYS + 1}, si sigue sin
+          entrar, sí.
         </p>
       </div>
 

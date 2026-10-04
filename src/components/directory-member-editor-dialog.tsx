@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -19,7 +20,7 @@ import { getCallingCodeOptions } from "@/lib/phone-calling-codes";
 import { splitPhoneForDirectoryForm } from "@/lib/phone-normalize";
 import { formatWhatsAppUsername } from "@/lib/whatsapp-username";
 import { DASHBOARD_MOBILE_EDITOR_ROOT_ID } from "@/lib/dashboard-mobile-top-nav";
-import { softBtnMint, softInputNeutral } from "@/lib/soft-ui";
+import { softBtnMint } from "@/lib/soft-ui";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
 function regionLabel(code: string | null): string | null {
@@ -166,13 +167,21 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
               </time>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            Cerrar
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <Link
+              href={`/dashboard/cuentas?member=${encodeURIComponent(m.id)}`}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              Ver historial
+            </Link>
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              Cerrar
+            </button>
+          </div>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-10 sm:py-10">

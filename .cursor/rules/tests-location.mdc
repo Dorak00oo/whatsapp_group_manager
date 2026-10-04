@@ -1,0 +1,20 @@
+---
+description: Los tests del panel van solo en tests/, nunca junto al código
+alwaysApply: true
+---
+
+# Ubicación de los tests
+
+- Todos los tests van en `tests/` (raíz del repo). Nunca dentro de `src/` ni al lado del módulo que prueban.
+- Nombre: `tests/<modulo>.test.ts` para `src/lib/<modulo>.ts`. Si ya existe, añade los casos ahí.
+- Se prueba lógica pura: si la lógica vive en un componente o una ruta, extráela a `src/lib/` y prueba ese módulo.
+- `node:test` + `node:assert/strict`. Imports relativos con extensión desde el test:
+
+```ts
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { miFuncion } from "../src/lib/mi-modulo.ts";
+```
+
+- El módulo probado puede usar el alias `@/` por dentro: `tsx` lo resuelve con `tsconfig.json`.
+- Correr: `npm test` (`tsx --test "tests/**/*.test.ts"`). Los tests también pasan por `npx tsc --noEmit` y `npm run lint`; CI (`.github/workflows/ci.yml`) corre los tres.

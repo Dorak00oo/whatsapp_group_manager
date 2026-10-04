@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getCallingCodeOptions } from "@/lib/phone-calling-codes";
 import { DirectoryForm } from "@/components/directory-form";
+import { getCallingCodeOptions } from "@/lib/phone-calling-codes";
 
 export default function DashboardAgregarPage() {
   const phoneCountryOptions = getCallingCodeOptions("es");
@@ -17,12 +17,12 @@ export default function DashboardAgregarPage() {
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           Gamertag, celular o @usuario de WhatsApp, edad opcional y situación en la comunidad. Luego podrás editar
           strikes y baneos desde la lista. Para administración del allowlist y
-          strikes usa{" "}
+          strikes e importar o exportar el directorio en CSV usa{" "}
           <Link
             href="/dashboard/administracion"
             className="font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
           >
-            Administración de jugadores
+            Administración de los usuarios
           </Link>
           .
         </p>

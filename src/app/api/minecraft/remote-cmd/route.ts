@@ -8,6 +8,7 @@ import {
   markAllowlistRemovesCompleted,
   pendingAllowlistRemovalGamertags,
 } from "@/lib/allowlist-removal";
+import { recordAuditEvent } from "@/lib/audit-log";
 import { DIRECTORY_NEW_MEMBER_DAYS } from "@/lib/directory-cohort";
 import {
   requireMinecraftAddon,
@@ -20,23 +21,33 @@ import {
   upsertMinecraftQueue,
 } from "@/lib/minecraft-queue";
 import {
+  asOnlinePlayersQueueData,
+  isOnlineRosterFresh,
+  normalizeOnlinePlayerNames,
+} from "@/lib/minecraft-online-players";
+import {
   REMOTE_CMD_ACTIONS,
   asRemoteCmdQueueData,
   isRemoteCmdAction,
-  isTpPrivilegedOrigin,
+  listedGamertag,
   parseTpCoords,
   remoteCmdActionForAddon,
+  remoteCmdDestinationDetail,
+  remoteCmdLabel,
   remoteCmdNeedsDestination,
   remoteCmdNeedsTarget,
   remoteCmdNeedsTargetList,
-  tpDestinationBlockedReason,
   type RemoteCmdAction,
 } from "@/lib/minecraft-remote-commands";
+import { getPanelActor, getPanelSession } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
 import { withDbRetry } from "@/lib/prisma-retry";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
 import { auth } from "@/auth";
-import type { MinecraftServerId } from "@/lib/minecraft-server";
+import {
+  MINECRAFT_SERVER_DEFAULTS,
+  type MinecraftServerId,
+} from "@/lib/minecraft-server";
 
 export const runtime = "nodejs";
 
@@ -44,19 +55,29 @@ function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
-async function isAdminGamertag(gamertag: string): Promise<boolean> {
-  const trimmed = gamertag.trim();
-  if (!trimmed) return false;
-  const row = await withDbRetry(() =>
-    prisma.directoryMember.findFirst({
-      where: {
-        isAdmin: true,
-        gamertag: { equals: trimmed, mode: "insensitive" },
-      },
-      select: { id: true },
-    }),
+async function freshOnlineRoster(
+  serverId: MinecraftServerId,
+): Promise<string[] | null> {
+  const found = await withDbRetry(() =>
+    readMinecraftQueueRow(serverId, "online_players"),
   );
-  return row != null;
+  const data = asOnlinePlayersQueueData(found?.data);
+  if (!isOnlineRosterFresh(data.reportedAt)) return null;
+  return normalizeOnlinePlayerNames(data.players);
+}
+
+async function auditWorldName(serverId: MinecraftServerId): Promise<string> {
+  try {
+    const row = await prisma.minecraftServer.findUnique({
+      where: { id: serverId },
+      select: { name: true },
+    });
+    const name = row?.name?.trim();
+    if (name) return name;
+  } catch {
+    /* el comando ya quedó encolado */
+  }
+  return MINECRAFT_SERVER_DEFAULTS[serverId].name;
 }
 
 function dedupedTrimmedGamertags(members: { gamertag: string }[]): string[] {
@@ -138,25 +159,37 @@ export async function POST(request: Request) {
   const action: RemoteCmdAction = actionRaw;
 
   let targetGamertag: string | null = null;
+  let onlineRoster: string[] | null | undefined;
+  const roster = async () => {
+    if (onlineRoster === undefined) {
+      onlineRoster = await freshOnlineRoster(serverId);
+    }
+    return onlineRoster;
+  };
+
   if (remoteCmdNeedsTarget(action)) {
     const t =
       typeof body.targetGamertag === "string" ? body.targetGamertag.trim() : "";
     if (!t) {
       return badRequest(
         action === "tp"
-          ? "targetGamertag (moderador) es obligatorio para tp"
+          ? "Elige el jugador de origen para el TP"
           : action === "extinguish_fire"
-            ? "targetGamertag (moderador) es obligatorio para apagar fuego"
-            : "targetGamertag es obligatorio para spectator/survival",
+            ? "Elige el jugador alrededor del cual apagar el fuego"
+            : "Elige el jugador para espectador o survival",
       );
     }
-    const privilegedTpOrigin = action === "tp" && isTpPrivilegedOrigin(t);
-    if (!(await isAdminGamertag(t)) && !privilegedTpOrigin) {
+    const names = await roster();
+    if (!names) {
       return badRequest(
-        "Solo se puede elegir un gamertag marcado como admin en el directorio",
+        "No hay un roster fresco de jugadores en línea. Espera unos segundos y vuelve a intentar.",
       );
     }
-    targetGamertag = t;
+    const listed = listedGamertag(names, t);
+    if (!listed) {
+      return badRequest("Ese jugador no está en línea en este mundo.");
+    }
+    targetGamertag = listed;
   }
 
   let destinationGamertag: string | null = null;
@@ -191,12 +224,20 @@ export async function POST(request: Request) {
       }
       if (targetGamertag && d.toLowerCase() === targetGamertag.toLowerCase()) {
         return badRequest(
-          "Origen y destino del tp deben ser jugadores distintos",
+          "Origen y destino del TP tienen que ser jugadores distintos",
         );
       }
-      const blocked = tpDestinationBlockedReason(d);
-      if (blocked) return badRequest(blocked);
-      destinationGamertag = d;
+      const names = await roster();
+      if (!names) {
+        return badRequest(
+          "No hay un roster fresco de jugadores en línea. Espera unos segundos y vuelve a intentar.",
+        );
+      }
+      const listed = listedGamertag(names, d);
+      if (!listed) {
+        return badRequest("El destino no está en línea en este mundo.");
+      }
+      destinationGamertag = listed;
     }
   }
 
@@ -280,6 +321,33 @@ export async function POST(request: Request) {
       handledAt: null,
     }),
   );
+
+  const actor = await getPanelActor();
+  const panel = await getPanelSession();
+  if (actor && panel) {
+    const destination = remoteCmdDestinationDetail({
+      action,
+      destinationGamertag,
+      destinationX,
+      destinationY,
+      destinationZ,
+      addedCount: targetGamertagsAdd?.length ?? 0,
+      removedCount: targetGamertagsRemove?.length ?? 0,
+    });
+    const world = await auditWorldName(serverId);
+    await recordAuditEvent({
+      userId: panel.userId,
+      actor,
+      action: "remote.cmd",
+      memberGamertag: targetGamertag,
+      details: {
+        label: remoteCmdLabel(action),
+        command: action,
+        world,
+        ...(destination ? { destination } : {}),
+      },
+    });
+  }
 
   return NextResponse.json({
     ok: true,
@@ -377,14 +445,10 @@ export async function PUT(request: Request) {
     await withDbRetry(() => markCorrectedAllowlistSynced(pendingCorrectionIds));
   }
 
-  const email = process.env.COMMUNITY_EMAIL?.trim().toLowerCase();
+  const { findCommunityOwner } = await import("@/lib/resolve-directory-user");
   const owner =
-    email &&
-    (storedAction === "allowlist_sync" ||
-      storedAction === "allowlist_sync_corrected")
-      ? await withDbRetry(() =>
-          prisma.user.findUnique({ where: { email }, select: { id: true } }),
-        )
+    storedAction === "allowlist_sync" || storedAction === "allowlist_sync_corrected"
+      ? await findCommunityOwner()
       : null;
 
   if (

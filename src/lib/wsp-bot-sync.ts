@@ -1,10 +1,22 @@
 import {
+  recordAuditEvent,
+  recordAuditEvents,
+  type AuditEventInput,
+} from "@/lib/audit-log";
+import type { AuditActor } from "@/lib/audit-format";
+import {
   cancelPendingAllowlistRemoval,
   enqueueAllowlistRemovalForMember,
 } from "@/lib/allowlist-removal";
 import { parseDirectoryAge } from "@/lib/directory-age";
+import { newMemberProtectionUntil } from "@/lib/directory-protection";
 import { prisma } from "@/lib/prisma";
 import { withDbRetry } from "@/lib/prisma-retry";
+import {
+  botAuditActorFromDirectory,
+  parseWspBotActor,
+  type WspBotActorFields,
+} from "@/lib/wsp-bot-actor";
 import { normalizeWhatsAppPhoneInput } from "@/lib/whatsapp-phone-normalize";
 import { normalizeWhatsAppUsername } from "@/lib/whatsapp-username";
 import {
@@ -34,21 +46,29 @@ type DirectoryRow = {
   allowlistRemovedAt: Date | null;
 };
 
+type ParsedParticipant = {
+  phone: string | null;
+  phoneCountry: string | null;
+  username: string | null;
+  digits: string;
+  gamertag: string | null;
+  displayName: string | null;
+  age: number | null;
+};
+
+type JoinOutcome =
+  | { kind: "created"; memberId: string; gamertag: string }
+  | { kind: "restored"; memberId: string; gamertag: string }
+  | { kind: "skipped" };
+
+type LeaveOutcome =
+  | { kind: "left"; memberId: string; gamertag: string }
+  | { kind: "skipped" };
+
 async function resolveBotDirectoryUserId(): Promise<string | null> {
-  const email = process.env.COMMUNITY_EMAIL?.trim().toLowerCase();
-  if (email) {
-    const byEmail = await withDbRetry(() =>
-      prisma.user.findUnique({ where: { email }, select: { id: true } }),
-    );
-    if (byEmail) return byEmail.id;
-  }
-  const first = await withDbRetry(() =>
-    prisma.user.findFirst({
-      orderBy: { createdAt: "asc" },
-      select: { id: true },
-    }),
-  );
-  return first?.id ?? null;
+  const { findCommunityOwner } = await import("@/lib/resolve-directory-user");
+  const owner = await findCommunityOwner();
+  return owner?.id ?? null;
 }
 
 async function loadMembers(userId: string): Promise<DirectoryRow[]> {
@@ -69,7 +89,9 @@ async function loadMembers(userId: string): Promise<DirectoryRow[]> {
   );
 }
 
-function parseParticipant(p: WspBotParticipant) {
+export function parseParticipant(
+  p: WspBotParticipant,
+): ParsedParticipant | null {
   const usernameN = normalizeWhatsAppUsername(p.username ?? "");
   const username = usernameN.ok ? usernameN.username : null;
   const jid = (p.jid ?? "").trim();
@@ -90,26 +112,21 @@ function parseParticipant(p: WspBotParticipant) {
   };
 }
 
-function identityFill(
-  existing: DirectoryRow,
-  parsed: NonNullable<ReturnType<typeof parseParticipant>>,
-) {
+function identityFill(existing: DirectoryRow, parsed: ParsedParticipant) {
   return fillEmptyWhatsAppIdentity(existing, parsed);
 }
 
 async function applyJoin(
   userId: string,
   members: DirectoryRow[],
-  parsed: NonNullable<ReturnType<typeof parseParticipant>>,
-): Promise<"created" | "restored" | "skipped"> {
+  parsed: ParsedParticipant,
+): Promise<JoinOutcome> {
   const existing = findMemberByWhatsAppIdentity(members, {
     phone: parsed.phone,
     username: parsed.username,
   });
   const plan = planWhatsAppRosterChange(
-    existing
-      ? { id: existing.id, leftAt: existing.leftAt }
-      : null,
+    existing ? { id: existing.id, leftAt: existing.leftAt } : null,
     "join",
   );
 
@@ -121,14 +138,22 @@ async function applyJoin(
           where: { id: existing.id, userId },
           data: fill,
         });
+        if (fill.phone !== undefined) existing.phone = fill.phone ?? null;
+        if (fill.whatsappUsername !== undefined) {
+          existing.whatsappUsername = fill.whatsappUsername ?? null;
+        }
+        if (fill.displayName !== undefined) {
+          existing.displayName = fill.displayName ?? null;
+        }
       }
     }
-    return "skipped";
+    return { kind: "skipped" };
   }
 
   if (plan.type === "create") {
-    if (!parsed.gamertag) return "skipped";
-    await prisma.directoryMember.create({
+    if (!parsed.gamertag) return { kind: "skipped" };
+    const createdAt = new Date();
+    const created = await prisma.directoryMember.create({
       data: {
         gamertag: parsed.gamertag,
         displayName: parsed.displayName,
@@ -138,10 +163,30 @@ async function applyJoin(
         whatsappUsername: parsed.username,
         active: true,
         leftAt: null,
+        activeHoldFromMc: false,
+        permanentlyActiveUntil: newMemberProtectionUntil(createdAt),
+        createdAt,
         userId,
       },
+      select: {
+        id: true,
+        phone: true,
+        whatsappUsername: true,
+        gamertag: true,
+        displayName: true,
+      },
     });
-    return "created";
+    members.push({
+      id: created.id,
+      phone: created.phone,
+      whatsappUsername: created.whatsappUsername,
+      gamertag: created.gamertag,
+      displayName: created.displayName,
+      leftAt: null,
+      allowlistSyncedAt: null,
+      allowlistRemovedAt: null,
+    });
+    return { kind: "created", memberId: created.id, gamertag: created.gamertag };
   }
 
   const fill = existing ? identityFill(existing, parsed) : {};
@@ -158,27 +203,38 @@ async function applyJoin(
     },
   });
   if (existing) {
+    existing.leftAt = null;
+    if (fill.phone !== undefined) existing.phone = fill.phone ?? null;
+    if (fill.whatsappUsername !== undefined) {
+      existing.whatsappUsername = fill.whatsappUsername ?? null;
+    }
+    if (fill.displayName !== undefined) {
+      existing.displayName = fill.displayName ?? null;
+    }
     await cancelPendingAllowlistRemoval(userId, existing.gamertag);
+    return {
+      kind: "restored",
+      memberId: existing.id,
+      gamertag: existing.gamertag,
+    };
   }
-  return "restored";
+  return { kind: "skipped" };
 }
 
 async function applyLeave(
   userId: string,
   members: DirectoryRow[],
-  parsed: NonNullable<ReturnType<typeof parseParticipant>>,
-): Promise<"left" | "skipped"> {
+  parsed: ParsedParticipant,
+): Promise<LeaveOutcome> {
   const existing = findMemberByWhatsAppIdentity(members, {
     phone: parsed.phone,
     username: parsed.username,
   });
   const plan = planWhatsAppRosterChange(
-    existing
-      ? { id: existing.id, leftAt: existing.leftAt }
-      : null,
+    existing ? { id: existing.id, leftAt: existing.leftAt } : null,
     "leave",
   );
-  if (plan.type !== "mark_left" || !existing) return "skipped";
+  if (plan.type !== "mark_left" || !existing) return { kind: "skipped" };
 
   await prisma.directoryMember.updateMany({
     where: { id: plan.memberId, userId },
@@ -191,13 +247,57 @@ async function applyLeave(
       absentActiveSince: null,
     },
   });
+  existing.leftAt = new Date();
   await enqueueAllowlistRemovalForMember(userId, existing);
-  return "left";
+  return { kind: "left", memberId: existing.id, gamertag: existing.gamertag };
+}
+
+function auditForOutcome(
+  userId: string,
+  actor: AuditActor,
+  outcome: JoinOutcome | LeaveOutcome,
+): AuditEventInput | null {
+  if (outcome.kind === "skipped") return null;
+  if (outcome.kind === "created") {
+    return {
+      userId,
+      actor,
+      action: "bot.join",
+      memberId: outcome.memberId,
+      memberGamertag: outcome.gamertag,
+      details: { restored: false },
+    };
+  }
+  if (outcome.kind === "restored") {
+    return {
+      userId,
+      actor,
+      action: "bot.rejoin",
+      memberId: outcome.memberId,
+      memberGamertag: outcome.gamertag,
+      details: { restored: true },
+    };
+  }
+  return {
+    userId,
+    actor,
+    action: "bot.leave",
+    memberId: outcome.memberId,
+    memberGamertag: outcome.gamertag,
+  };
+}
+
+export function actorForBotRequest(
+  actor: WspBotActorFields | null | undefined,
+  members: DirectoryRow[],
+): AuditActor {
+  return botAuditActorFromDirectory(actor ?? null, members);
 }
 
 export async function applyWspBotEvent(input: {
   action: RosterEvent;
   participant: WspBotParticipant;
+  actor?: unknown;
 }): Promise<{ ok: true; result: string } | { error: string; status: number }> {
   const userId = await resolveBotDirectoryUserId();
   if (!userId) {
@@ -208,16 +308,20 @@ export async function applyWspBotEvent(input: {
     return { error: "Falta teléfono o usuario de WhatsApp", status: 400 };
   }
   const members = await loadMembers(userId);
-  const result =
+  const actor = actorForBotRequest(parseWspBotActor(input.actor), members);
+  const outcome =
     input.action === "join"
       ? await applyJoin(userId, members, parsed)
       : await applyLeave(userId, members, parsed);
-  return { ok: true, result };
+  const event = auditForOutcome(userId, actor, outcome);
+  if (event) await recordAuditEvent(event);
+  return { ok: true, result: outcome.kind === "skipped" ? "skipped" : outcome.kind };
 }
 
 export async function applyWspBotSync(input: {
   participants: WspBotParticipant[];
   markMissingAsLeft?: boolean;
+  actor?: unknown;
 }): Promise<
   | {
       ok: true;
@@ -233,6 +337,10 @@ export async function applyWspBotSync(input: {
     return { error: "No hay usuario del directorio", status: 503 };
   }
 
+  const members = await loadMembers(userId);
+  const actor = actorForBotRequest(parseWspBotActor(input.actor), members);
+  const events: AuditEventInput[] = [];
+
   let created = 0;
   let restored = 0;
   let left = 0;
@@ -244,15 +352,15 @@ export async function applyWspBotSync(input: {
       skipped++;
       continue;
     }
-    const members = await loadMembers(userId);
-    const result = await applyJoin(userId, members, parsed);
-    if (result === "created") created++;
-    else if (result === "restored") restored++;
+    const outcome = await applyJoin(userId, members, parsed);
+    if (outcome.kind === "created") created++;
+    else if (outcome.kind === "restored") restored++;
     else skipped++;
+    const event = auditForOutcome(userId, actor, outcome);
+    if (event) events.push(event);
   }
 
   if (input.markMissingAsLeft) {
-    const members = await loadMembers(userId);
     for (const row of members) {
       if (row.leftAt != null) continue;
       const stillHere = input.participants.some((p) => {
@@ -266,7 +374,7 @@ export async function applyWspBotSync(input: {
         );
       });
       if (stillHere) continue;
-      const result = await applyLeave(userId, [row], {
+      const outcome = await applyLeave(userId, [row], {
         phone: row.phone,
         phoneCountry: null,
         username: row.whatsappUsername,
@@ -275,9 +383,21 @@ export async function applyWspBotSync(input: {
         displayName: null,
         age: null,
       });
-      if (result === "left") left++;
+      if (outcome.kind === "left") {
+        left++;
+        const event = auditForOutcome(userId, actor, outcome);
+        if (event) events.push(event);
+      }
     }
   }
+
+  events.push({
+    userId,
+    actor,
+    action: "bot.sync",
+    details: { created, restored, left, skipped },
+  });
+  await recordAuditEvents(events);
 
   return { ok: true, created, restored, left, skipped };
 }

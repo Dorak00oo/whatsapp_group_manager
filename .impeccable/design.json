@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T12:00:00.000Z",
+  "title": "Design System: Panel WSP",
+  "extensions": {
+    "colorMeta": {
+      "paper": { "role": "neutral", "displayName": "Papel", "canonical": "#fbf9f7", "tonalRamp": ["#141210", "#2e2a26", "#453e38", "#5c534c", "#7d7167", "#d9cfc3", "#ebe4dc", "#fbf9f7"] },
+      "surface": { "role": "neutral", "displayName": "Superficie", "canonical": "#f5f0eb" },
+      "card": { "role": "neutral", "displayName": "Tarjeta marfil", "canonical": "#fffefb" },
+      "ink": { "role": "primary", "displayName": "Tinta", "canonical": "#1a1a1a" },
+      "mint": { "role": "secondary", "displayName": "Menta", "canonical": "#b0e8d4", "tonalRamp": ["#052e24", "#124236", "#15634f", "#1f9b78", "#45b894", "#7dd4b8", "#b0e8d4", "#f0fdf8"] },
+      "lavender": { "role": "secondary", "displayName": "Lavanda", "canonical": "#c4b5fc", "tonalRamp": ["#2e1065", "#4c1d95", "#6d28d9", "#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fc", "#faf8ff"] },
+      "peach": { "role": "secondary", "displayName": "Melocotón", "canonical": "#fdd9b0", "tonalRamp": ["#3d1c09", "#6c3818", "#9f5414", "#e08520", "#f0a040", "#f8c078", "#fdd9b0", "#fffbf5"] },
+      "danger": { "role": "tertiary", "displayName": "Rojo peligro", "canonical": "#c4354f", "tonalRamp": ["#42101d", "#77263a", "#a62a42", "#c4354f", "#d85568", "#ea8690", "#f8d7da", "#fff5f5"] },
+      "link": { "role": "tertiary", "displayName": "Cielo enlace", "canonical": "#0284c7" },
+      "status-ban": { "role": "tertiary", "displayName": "Ban (anillo rojo 2px)", "canonical": "#f8d7da" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Título de sección en el encabezado principal (solo PC)." },
+      "title": { "displayName": "Title", "purpose": "h2 de cada página, también en celular." },
+      "subtitle": { "displayName": "Subtitle", "purpose": "h3 de un panel dentro de la página." },
+      "body": { "displayName": "Body", "purpose": "Texto, tablas y descripciones." },
+      "label": { "displayName": "Label", "purpose": "Etiquetas de campos y fichas de estado." },
+      "caption": { "displayName": "Caption", "purpose": "Cabeceras de tabla en mayúsculas, hora de Colombia, pistas." },
+      "micro": { "displayName": "Micro", "purpose": "Texto bajo iconos de pestañas y teselas; nunca texto de lectura." }
+    },
+    "shadows": [
+      { "name": "panel", "value": "0 1px 2px 0 rgb(26 26 26 / 0.04)", "purpose": "Paneles en reposo (desaparece en oscuro)." },
+      { "name": "button", "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)", "purpose": "Botones rellenos." },
+      { "name": "dialog", "value": "0 10px 15px -3px rgb(26 26 26 / 0.1)", "purpose": "Diálogos sobre velo oscuro con blur de 2px." }
+    ],
+    "motion": [
+      { "name": "state", "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Cambios de color en hover y foco." },
+      { "name": "nav-tile", "value": "200ms ease-out", "purpose": "Teselas de la barra lateral." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botón primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción principal de un formulario o panel.",
+      "html": "<button class=\"ds-btn-primary\">Filtrar</button>",
+      "css": ".ds-btn-primary { background: #1a1a1a; color: #fffefb; border: 0; border-radius: 16px; padding: 10px 16px; font: 500 14px/20px Geist, system-ui, sans-serif; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); cursor: pointer; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { background: #2e2a26; } .ds-btn-primary:focus-visible { outline: 2px solid rgb(26 26 26 / 0.35); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.6; }"
+    },
+    {
+      "name": "Botón menta",
+      "kind": "button",
+      "refersTo": "button-mint",
+      "description": "Acción positiva secundaria: agregar, guardar, dar cuenta.",
+      "html": "<button class=\"ds-btn-mint\">Dar cuenta</button>",
+      "css": ".ds-btn-mint { background: #b0e8d4; color: #1a1a1a; border: 0; border-radius: 16px; padding: 10px 16px; font: 500 14px/20px Geist, system-ui, sans-serif; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); cursor: pointer; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-mint:hover { background: #7dd4b8; } .ds-btn-mint:focus-visible { outline: 2px solid rgb(31 155 120 / 0.5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Botón peligro",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Confirmar algo irreversible (borrar, quitar cuenta).",
+      "html": "<button class=\"ds-btn-danger\">Quitar cuenta</button>",
+      "css": ".ds-btn-danger { background: #c4354f; color: #fffefb; border: 0; border-radius: 16px; padding: 10px 16px; font: 500 14px/20px Geist, system-ui, sans-serif; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); cursor: pointer; transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-danger:hover { background: #a62a42; } .ds-btn-danger:focus-visible { outline: 2px solid rgb(196 53 79 / 0.5); outline-offset: 2px; }"
+    },
+    {
+      "name": "Campo neutro",
+      "kind": "input",
+      "refersTo": "input-neutral",
+      "description": "Input y select con etiqueta arriba.",
+      "html": "<label class=\"ds-field\"><span>Gamertag</span><input class=\"ds-input\" placeholder=\"Gamertag del miembro\"></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; font: 600 12px/16px Geist, system-ui, sans-serif; color: #2e2a26; } .ds-input { background: #f5f0eb; color: #1a1a1a; border: 0; border-radius: 16px; padding: 10px 16px; font: 400 14px/20px Geist, system-ui, sans-serif; box-shadow: 0 0 0 1px rgb(235 228 220 / 0.9); outline: none; transition: box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-input::placeholder { color: #a89b8f; } .ds-input:focus-visible { box-shadow: 0 0 0 2px rgb(26 26 26 / 0.15); }"
+    },
+    {
+      "name": "Fichas de estado",
+      "kind": "chip",
+      "refersTo": "chip-status",
+      "description": "Estado del miembro o tipo de evento; mismo significado en todo el panel.",
+      "html": "<span class=\"ds-chip ds-chip-active\">Activo</span> <span class=\"ds-chip ds-chip-left\">Salió</span> <span class=\"ds-chip ds-chip-admin\">Admin</span> <span class=\"ds-chip ds-chip-ban\">Ban</span>",
+      "css": ".ds-chip { display: inline-flex; border-radius: 9999px; padding: 2px 10px; font: 500 12px/16px Geist, system-ui, sans-serif; } .ds-chip-active { background: #b0e8d4; color: #052e24; box-shadow: 0 0 0 1px rgb(31 155 120 / 0.95); } .ds-chip-left { background: #feead3; color: #3d1c09; box-shadow: 0 0 0 1px rgb(240 160 64 / 0.9); } .ds-chip-admin { background: #e9d5ff; color: #3b0d5c; box-shadow: 0 0 0 1px rgb(197 133 252 / 0.85); } .ds-chip-ban { background: #f8d7da; color: #42101d; box-shadow: 0 0 0 2px rgb(196 53 79 / 0.95); }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Bloque de contenido de una página.",
+      "html": "<section class=\"ds-panel\"><h3>Historial</h3><p>1.234 eventos</p></section>",
+      "css": ".ds-panel { display: flex; flex-direction: column; gap: 16px; background: #fffefb; border: 1px solid rgb(235 228 220 / 0.7); border-radius: 28px; padding: 20px; box-shadow: 0 1px 2px 0 rgb(26 26 26 / 0.04); } .ds-panel h3 { margin: 0; font: 600 16px/22px Geist, system-ui, sans-serif; color: #1a1a1a; } .ds-panel p { margin: 0; font: 400 12px/16px Geist, system-ui, sans-serif; color: #7d7167; }"
+    },
+    {
+      "name": "Tesela de navegación",
+      "kind": "nav",
+      "refersTo": "nav-tile-active",
+      "description": "Barra lateral: icono + texto corto; la activa invierte el contraste.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-tile\" href=\"#\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"5\" y=\"8\" width=\"14\" height=\"10\" rx=\"3\"/><path d=\"M12 8V4\"/></svg><span>Bot</span></a><a class=\"ds-tile ds-tile-active\" href=\"#\" aria-current=\"page\"><svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/><path d=\"M12 7v5l4 2\"/></svg><span>Cuentas</span></a></nav>",
+      "css": ".ds-nav { display: grid; grid-template-columns: repeat(2, 56px); gap: 8px 4px; } .ds-tile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 12px; color: #5c534c; text-decoration: none; font: 500 10px/12px Geist, system-ui, sans-serif; transition: background-color 200ms ease-out, color 200ms ease-out; } .ds-tile:hover { background: #fbf9f7; color: #2e2a26; } .ds-tile:focus-visible { outline: 2px solid rgb(26 26 26 / 0.35); outline-offset: 2px; } .ds-tile-active, .ds-tile-active:hover { background: #1a1a1a; color: #fffefb; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El cuaderno de control",
+    "overview": "Un cuaderno de papel crema donde los admins anotan y corrigen el estado de la comunidad. La superficie es cálida y quieta: neutros beige en lugar de grises fríos, radios grandes y blandos, sombras casi imperceptibles. El color no decora: casi todo el tono vive en las fichas de estado (activo, inactivo, nuevo, ausente, se salió, admin, protegido, ban) y en un par de botones pastel. La sección activa se marca invirtiendo el contraste (tinta sobre papel pasa a papel sobre tinta), nunca con un color de categoría.\n\nEs un panel de trabajo para PC primero: denso pero respirado, con listas y tablas que se escanean rápido, conteos arriba y el detalle a un clic. En celular las tablas se vuelven tarjetas y la barra lateral pasa a pestañas horizontales con scroll. El modo oscuro existe y es casi negro (no azul), con un único resplandor violeta muy tenue arriba a la derecha.",
+    "keyCharacteristics": [
+      "Neutros cálidos (escala zinc redefinida a crema/carbón) en toda la interfaz.",
+      "Estado = ficha pastel redondeada con anillo de 1px; el ban es la única con anillo de 2px.",
+      "Activo = contraste invertido, sin tinte.",
+      "Radios grandes: paneles de 28px, controles de 16px.",
+      "Plano: profundidad por capas tonales (papel → superficie → tarjeta), no por sombras.",
+      "Copy en español, tuteo, frases cortas que dicen qué pasa."
+    ],
+    "rules": [
+      { "name": "The Estado-Es-Color Rule", "body": "El tono se reserva para el estado de un miembro o de un evento. Si algo no comunica estado ni es una acción, va en neutros.", "section": "colors" },
+      { "name": "The Mismo-Significado Rule", "body": "Un color de estado significa lo mismo en todo el panel: ámbar es \"se salió\" o \"salida\", rojo es ban, borrado o strike, fucsia es admin. No reutilices un tono de estado para otra cosa.", "section": "colors" },
+      { "name": "The Una-Familia Rule", "body": "Geist para todo; mono solo para salida técnica (logs, comandos remotos).", "section": "typography" },
+      { "name": "The Hora-Doble Rule", "body": "Las horas se muestran en México y debajo, más chica, en Colombia, con cifras tabulares.", "section": "typography" },
+      { "name": "The Plano-Por-Defecto Rule", "body": "Si un bloque necesita separarse, cambia su tono de fondo o añade un anillo de 1px; no le subas la sombra.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do usar las fichas de estado existentes con su significado de siempre antes de inventar un color nuevo.",
+      "Do marcar la sección activa con contraste invertido (tinta ↔ marfil).",
+      "Do usar tablas en PC y tarjetas en celular para listas, con la hora de México y debajo la de Colombia.",
+      "Do escribir el copy en español con tuteo, y que cada mensaje diga qué pasó y qué sigue.",
+      "Do usar cifras tabulares en horas, conteos y paginación."
+    ],
+    "donts": [
+      "Don't usar grises fríos ni #fff puro: el sistema es crema y marfil.",
+      "Don't poner bordes laterales de color como acento ni etiquetas pequeñas en mayúsculas encima de los títulos.",
+      "Don't usar sombras para separar bloques; usa tono o un anillo de 1px.",
+      "Don't usar un tono de estado como decoración ni con otro significado."
+    ]
+  }
+}

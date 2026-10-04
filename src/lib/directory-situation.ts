@@ -20,6 +20,8 @@ export function memberRosterSituation(
 ): DirectoryRosterSituation | "left" {
   if (m.leftAt) return "left";
   if (m.absentWithCause) return "absent";
+  // Solo el flag manual. La protección temporal (`permanentlyActiveUntil`) no
+  // es esta situación: guardarla no debe dejar `permanentlyActive` en true.
   if (m.permanentlyActive) return "permanent";
   if (m.active) return "normal";
   return "inactive";

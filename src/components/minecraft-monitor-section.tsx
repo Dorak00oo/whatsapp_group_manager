@@ -464,7 +464,7 @@ export function MinecraftMonitorSection({
               >
                 <div>
                   <Link
-                    href={`/dashboard?q=${encodeURIComponent(a.gamertag)}`}
+                    href={`/dashboard/lista?q=${encodeURIComponent(a.gamertag)}`}
                     className="font-semibold text-red-900 underline-offset-2 hover:underline dark:text-red-100"
                   >
                     {a.gamertag}
@@ -697,7 +697,7 @@ export function MinecraftMonitorSection({
                       </td>
                       <td className="px-3 py-2">
                         <Link
-                          href={`/dashboard?q=${encodeURIComponent(e.gamertag)}`}
+                          href={`/dashboard/lista?q=${encodeURIComponent(e.gamertag)}`}
                           className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
                         >
                           {e.gamertag}
@@ -732,7 +732,7 @@ export function MinecraftMonitorSection({
                   </span>
                 </div>
                 <Link
-                  href={`/dashboard?q=${encodeURIComponent(e.gamertag)}`}
+                  href={`/dashboard/lista?q=${encodeURIComponent(e.gamertag)}`}
                   className="mt-2 block text-base font-semibold text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
                 >
                   {e.gamertag}

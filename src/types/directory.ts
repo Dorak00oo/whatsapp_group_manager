@@ -20,6 +20,11 @@ export type DirectoryMemberDTO = {
   /** Mundos Bedrock donde está activo (sin blacklist). */
   activeOn: Array<"vanilla" | "mods">;
   permanentlyActive: boolean;
+  /**
+   * Fin de la protección de nuevo. Mientras esté en el futuro, la ficha
+   * muestra activo permanente temporal. No es el flag manual.
+   */
+  permanentlyActiveUntil: string | null;
   absentWithCause: boolean;
   absentReason: string | null;
   isAdmin: boolean;

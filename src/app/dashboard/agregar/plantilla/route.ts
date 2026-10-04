@@ -1,74 +1,16 @@
-import { redirect } from "next/navigation";
-import * as XLSX from "xlsx";
-import { auth } from "@/auth";
+import { requirePanelSession } from "@/lib/panel-session";
+import { directoryCsvTemplate } from "@/lib/spreadsheet-members";
 
-export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
+export const runtime = "nodejs";
 
-  const format = new URL(request.url).searchParams.get("format");
-  if (format === "csv") {
-    const csv =
-      "\ufeff" +
-      [
-        "nombres,gamertag,telefono,pais,activo,admin,protegido,se_salio,notas",
-        "Ana Player,PlayerEjemplo,+52 55 1234 5678,,si,no,no,no,",
-        "Otro nombre,OtroPlayer,5512345678,MX,si,no,no,no,grupo A",
-      ].join("\n");
-    return new Response(csv, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="plantilla-jugadores.csv"',
-      },
-    });
-  }
-
-  const ws = XLSX.utils.aoa_to_sheet([
-    [
-      "nombres",
-      "gamertag",
-      "telefono",
-      "pais",
-      "activo",
-      "admin",
-      "protegido",
-      "se_salio",
-      "notas",
-    ],
-    [
-      "Ana Player",
-      "PlayerEjemplo",
-      "+52 55 1234 5678",
-      "",
-      "si",
-      "no",
-      "no",
-      "no",
-      "",
-    ],
-    [
-      "Otro nombre",
-      "OtroPlayer",
-      "5512345678",
-      "MX",
-      "si",
-      "no",
-      "no",
-      "no",
-      "grupo A",
-    ],
-  ]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "jugadores");
-  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-
-  return new Response(new Uint8Array(buf), {
+/** Plantilla vacía: mismas columnas que la exportación, sin filas de ejemplo. */
+export async function GET() {
+  await requirePanelSession();
+  return new Response(directoryCsvTemplate(), {
     headers: {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": 'attachment; filename="plantilla-jugadores.xlsx"',
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": 'attachment; filename="plantilla-directorio.csv"',
+      "Cache-Control": "no-store",
     },
   });
 }

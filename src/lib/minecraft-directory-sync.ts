@@ -1,4 +1,10 @@
+import { recordAuditEvents } from "@/lib/audit-log";
 import { reconcileDirectoryAbsentActive } from "@/lib/directory-absent-clock";
+import {
+  planHeartbeatDirectoryActive,
+  planPanelDirectoryActive,
+  type ActiveSyncChange,
+} from "@/lib/directory-active-sync-plan";
 import { prisma } from "@/lib/prisma";
 import {
   buildRosterFromSnapshot,
@@ -13,72 +19,140 @@ import {
 } from "@/lib/minecraft-community-activity";
 import {
   MINECRAFT_SERVER_IDS,
-  parseMinecraftServerId,
   type MinecraftServerId,
 } from "@/lib/minecraft-server";
 import { ensureMinecraftServers } from "@/lib/minecraft-servers-db";
 
-async function worldRowsForGamertag(gamertag: string): Promise<WorldActivityRow[]> {
-  const tag = gamertag.trim();
-  if (!tag) return [];
-  const players = await prisma.minecraftPlayer.findMany({
-    where: { gamertag: { equals: tag, mode: "insensitive" } },
-    select: { serverId: true, active: true, isBlacklisted: true },
-  });
-  return players.flatMap((p) => {
-    const serverId = parseMinecraftServerId(p.serverId);
-    if (!serverId) return [];
-    return [{ serverId, active: p.active, isBlacklisted: p.isBlacklisted }];
-  });
+const MC_SYNC_ACTOR = {
+  actorType: "sistema" as const,
+  actorName: "Sincronización con Minecraft",
+};
+
+async function communityOwnerId(): Promise<string | null> {
+  const { findCommunityOwner } = await import("@/lib/resolve-directory-user");
+  const owner = await findCommunityOwner();
+  return owner?.id ?? null;
+}
+
+function uniqueTags(gamertags: string[]): string[] {
+  const seen = new Map<string, string>();
+  for (const raw of gamertags) {
+    const tag = raw.trim();
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (!seen.has(key)) seen.set(key, tag);
+  }
+  return [...seen.values()];
+}
+
+async function updateMemberActive(
+  ids: string[],
+  data: { active: boolean; activeHoldFromMc?: boolean },
+): Promise<number> {
+  let updated = 0;
+  const size = 500;
+  for (let i = 0; i < ids.length; i += size) {
+    const result = await prisma.directoryMember.updateMany({
+      where: { id: { in: ids.slice(i, i + size) } },
+      data,
+    });
+    updated += result.count;
+  }
+  return updated;
+}
+
+/** Historial solo de quien cambió de activo de verdad. Fuera de transacciones. */
+export async function recordMinecraftActiveChanges(
+  userId: string,
+  changes: ActiveSyncChange[],
+): Promise<void> {
+  if (changes.length === 0) return;
+  await recordAuditEvents(
+    changes.map((c) => ({
+      userId,
+      actor: MC_SYNC_ACTOR,
+      action: "member.update",
+      memberId: c.id,
+      memberGamertag: c.gamertag,
+      changes: { active: { from: c.from, to: c.to } },
+      details: { source: "mc.sync" },
+    })),
+  );
 }
 
 /**
- * Alinea `DirectoryMember.active` con la unión de mundos (activo y sin
- * blacklist en al menos uno). No modifica filas con `leftAt`.
- * Respeta `permanentlyActive` y `activeHoldFromMc` al bajar a inactivo.
- * Los ausentes con causa sí cambian de columna (siguen ausentes).
+ * Alinea el directorio de estos gamertags con la unión de mundos.
+ * Una lectura de jugadores, un plan y `updateMany` agrupados. No reconcilia
+ * ausentes: el llamador lo hace una vez al final.
+ */
+export async function syncDirectoryActiveForGamertags(
+  gamertags: string[],
+  now: Date = new Date(),
+): Promise<{ userId: string | null; changes: ActiveSyncChange[] }> {
+  const userId = await communityOwnerId();
+  if (!userId) return { userId: null, changes: [] };
+  const tags = uniqueTags(gamertags);
+  if (tags.length === 0) return { userId, changes: [] };
+
+  const tagWhere = tags.map((t) => ({
+    gamertag: { equals: t, mode: "insensitive" as const },
+  }));
+  const [players, members] = await Promise.all([
+    prisma.minecraftPlayer.findMany({
+      where: { OR: tagWhere },
+      select: {
+        gamertag: true,
+        serverId: true,
+        active: true,
+        isBlacklisted: true,
+      },
+    }),
+    prisma.directoryMember.findMany({
+      where: { userId, OR: tagWhere },
+      select: {
+        id: true,
+        gamertag: true,
+        active: true,
+        permanentlyActive: true,
+        permanentlyActiveUntil: true,
+        activeHoldFromMc: true,
+        absentWithCause: true,
+        leftAt: true,
+      },
+    }),
+  ]);
+
+  const grouped = groupWorldActivityByGamertag(players);
+  const mc = new Map<string, boolean>();
+  for (const tag of tags) {
+    const key = tag.toLowerCase();
+    mc.set(key, isCommunityActiveFromWorlds(grouped.get(key) ?? []));
+  }
+  const plan = planHeartbeatDirectoryActive({
+    members,
+    minecraftActiveByGamertag: mc,
+    now,
+  });
+  if (plan.activateIds.length > 0) {
+    await updateMemberActive(plan.activateIds, { active: true });
+  }
+  if (plan.deactivateIds.length > 0) {
+    await updateMemberActive(plan.deactivateIds, { active: false });
+  }
+  return { userId, changes: plan.changes };
+}
+
+/**
+ * Un gamertag (p. ej. tras un ban en todos los mundos). Reconcilia ausentes
+ * una vez y deja historial si `active` cambió.
  */
 export async function syncDirectoryActiveWithMinecraft(
   gamertag: string,
 ): Promise<void> {
-  const email = process.env.COMMUNITY_EMAIL?.trim().toLowerCase();
-  if (!email) return;
-
-  const owner = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
-  });
-  if (!owner) return;
-
-  const tag = gamertag.trim();
-  if (!tag) return;
-
-  const minecraftActive = isCommunityActiveFromWorlds(
-    await worldRowsForGamertag(tag),
-  );
-
-  const baseWhere = {
-    userId: owner.id,
-    leftAt: null,
-    gamertag: { equals: tag, mode: "insensitive" as const },
-  };
-
-  if (minecraftActive) {
-    await prisma.directoryMember.updateMany({
-      where: baseWhere,
-      data: { active: true },
-    });
-  } else {
-    await prisma.directoryMember.updateMany({
-      where: {
-        ...baseWhere,
-        permanentlyActive: false,
-        OR: [{ activeHoldFromMc: false }, { absentWithCause: true }],
-      },
-      data: { active: false },
-    });
-  }
-  await reconcileDirectoryAbsentActive(owner.id);
+  const { userId, changes } = await syncDirectoryActiveForGamertags([gamertag]);
+  if (!userId) return;
+  await reconcileDirectoryAbsentActive(userId);
+  await recordMinecraftActiveChanges(userId, changes);
 }
 
 export type SyncDirectoryFromMinecraftSummary = {
@@ -87,6 +161,7 @@ export type SyncDirectoryFromMinecraftSummary = {
   matchedGamertags: number;
   activated: string[];
   deactivated: string[];
+  changes: ActiveSyncChange[];
 };
 
 async function unionActivityByGamertag(): Promise<Map<string, WorldActivityRow[]>> {
@@ -143,12 +218,14 @@ async function unionActivityByGamertag(): Promise<Map<string, WorldActivityRow[]
 /**
  * Alinea el directorio con el roster de Minecraft (unión de mundos:
  * activo en MC y sin blacklist en al menos uno).
- * Solo filas del panel sin `leftAt`. El activo permanente no se baja.
+ * Solo filas del panel sin `leftAt`. Protegido (manual o temporal vigente)
+ * no se baja y, si estaba inactivo, sube a activo.
  * Los ausentes con causa siguen ausentes, pero sí cambian de columna.
  * Esta acción de panel ignora `activeHoldFromMc` (si no, casi nadie se inactiva).
  */
 export async function syncDirectoryMembersFromMinecraftTable(
   userId: string,
+  now: Date = new Date(),
 ): Promise<SyncDirectoryFromMinecraftSummary> {
   const byTag = await unionActivityByGamertag();
 
@@ -160,62 +237,62 @@ export async function syncDirectoryMembersFromMinecraftTable(
       displayName: true,
       active: true,
       permanentlyActive: true,
+      permanentlyActiveUntil: true,
+      activeHoldFromMc: true,
       absentWithCause: true,
+      leftAt: true,
     },
   });
 
-  const toActivate: string[] = [];
-  const toDeactivate: string[] = [];
-  const activated: string[] = [];
-  const deactivated: string[] = [];
+  const mc = new Map<string, boolean>();
   let matchedGamertags = 0;
+  for (const m of members) {
+    const key = m.gamertag.trim().toLowerCase();
+    let activeInMc = mc.get(key);
+    if (activeInMc === undefined) {
+      activeInMc = isCommunityActiveFromWorlds(byTag.get(key) ?? []);
+      mc.set(key, activeInMc);
+    }
+    if (activeInMc) matchedGamertags += 1;
+  }
 
-  function memberLabel(m: {
-    gamertag: string;
-    displayName: string | null;
-  }): string {
+  const plan = planPanelDirectoryActive({
+    members,
+    minecraftActiveByGamertag: mc,
+    now,
+  });
+
+  function memberLabel(id: string): string {
+    const m = members.find((row) => row.id === id);
+    if (!m) return id;
     const name = m.displayName?.trim();
     return name ? `${name} · ${m.gamertag}` : m.gamertag;
   }
 
-  for (const m of members) {
-    const key = m.gamertag.trim().toLowerCase();
-    const worlds = byTag.get(key) ?? [];
-    const mcActive = isCommunityActiveFromWorlds(worlds);
-    if (mcActive) matchedGamertags += 1;
-
-    const shouldBeActive = m.permanentlyActive || mcActive;
-    if (m.active === shouldBeActive) continue;
-    if (shouldBeActive) {
-      toActivate.push(m.id);
-      activated.push(memberLabel(m));
-    } else {
-      toDeactivate.push(m.id);
-      deactivated.push(memberLabel(m));
-    }
-  }
-
-  activated.sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
-  deactivated.sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+  const activated = plan.changes
+    .filter((c) => c.to)
+    .map((c) => memberLabel(c.id))
+    .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
+  const deactivated = plan.changes
+    .filter((c) => !c.to)
+    .map((c) => memberLabel(c.id))
+    .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
 
   let updatedRows = 0;
-
-  if (toActivate.length > 0) {
-    const r = await prisma.directoryMember.updateMany({
-      where: { id: { in: toActivate } },
-      data: { active: true, activeHoldFromMc: false },
+  if (plan.activateIds.length > 0) {
+    updatedRows += await updateMemberActive(plan.activateIds, {
+      active: true,
+      activeHoldFromMc: false,
     });
-    updatedRows += r.count;
   }
-  if (toDeactivate.length > 0) {
-    const r = await prisma.directoryMember.updateMany({
-      where: { id: { in: toDeactivate } },
-      data: { active: false, activeHoldFromMc: false },
+  if (plan.deactivateIds.length > 0) {
+    updatedRows += await updateMemberActive(plan.deactivateIds, {
+      active: false,
+      activeHoldFromMc: false,
     });
-    updatedRows += r.count;
   }
 
-  await reconcileDirectoryAbsentActive(userId);
+  await reconcileDirectoryAbsentActive(userId, now);
 
   const minecraftCount = [...byTag.values()].filter((worlds) =>
     isCommunityActiveFromWorlds(worlds),
@@ -227,6 +304,7 @@ export async function syncDirectoryMembersFromMinecraftTable(
     matchedGamertags,
     activated,
     deactivated,
+    changes: plan.changes,
   };
 }
 

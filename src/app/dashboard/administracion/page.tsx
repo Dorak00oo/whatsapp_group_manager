@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { DirectoryAllowlistExport } from "@/components/directory-allowlist-export";
+import { DirectoryBulkUpload } from "@/components/directory-bulk-upload";
 import { DirectoryMinecraftActiveCompare } from "@/components/directory-minecraft-active-compare";
 import { GamertagAuditPanel } from "@/components/gamertag-audit-panel";
 import { PlayerAdminStrikePanel } from "@/components/player-admin-strike-panel";
@@ -150,6 +151,8 @@ export default async function DashboardAdministracionPage() {
       />
 
       <DirectoryAllowlistExport activeCount={activeCount} />
+
+      <DirectoryBulkUpload />
     </section>
   );
 }

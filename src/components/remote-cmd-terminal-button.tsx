@@ -60,13 +60,10 @@ export function RemoteCmdTerminalButton({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (phase !== "running") return;
-    if (visibleCount >= allLines.length) {
-      if (allLines.length > 0) setPhase("done");
-      return;
-    }
+    if (phase !== "running" || visibleCount >= allLines.length) return;
     const t = setTimeout(() => {
       setVisibleCount((c) => c + 1);
+      if (visibleCount + 1 >= allLines.length) setPhase("done");
     }, LINE_REVEAL_MS);
     return () => clearTimeout(t);
   }, [phase, visibleCount, allLines.length]);

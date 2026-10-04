@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generado por `prisma generate`.
+    "src/generated/**",
+    // Carpeta local, no versionada (ver .gitignore).
+    "scripts/**",
   ]),
 ]);
 

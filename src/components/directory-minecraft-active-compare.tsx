@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   blacklistReconcileCandidates,
@@ -80,20 +80,21 @@ function ReconcileBlacklistDialog({
   onConfirm: (gamertags: string[]) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const wasOpen = useRef(false);
+  const [wasOpen, setWasOpen] = useState(false);
+
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setSelected(new Set(candidates.map((c) => c.gamertag)));
+  }
 
   useEffect(() => {
-    if (open && !wasOpen.current) {
-      setSelected(new Set(candidates.map((c) => c.gamertag)));
-    }
-    wasOpen.current = open;
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open, candidates]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

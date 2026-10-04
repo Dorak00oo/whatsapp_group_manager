@@ -2,12 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
+import { recordAuditEvent } from "@/lib/audit-log";
 import type { GamertagAuditRunResult } from "@/lib/gamertag-audit";
 import { runGamertagAuditWithLog } from "@/lib/gamertag-audit";
 import { recordPendingGamertagCorrection } from "@/lib/allowlist-corrected";
+import { getPanelActor } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
+import { revalidateDirectoryViews } from "@/lib/revalidate-directory";
 
 const STALE_SESSION_ERROR =
   "Sesión desactualizada respecto a la base de datos. Cierra sesión y vuelve a entrar.";
@@ -78,7 +81,24 @@ export async function approveGamertagAuditSuggestion(
       suggestion.suggestedGamertag,
     );
 
-    revalidatePath("/dashboard");
+    const actor = await getPanelActor();
+    if (actor) {
+      await recordAuditEvent({
+        userId,
+        actor,
+        action: "member.update",
+        memberId: suggestion.directoryMemberId,
+        memberGamertag: suggestion.suggestedGamertag,
+        changes: {
+          gamertag: {
+            from: suggestion.currentGamertag,
+            to: suggestion.suggestedGamertag,
+          },
+        },
+      });
+    }
+
+    revalidateDirectoryViews();
     revalidatePath("/dashboard/administracion");
     return { ok: true, newGamertag: suggestion.suggestedGamertag };
   } catch (e) {

@@ -30,3 +30,59 @@ export async function resolveDirectoryUserId(
 
   return null;
 }
+
+/**
+ * Dueño interno de los datos. Si `COMMUNITY_EMAIL` está definido, esa fila.
+ * Si no, la que ya tiene el directorio (o la única que exista). El correo no
+ * se usa para entrar.
+ */
+export async function findCommunityOwner(): Promise<{ id: string; email: string } | null> {
+  const { getCommunityCredentialsFromEnv } = await import("@/lib/community-env");
+  const email = getCommunityCredentialsFromEnv().email;
+  if (email) {
+    const byEmail = await withDbRetry(() =>
+      prisma.user.findUnique({ where: { email }, select: { id: true, email: true } }),
+    );
+    if (byEmail) return byEmail;
+  }
+  const withMembers = await withDbRetry(() =>
+    prisma.user.findFirst({
+      where: { directoryMembers: { some: {} } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, email: true },
+    }),
+  );
+  if (withMembers) return withMembers;
+  return withDbRetry(() =>
+    prisma.user.findFirst({
+      orderBy: { createdAt: "asc" },
+      select: { id: true, email: true },
+    }),
+  );
+}
+
+/**
+ * User comunitario (`COMMUNITY_EMAIL`): dueño interno de todo el directorio.
+ * Se crea en el primer login; la columna del hash es obligatoria pero nadie
+ * entra con ella, así que guarda el hash de un valor aleatorio.
+ */
+export async function ensureCommunityUser(
+  email: string,
+): Promise<{ id: string; email: string }> {
+  const existing = await withDbRetry(() =>
+    prisma.user.findUnique({ where: { email }, select: { id: true, email: true } }),
+  );
+  if (existing) return existing;
+
+  const bcrypt = await import("bcryptjs");
+  const { randomUUID } = await import("node:crypto");
+  const passwordHash = await bcrypt.hash(randomUUID(), 12);
+  return prisma.user.create({
+    data: {
+      email,
+      passwordHash,
+      name: process.env.COMMUNITY_DISPLAY_NAME?.trim() || "Comunidad",
+    },
+    select: { id: true, email: true },
+  });
+}

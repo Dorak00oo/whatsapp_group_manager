@@ -46,7 +46,7 @@ export function normalizePhoneForDirectory(
   const isoC = upper as CountryCode;
   const e164 = `+${cc}${digits}`;
 
-  let parsed =
+  const parsed =
     parsePhoneNumberFromString(digits, isoC) ??
     parsePhoneNumberFromString(e164);
 

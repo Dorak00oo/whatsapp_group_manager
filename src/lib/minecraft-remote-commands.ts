@@ -102,66 +102,92 @@ export function remoteCmdNeedsDestination(action: RemoteCmdAction): boolean {
   return action === "tp";
 }
 
-/** Destino de TP bloqueado: nadie puede teletransportarse a este gamertag. */
-export const TP_PROTECTED_DESTINATION_GAMERTAG = "drako274";
-
 export function normalizeGamertag(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
 
-export function isTpProtectedDestination(
-  gamertag: string | null | undefined,
-): boolean {
-  return normalizeGamertag(gamertag) === TP_PROTECTED_DESTINATION_GAMERTAG;
-}
-
-/** Puede ser origen de TP aunque no esté marcado como admin en el directorio. */
-export function isTpPrivilegedOrigin(
-  gamertag: string | null | undefined,
-): boolean {
-  return normalizeGamertag(gamertag) === TP_PROTECTED_DESTINATION_GAMERTAG;
-}
-
-export function tpDestinationBlockedReason(
-  destination: string | null | undefined,
-): string | null {
-  if (!isTpProtectedDestination(destination)) return null;
-  return "No se puede teletransportar a drako274";
-}
-
+/** Destinos de TP: cualquier otro jugador en línea, incluido el dueño. */
 export function tpDestinationOptions(
   onlinePlayers: string[],
   originGamertag: string,
 ): string[] {
   const origin = normalizeGamertag(originGamertag);
-  return onlinePlayers.filter((p) => {
-    const tag = normalizeGamertag(p);
-    return tag.length > 0 && tag !== origin && !isTpProtectedDestination(p);
+  return onlinePlayers.filter((player) => {
+    const tag = normalizeGamertag(player);
+    return tag.length > 0 && tag !== origin;
   });
 }
 
-export type TpOriginOption = {
-  id: string;
-  gamertag: string;
-  displayName: string | null;
+/** La cuenta queda primera; el resto conserva el orden del roster. */
+export function orderAccountFirst(
+  players: readonly string[],
+  accountGamertag: string,
+): string[] {
+  const key = normalizeGamertag(accountGamertag);
+  if (!key) return [...players];
+  const hit = players.find((player) => normalizeGamertag(player) === key);
+  if (!hit) return [...players];
+  return [hit, ...players.filter((player) => player !== hit)];
+}
+
+/** Nombre tal como está en el roster, o `null` si ese jugador no está en línea. */
+export function listedGamertag(
+  roster: readonly string[],
+  gamertag: string,
+): string | null {
+  const key = normalizeGamertag(gamertag);
+  if (!key) return null;
+  return roster.find((player) => normalizeGamertag(player) === key) ?? null;
+}
+
+const REMOTE_CMD_LABELS: Record<RemoteCmdAction, string> = {
+  spectator: "Modo espectador",
+  survival: "Modo survival",
+  tp: "TP",
+  kill_silverfish: "Eliminar silverfish",
+  kill_withers: "Eliminar withers",
+  extinguish_fire: "Apagar fuego",
+  sync_config: "Sincronizar ajustes",
+  allowlist_sync: "Sincronizar allowlist",
+  allowlist_sync_corrected: "Corregir allowlist",
 };
 
-const SYNTHETIC_PRIVILEGED_ORIGIN_ID = "privileged-origin-drako274";
+export function remoteCmdLabel(action: RemoteCmdAction): string {
+  return REMOTE_CMD_LABELS[action];
+}
 
-/** Asegura que drako274 aparezca como origen de TP aunque no esté marcado admin. */
-export function mergePrivilegedTpOrigin(
-  admins: TpOriginOption[],
-  privilegedMember: TpOriginOption | null,
-): TpOriginOption[] {
-  if (admins.some((a) => isTpPrivilegedOrigin(a.gamertag))) return admins;
-  const extra = privilegedMember ?? {
-    id: SYNTHETIC_PRIVILEGED_ORIGIN_ID,
-    gamertag: TP_PROTECTED_DESTINATION_GAMERTAG,
-    displayName: null,
-  };
-  return [...admins, extra].sort((a, b) =>
-    a.gamertag.localeCompare(b.gamertag, undefined, { sensitivity: "base" }),
-  );
+/** Texto de `details.destination` para el historial (`remote.cmd`). */
+export function remoteCmdDestinationDetail(input: {
+  action: RemoteCmdAction;
+  destinationGamertag?: string | null;
+  destinationX?: string | null;
+  destinationY?: string | null;
+  destinationZ?: string | null;
+  addedCount?: number;
+  removedCount?: number;
+}): string | null {
+  if (input.action === "tp") {
+    const player = input.destinationGamertag?.trim();
+    if (player) return player;
+    if (
+      input.destinationX != null ||
+      input.destinationY != null ||
+      input.destinationZ != null
+    ) {
+      return `${input.destinationX ?? "~"} ${input.destinationY ?? "~"} ${input.destinationZ ?? "~"}`;
+    }
+    return null;
+  }
+  if (
+    input.action === "allowlist_sync" ||
+    input.action === "allowlist_sync_corrected"
+  ) {
+    const added = input.addedCount ?? 0;
+    const removed = input.removedCount ?? 0;
+    if (added === 0 && removed === 0) return null;
+    return `+${added} / -${removed}`;
+  }
+  return null;
 }
 
 /** Acciones que se resuelven contra listas de gamertags calculadas en el servidor (no las elige el cliente). */

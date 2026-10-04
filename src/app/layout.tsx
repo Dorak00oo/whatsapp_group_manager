@@ -13,7 +13,7 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "Panel de la comunidad",
   description:
-    "Directorio de personas, WhatsApp y Minecraft. Entrá con la cuenta compartida.",
+    "Directorio de la comunidad, WhatsApp y Minecraft. Entra con tu gamertag.",
 };
 
 export const viewport: Viewport = {

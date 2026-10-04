@@ -17,6 +17,7 @@ export default async function DashboardMonitoreoPage() {
   const session = await auth();
   if (!session?.user) return null;
 
+  let data;
   try {
     const serverId = await getSelectedMinecraftServerId();
     const [config, events, eventTotal, alerts] = await Promise.all([
@@ -51,36 +52,39 @@ export default async function DashboardMonitoreoPage() {
       };
     });
 
-    return (
-      <section className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Monitoreo
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            Bloques colocados/rotos, fuego, lava, TNT, wither y animales
-            domésticos/colección en Overworld. El addon envía lotes cada 30 s (o
-            al pedirlos). Historial 6 meses. Alertas 5 días (o hasta
-            descartarlas).
-          </p>
-        </div>
-        <MinecraftMonitorSection
-          key={serverId}
-          events={mapped}
-          totalEvents={eventTotal}
-          alerts={alerts}
-          monitorExclude={
-            config
-              ? parseExcludeList(config.monitorExcludeJson)
-              : [...DEFAULT_MONITOR_EXCLUDE]
-          }
-        />
-      </section>
-    );
+    data = { serverId, config, mapped, eventTotal, alerts };
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
       return <DatabaseUnavailable />;
     }
     throw e;
   }
+  const { serverId, config, mapped, eventTotal, alerts } = data;
+
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          Monitoreo
+        </h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Bloques colocados/rotos, fuego, lava, TNT, wither y animales
+          domésticos/colección en Overworld. El addon envía lotes cada 30 s (o
+          al pedirlos). Historial 6 meses. Alertas 5 días (o hasta
+          descartarlas).
+        </p>
+      </div>
+      <MinecraftMonitorSection
+        key={serverId}
+        events={mapped}
+        totalEvents={eventTotal}
+        alerts={alerts}
+        monitorExclude={
+          config
+            ? parseExcludeList(config.monitorExcludeJson)
+            : [...DEFAULT_MONITOR_EXCLUDE]
+        }
+      />
+    </section>
+  );
 }

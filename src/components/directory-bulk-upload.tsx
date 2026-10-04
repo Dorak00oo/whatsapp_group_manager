@@ -5,7 +5,10 @@ import {
   bulkImportDirectoryMembers,
   type BulkImportResult,
 } from "@/app/dashboard/actions";
-import { softBtnLavender, softPanel } from "@/lib/soft-ui";
+import { softBtnLavender, softBtnMint, softBtnPrimary, softPanel } from "@/lib/soft-ui";
+
+const linkBtn =
+  "inline-flex items-center justify-center rounded-2xl px-4 py-2.5 text-sm font-medium shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/20 disabled:opacity-60 dark:focus-visible:ring-zinc-100/25";
 
 export function DirectoryBulkUpload() {
   const [state, formAction, pending] = useActionState<
@@ -13,113 +16,101 @@ export function DirectoryBulkUpload() {
     FormData
   >(bulkImportDirectoryMembers, null);
 
+  const skipped = state && "ok" in state ? state.skipped : [];
+  const errors = state && "ok" in state ? state.errors : [];
+
   return (
-    <div className={`${softPanel} gap-3`}>
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-800 dark:text-zinc-200">
-          Hoja de cálculo
-        </p>
-        <h3 className="mt-1 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-          Importar desde Excel o Google Sheets
+    <section className={softPanel} aria-labelledby="csv-directorio-titulo">
+      <div className="flex flex-col gap-2">
+        <h3
+          id="csv-directorio-titulo"
+          className="text-base font-semibold text-zinc-900 dark:text-zinc-50"
+        >
+          Importar y exportar (CSV)
         </h3>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-          <strong className="font-medium text-zinc-800 dark:text-zinc-200">.xlsx</strong> /{" "}
-          <strong className="font-medium text-zinc-800 dark:text-zinc-200">.xls</strong>, o exporta
-          desde Sheets con{" "}
-          <strong className="font-medium text-zinc-800 dark:text-zinc-200">.csv</strong> /{" "}
-          <strong className="font-medium text-zinc-800 dark:text-zinc-200">.tsv</strong> (Archivo →
-          Descargar). Primera
-          fila = títulos de columna. Los títulos se reconocen aunque estén mal escritos o usen
-          palabras parecidas a los filtros (por ejemplo «Los que se salieron», «Protegidos (sin
-          ban)», «roster», «administrador»). Obligatorio: columna de{" "}
-          <strong className="font-medium text-zinc-800 dark:text-zinc-200">gamertag</strong> (o
-          gamertags) y otra de <strong className="font-medium text-zinc-800 dark:text-zinc-200">teléfono</strong>
-          . Opcional: <strong className="font-medium text-zinc-800 dark:text-zinc-200">nombres</strong> o{" "}
-          <strong className="font-medium text-zinc-800 dark:text-zinc-200">nombre</strong> para el nombre
-          real (se guarda aparte del gamertag).
-          . Si el número no lleva{" "}
-          <code className="rounded-lg bg-amber-100 px-1.5 py-0.5 font-mono text-xs text-zinc-800 ring-1 ring-amber-200/90 dark:bg-amber-950/50 dark:text-amber-100 dark:ring-amber-800/50">
-            +
-          </code>
-          , usa la columna de{" "}
-          <strong className="font-medium text-zinc-800 dark:text-zinc-200">país</strong> (ISO2, ej.{" "}
-          MX). Opcionales: activo, admin, protegido, se salió, notas (sí/no u homónimos en celdas). En
-          Excel se leen <strong className="font-medium text-zinc-800 dark:text-zinc-200">todas las
-          hojas</strong> que tengan cabeceras reconocibles (las demás se ignoran).
+        <p className="max-w-prose text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+          Exporta todo el directorio o baja la plantilla vacía, con las mismas
+          columnas. Al importar, quien ya esté (mismo teléfono, @usuario o
+          gamertag) se salta y no se pisa. Las altas nuevas quedan protegidas
+          5 días.
         </p>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold">
-          <a
-            href="/dashboard/agregar/plantilla"
-            className="text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
-          >
-            Plantilla .xlsx
-          </a>
-          <a
-            href="/dashboard/agregar/plantilla?format=csv"
-            className="text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
-          >
-            Plantilla .csv (Sheets)
-          </a>
-        </div>
       </div>
 
-      <form
-        action={formAction}
-        className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
-      >
-        <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-          Archivo
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <a href="/dashboard/agregar/exportar" className={`${linkBtn} ${softBtnPrimary}`}>
+          Exportar CSV
+        </a>
+        <a href="/dashboard/agregar/plantilla" className={`${linkBtn} ${softBtnLavender}`}>
+          Descargar plantilla
+        </a>
+      </div>
+
+      <form action={formAction} className="flex flex-col gap-3">
+        <label className="flex min-w-0 flex-col gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+          Archivo CSV
           <input
             type="file"
             name="file"
-            accept=".xlsx,.xls,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv,text/tab-separated-values"
+            accept=".csv,text/csv"
             required
             disabled={pending}
-            className="text-sm text-zinc-700 file:mr-3 file:rounded-2xl file:border-0 file:bg-emerald-200 file:px-4 file:py-2 file:text-sm file:font-medium file:text-zinc-900 hover:file:bg-emerald-300 disabled:opacity-60 dark:text-zinc-300 dark:file:bg-emerald-800/80 dark:file:text-emerald-50 dark:hover:file:bg-emerald-700/80"
+            className="text-sm text-zinc-800 file:mr-3 file:rounded-2xl file:border-0 file:bg-zinc-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/15 disabled:opacity-60 dark:text-zinc-200 dark:file:bg-zinc-100 dark:file:text-zinc-900 dark:hover:file:bg-white dark:focus-visible:ring-zinc-100/25"
           />
         </label>
-        <button
-          type="submit"
-          disabled={pending}
-          className={softBtnLavender}
-        >
-          {pending ? "Importando…" : "Importar jugadores"}
+        <p className="max-w-prose text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+          UTF-8, separador coma o punto y coma. La primera fila son los títulos.
+          Sin + en el teléfono, llena la columna de país (MX, CO…).
+        </p>
+        <button type="submit" disabled={pending} className={`${softBtnMint} self-start`}>
+          {pending ? "Importando…" : "Importar CSV"}
         </button>
       </form>
 
       {state && "error" in state ? (
-        <p className="text-xs text-red-600 dark:text-red-400" role="alert">
+        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
           {state.error}
         </p>
       ) : null}
 
       {state && "ok" in state && state.ok ? (
-        <div className="rounded-2xl bg-emerald-100 px-3 py-2 text-xs ring-1 ring-emerald-200/90 dark:bg-emerald-950/35 dark:ring-emerald-800/50">
-          <p className="font-semibold text-zinc-800 dark:text-zinc-100">
-            Creados: {state.created}
-            {state.errors.length > 0
-              ? ` · Filas con error: ${state.errors.length}`
+        <div
+          className="rounded-2xl bg-emerald-100 px-3 py-3 text-sm ring-1 ring-emerald-200/90 dark:bg-emerald-950/35 dark:ring-emerald-800/50"
+          role="status"
+        >
+          <p className="font-semibold text-zinc-900 dark:text-zinc-50">
+            {state.created === 1
+              ? "1 alta nueva."
+              : `${state.created} altas nuevas.`}{" "}
+            {skipped.length === 1
+              ? "1 ya estaba y se saltó."
+              : skipped.length > 0
+                ? `${skipped.length} ya estaban y se saltaron.`
+                : "Nadie se saltó."}
+            {errors.length > 0
+              ? ` ${errors.length === 1 ? "1 fila con error." : `${errors.length} filas con error.`}`
               : ""}
           </p>
-          {state.errors.length > 0 ? (
-            <ul className="mt-2 max-h-40 list-inside list-disc space-y-0.5 overflow-y-auto text-zinc-600 dark:text-zinc-300">
-              {state.errors.map((e) => (
-                <li key={`${e.sheet ?? ""}-${e.row}-${e.message}`}>
-                  {e.sheet ? (
-                    <>
-                      Hoja «{e.sheet}», fila {e.row}: {e.message}
-                    </>
-                  ) : (
-                    <>
-                      Fila {e.row}: {e.message}
-                    </>
-                  )}
+          {skipped.length > 0 ? (
+            <ul className="mt-2 max-h-40 list-inside list-disc space-y-0.5 overflow-y-auto text-xs text-zinc-700 dark:text-zinc-300">
+              {skipped.map((row) => (
+                <li key={`skip-${row.row}-${row.gamertag}`}>
+                  Fila {row.row}
+                  {row.gamertag ? ` · ${row.gamertag}` : ""} — {row.reason}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {errors.length > 0 ? (
+            <ul className="mt-2 max-h-40 list-inside list-disc space-y-0.5 overflow-y-auto text-xs text-red-700 dark:text-red-300">
+              {errors.map((row) => (
+                <li key={`err-${row.row}-${row.message}`}>
+                  Fila {row.row}: {row.message}
                 </li>
               ))}
             </ul>
           ) : null}
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }

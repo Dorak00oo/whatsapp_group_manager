@@ -64,7 +64,9 @@ export function DirectoryFilters({ filters, countryCodes }: Props) {
     [pathname, router, searchParams],
   );
   const navigateRef = useRef(navigate);
-  navigateRef.current = navigate;
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
 
   useEffect(() => {
     if (

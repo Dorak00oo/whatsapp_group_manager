@@ -9,6 +9,7 @@ export async function setSelectedMinecraftWorld(id: string) {
   if (!parsed) return { error: "Mundo inválido" };
   await persistSelectedMinecraftWorld(parsed);
   revalidatePath("/dashboard", "layout");
+  revalidatePath("/dashboard/lista");
   revalidatePath("/dashboard/minecraft");
   revalidatePath("/dashboard/parcela");
   revalidatePath("/dashboard/monitoreo");

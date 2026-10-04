@@ -159,6 +159,7 @@ export async function POST(request: Request) {
     const sync = await enqueueMinecraftPanelCommand("synclists", serverId);
 
     revalidatePath("/dashboard");
+    revalidatePath("/dashboard/lista");
     revalidatePath("/dashboard/minecraft");
     revalidatePath("/dashboard/administracion");
 

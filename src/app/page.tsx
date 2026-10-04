@@ -14,7 +14,7 @@ export default async function Home() {
         <p className="mt-4 text-pretty text-base leading-relaxed text-zinc-600 dark:text-zinc-400 sm:text-lg">
           {session?.user
             ? "Directorio de personas, WhatsApp y Minecraft."
-            : "Directorio de personas, WhatsApp y Minecraft. Entrá con la cuenta compartida."}
+            : "Directorio de personas, WhatsApp y Minecraft. Entra con tu gamertag y la contraseña del grupo."}
         </p>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">

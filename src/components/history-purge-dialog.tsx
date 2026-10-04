@@ -31,14 +31,19 @@ export function HistoryPurgeDialog({
   const inputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<1 | 2>(1);
   const [typed, setTyped] = useState("");
+  const [wasOpen, setWasOpen] = useState(open);
   const canDelete = matchesPurgeConfirm(typed);
 
-  useEffect(() => {
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (!open) {
       setStep(1);
       setTyped("");
-      return;
     }
+  }
+
+  useEffect(() => {
+    if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {

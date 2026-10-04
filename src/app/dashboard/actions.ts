@@ -3,13 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import {
+  recordAuditEvent,
+  recordAuditEvents,
+  type AuditEventInput,
+} from "@/lib/audit-log";
+import { diffAuditChanges, type AuditChanges } from "@/lib/audit-format";
 import { recordPendingGamertagCorrection } from "@/lib/allowlist-corrected";
 import {
   MAX_DIRECTORY_STRIKES,
   memberHasStrikeWithoutReason,
   parseStrikeKind,
-  STRIKE_KIND_DEFINITIVE,
-  STRIKE_KIND_PENDING,
 } from "@/lib/directory-strikes";
 import {
   cancelPendingAllowlistRemoval,
@@ -18,7 +22,6 @@ import {
 import { prisma } from "@/lib/prisma";
 import { parseDirectoryAge } from "@/lib/directory-age";
 import { resolveDirectoryWhatsAppContact } from "@/lib/directory-whatsapp-contact";
-import { normalizePhoneFreeform } from "@/lib/phone-normalize";
 import { parseGamertagsFromInactiveLog } from "@/lib/minecraft-inactive-log";
 import {
   isMissingAgeColumnError,
@@ -29,9 +32,20 @@ import {
   MISSING_WHATSAPP_USERNAME_COLUMN_MESSAGE,
 } from "@/lib/prisma-migration-hints";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
-import { blacklistMinecraftGamertagOnAllWorlds, syncDirectoryMembersFromMinecraftTable } from "@/lib/minecraft-directory-sync";
+import { isMemberProtected, newMemberProtectionUntil } from "@/lib/directory-protection";
+import {
+  blacklistMinecraftGamertagOnAllWorlds,
+  recordMinecraftActiveChanges,
+  syncDirectoryMembersFromMinecraftTable,
+} from "@/lib/minecraft-directory-sync";
+import { getPanelActor } from "@/lib/panel-session";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
-import { parseMemberSpreadsheet } from "@/lib/spreadsheet-members";
+import { revalidateDirectoryViews } from "@/lib/revalidate-directory";
+import {
+  parseDirectoryCsv,
+  planCsvImport,
+  type CsvExistingIdentity,
+} from "@/lib/spreadsheet-members";
 import { reconcileDirectoryAbsentActive } from "@/lib/directory-absent-clock";
 import {
   absentActiveSinceForSituation,
@@ -41,6 +55,29 @@ import {
 
 const STALE_SESSION_ERROR =
   "Sesión desactualizada respecto a la base de datos. Cierra sesión y vuelve a entrar.";
+
+const PROFILE_AUDIT_FIELDS = [
+  "gamertag",
+  "displayName",
+  "age",
+  "phone",
+  "phoneCountry",
+  "whatsappUsername",
+  "notes",
+] as const;
+
+async function auditPanel(
+  userId: string,
+  input: Omit<AuditEventInput, "userId" | "actor">,
+): Promise<void> {
+  const actor = await getPanelActor();
+  if (!actor) return;
+  await recordAuditEvent({ userId, actor, ...input });
+}
+
+function revalidateMemberViews(): void {
+  revalidateDirectoryViews();
+}
 
 export async function createDirectoryMember(
   _prev: { error?: string } | null,
@@ -75,8 +112,10 @@ export async function createDirectoryMember(
   });
   if (!contact.ok) return { error: contact.error };
 
+  const createdAt = new Date();
+  let createdId: string;
   try {
-    await prisma.directoryMember.create({
+    const created = await prisma.directoryMember.create({
       data: {
         gamertag,
         displayName: displayName || null,
@@ -85,17 +124,21 @@ export async function createDirectoryMember(
         phoneCountry: contact.phoneCountry,
         whatsappUsername: contact.whatsappUsername,
         active: markedLeft ? false : active || permanentlyActive,
-        leftAt: markedLeft ? new Date() : null,
+        leftAt: markedLeft ? createdAt : null,
         isAdmin,
         banExempt,
         permanentlyActive,
+        permanentlyActiveUntil: newMemberProtectionUntil(createdAt),
         absentWithCause: false,
         absentReason: null,
-        activeHoldFromMc: permanentlyActive || (active && !markedLeft),
+        activeHoldFromMc: false,
         notes: notesRaw || null,
+        createdAt,
         userId,
       },
+      select: { id: true },
     });
+    createdId = created.id;
   } catch (e) {
     if (isMissingDisplayNameColumnError(e)) {
       return { error: MISSING_DISPLAY_NAME_COLUMN_MESSAGE };
@@ -109,9 +152,16 @@ export async function createDirectoryMember(
     throw e;
   }
 
-  revalidatePath("/dashboard");
+  await auditPanel(userId, {
+    action: "member.create",
+    memberId: createdId,
+    memberGamertag: gamertag,
+    details: { source: "formulario" },
+  });
+
+  revalidateMemberViews();
   revalidatePath("/dashboard/agregar");
-  redirect("/dashboard");
+  redirect("/dashboard/lista");
 }
 
 export type BulkImportResult =
@@ -119,10 +169,12 @@ export type BulkImportResult =
   | {
       ok: true;
       created: number;
-      errors: { row: number; sheet?: string; message: string }[];
+      skipped: { row: number; gamertag: string; reason: string }[];
+      errors: { row: number; message: string }[];
     };
 
 const BULK_MAX_FILE_BYTES = 3 * 1024 * 1024;
+const CSV_CREATE_CHUNK = 400;
 
 export async function bulkImportDirectoryMembers(
   _prev: BulkImportResult | null,
@@ -135,90 +187,118 @@ export async function bulkImportDirectoryMembers(
 
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    return {
-      error:
-        "Selecciona un archivo: Excel (.xlsx, .xls), CSV o TSV (exportación desde Google Sheets)",
-    };
+    return { error: "Selecciona un archivo CSV" };
   }
-
-  const lower = file.name.toLowerCase();
-  const allowed =
-    lower.endsWith(".xlsx") ||
-    lower.endsWith(".xls") ||
-    lower.endsWith(".csv") ||
-    lower.endsWith(".tsv");
-  if (!allowed) {
+  if (!file.name.toLowerCase().endsWith(".csv")) {
     return {
       error:
-        "Formatos admitidos: .xlsx, .xls, .csv, .tsv (en Sheets: Archivo → Descargar → Excel o Valores separados por comas)",
+        "Solo CSV. En Excel o Sheets: Archivo → Descargar → Valores separados por comas.",
     };
   }
   if (file.size > BULK_MAX_FILE_BYTES) {
     return { error: "Archivo demasiado grande (máximo 3 MB)" };
   }
 
-  let rows: ReturnType<typeof parseMemberSpreadsheet>;
+  let parsed: ReturnType<typeof parseDirectoryCsv>;
   try {
-    const buf = Buffer.from(await file.arrayBuffer());
-    rows = parseMemberSpreadsheet(buf, file.name);
+    parsed = parseDirectoryCsv(Buffer.from(await file.arrayBuffer()));
   } catch (e) {
     return { error: (e as Error).message };
   }
-
-  if (rows.length === 0) {
+  if (parsed.length === 0) {
     return { error: "No hay filas de datos (además de la cabecera)" };
   }
 
-  const errors: { row: number; sheet?: string; message: string }[] = [];
-  let created = 0;
+  const existing: CsvExistingIdentity[] = await prisma.directoryMember.findMany({
+    where: { userId },
+    select: { gamertag: true, phone: true, whatsappUsername: true },
+  });
+  const plan = planCsvImport(parsed, existing);
+  const actor = await getPanelActor();
+  const createdRows: { id: string; gamertag: string }[] = [];
 
-  for (const row of rows) {
-    const loc = { row: row.rowNumber, sheet: row.sheetName };
-    if (!row.gamertag) {
-      errors.push({ ...loc, message: "Falta gamertag" });
-      continue;
-    }
-    if (!row.telefono) {
-      errors.push({ ...loc, message: "Falta teléfono" });
-      continue;
-    }
-
-    const phoneResult = normalizePhoneFreeform(row.telefono, row.pais);
-    if (!phoneResult.ok) {
-      errors.push({ ...loc, message: phoneResult.error });
-      continue;
-    }
-
-    try {
-      await prisma.directoryMember.create({
-        data: {
+  try {
+    for (let i = 0; i < plan.create.length; i += CSV_CREATE_CHUNK) {
+      const chunk = plan.create.slice(i, i + CSV_CREATE_CHUNK);
+      const createdAt = new Date();
+      const until = newMemberProtectionUntil(createdAt);
+      const inserted = await prisma.directoryMember.createManyAndReturn({
+        data: chunk.map((row) => ({
           gamertag: row.gamertag,
           displayName: row.displayName,
-          phone: phoneResult.phone,
-          phoneCountry: phoneResult.phoneCountry,
-          active: row.seSalio ? false : row.activo,
-          leftAt: row.seSalio ? new Date() : null,
-          isAdmin: row.admin,
-          banExempt: row.protegido,
-          notes: row.notas,
+          age: row.age,
+          phone: row.phone,
+          phoneCountry: row.phoneCountry,
+          whatsappUsername: row.whatsappUsername,
+          active: row.active,
+          leftAt: row.left ? createdAt : null,
+          isAdmin: row.isAdmin,
+          banExempt: row.banExempt,
+          permanentlyActive: row.permanentlyActive,
+          permanentlyActiveUntil: until,
+          absentWithCause: row.absent,
+          absentReason: row.absentReason,
+          absentActiveSince: row.absent && row.active ? createdAt : null,
+          activeHoldFromMc: false,
+          banned: row.banned,
+          bannedReason: row.bannedReason,
+          notes: row.notes,
+          createdAt,
           userId,
-        },
+        })),
+        select: { id: true, gamertag: true },
       });
-      created++;
-    } catch (err) {
-      if (isMissingDisplayNameColumnError(err)) {
-        return { error: MISSING_DISPLAY_NAME_COLUMN_MESSAGE };
-      }
-      const msg = err instanceof Error ? err.message : "Error al guardar";
-      errors.push({ ...loc, message: msg });
+      createdRows.push(...inserted);
     }
+  } catch (err) {
+    if (isMissingDisplayNameColumnError(err)) {
+      return { error: MISSING_DISPLAY_NAME_COLUMN_MESSAGE };
+    }
+    if (isMissingWhatsAppUsernameColumnError(err)) {
+      return { error: MISSING_WHATSAPP_USERNAME_COLUMN_MESSAGE };
+    }
+    if (isMissingAgeColumnError(err)) {
+      return { error: MISSING_AGE_COLUMN_MESSAGE };
+    }
+    const msg = err instanceof Error ? err.message : "Error al guardar";
+    return { error: msg };
   }
 
-  revalidatePath("/dashboard");
+  if (actor) {
+    const events: AuditEventInput[] = createdRows.map((row) => ({
+      userId,
+      actor,
+      action: "member.create",
+      memberId: row.id,
+      memberGamertag: row.gamertag,
+      details: { source: "csv" },
+    }));
+    events.push({
+      userId,
+      actor,
+      action: "csv.import",
+      details: {
+        created: createdRows.length,
+        skipped: plan.skipped.length,
+      },
+    });
+    await recordAuditEvents(events);
+  }
+
+  revalidateMemberViews();
   revalidatePath("/dashboard/agregar");
   revalidatePath("/dashboard/administracion");
 
-  return { ok: true, created, errors };
+  return {
+    ok: true,
+    created: createdRows.length,
+    skipped: plan.skipped.map((s) => ({
+      row: s.rowNumber,
+      gamertag: s.gamertag,
+      reason: s.reason,
+    })),
+    errors: plan.errors.map((e) => ({ row: e.rowNumber, message: e.message })),
+  };
 }
 
 export async function deleteDirectoryMember(id: string) {
@@ -245,7 +325,13 @@ export async function deleteDirectoryMember(id: string) {
 
   if (result.count === 0) return { error: "No encontrado" };
 
-  revalidatePath("/dashboard");
+  await auditPanel(userId, {
+    action: "member.delete",
+    memberId: id,
+    memberGamertag: member.gamertag,
+  });
+
+  revalidateMemberViews();
   return { ok: true as const };
 }
 
@@ -279,26 +365,41 @@ export async function updateDirectoryMemberNotes(
   });
   if (!contact.ok) return { error: contact.error };
 
+  const afterProfile = {
+    gamertag,
+    displayName: displayName || null,
+    age: ageParsed.age,
+    phone: contact.phone,
+    phoneCountry: contact.phoneCountry,
+    whatsappUsername: contact.whatsappUsername,
+    notes: notes || null,
+  };
+  let profileChanges: AuditChanges | null = null;
+
   try {
     const before = await prisma.directoryMember.findFirst({
       where: { id, userId },
-      select: { gamertag: true },
-    });
-
-    await prisma.directoryMember.updateMany({
-      where: { id, userId },
-      data: {
-        gamertag,
-        phone: contact.phone,
-        phoneCountry: contact.phoneCountry,
-        whatsappUsername: contact.whatsappUsername,
-        notes: notes || null,
-        displayName: displayName || null,
-        age: ageParsed.age,
+      select: {
+        gamertag: true,
+        displayName: true,
+        age: true,
+        phone: true,
+        phoneCountry: true,
+        whatsappUsername: true,
+        notes: true,
       },
     });
+    if (!before) return { error: "No encontrado" };
 
-    if (before && before.gamertag.trim() !== gamertag) {
+    profileChanges = diffAuditChanges(before, afterProfile, PROFILE_AUDIT_FIELDS);
+
+    const updated = await prisma.directoryMember.updateMany({
+      where: { id, userId },
+      data: afterProfile,
+    });
+    if (updated.count === 0) return { error: "No encontrado" };
+
+    if (before.gamertag.trim() !== gamertag) {
       await recordPendingGamertagCorrection(id, before.gamertag, gamertag);
     }
   } catch (e) {
@@ -314,7 +415,16 @@ export async function updateDirectoryMemberNotes(
     throw e;
   }
 
-  revalidatePath("/dashboard");
+  if (profileChanges) {
+    await auditPanel(userId, {
+      action: "member.update",
+      memberId: id,
+      memberGamertag: gamertag,
+      changes: profileChanges,
+    });
+  }
+
+  revalidateMemberViews();
   return null;
 }
 
@@ -406,7 +516,31 @@ export async function setDirectoryMemberSituation(
     await enqueueAllowlistRemovalForMember(userId, before);
   }
 
-  revalidatePath("/dashboard");
+  const situationChanges = diffAuditChanges(
+    {
+      active: before.active,
+      permanentlyActive: before.permanentlyActive,
+      absentWithCause: before.absentWithCause,
+      absentReason: before.absentReason,
+    },
+    {
+      active: next.active,
+      permanentlyActive: next.permanentlyActive,
+      absentWithCause: next.absentWithCause,
+      absentReason: next.absentReason,
+    },
+    ["active", "permanentlyActive", "absentWithCause", "absentReason"],
+  );
+  if (situationChanges) {
+    await auditPanel(userId, {
+      action: "member.update",
+      memberId: id,
+      memberGamertag: before.gamertag,
+      changes: situationChanges,
+    });
+  }
+
+  revalidateMemberViews();
   return { ok: true as const };
 }
 
@@ -430,10 +564,28 @@ export async function syncDirectoryFromMinecraftPanel(): Promise<SyncFromMinecra
 
   try {
     const summary = await syncDirectoryMembersFromMinecraftTable(userId);
-    revalidatePath("/dashboard");
+    await recordMinecraftActiveChanges(userId, summary.changes);
+    if (summary.changes.length > 0) {
+      await auditPanel(userId, {
+        action: "mc.sync",
+        details: {
+          updated: summary.changes.length,
+          activated: summary.activated.length,
+          deactivated: summary.deactivated.length,
+        },
+      });
+    }
+    revalidateMemberViews();
     revalidatePath("/dashboard/minecraft");
     revalidatePath("/dashboard/administracion");
-    return { ok: true, ...summary };
+    return {
+      ok: true,
+      updatedRows: summary.updatedRows,
+      minecraftCount: summary.minecraftCount,
+      matchedGamertags: summary.matchedGamertags,
+      activated: summary.activated,
+      deactivated: summary.deactivated,
+    };
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
       return {
@@ -483,7 +635,14 @@ export async function addDirectoryStrike(
     data: { memberId, kind, reason: reasonRaw },
   });
 
-  revalidatePath("/dashboard");
+  await auditPanel(userId, {
+    action: "strike.add",
+    memberId,
+    memberGamertag: member.gamertag,
+    details: reasonRaw ? { reason: reasonRaw } : null,
+  });
+
+  revalidateMemberViews();
   revalidatePath("/dashboard/administracion");
   return { ok: true };
 }
@@ -504,15 +663,23 @@ export async function removeDirectoryStrike(
   const userId = await resolveDirectoryUserId(session);
   if (!userId) return;
 
+  const strike = await prisma.directoryStrike.findFirst({
+    where: { id: strikeId, memberId, member: { userId } },
+    select: { id: true, member: { select: { gamertag: true } } },
+  });
+  if (!strike) return;
+
   await prisma.directoryStrike.deleteMany({
-    where: {
-      id: strikeId,
-      memberId,
-      member: { userId },
-    },
+    where: { id: strikeId, memberId, member: { userId } },
   });
 
-  revalidatePath("/dashboard");
+  await auditPanel(userId, {
+    action: "strike.remove",
+    memberId,
+    memberGamertag: strike.member.gamertag,
+  });
+
+  revalidateMemberViews();
   revalidatePath("/dashboard/administracion");
 }
 
@@ -526,36 +693,49 @@ export async function setDirectoryMemberBan(formData: FormData) {
   const action = String(formData.get("banAction") ?? "").trim();
   if (!memberId || !action) return;
 
+  const member = await prisma.directoryMember.findFirst({
+    where: { id: memberId, userId },
+    select: {
+      gamertag: true,
+      banned: true,
+      banExempt: true,
+      allowlistSyncedAt: true,
+      allowlistRemovedAt: true,
+    },
+  });
+  if (!member) return;
+
   if (action === "unban") {
+    if (!member.banned) return;
     await prisma.directoryMember.updateMany({
       where: { id: memberId, userId },
       data: { banned: false, bannedReason: null },
     });
+    await auditPanel(userId, {
+      action: "ban.set",
+      memberId,
+      memberGamertag: member.gamertag,
+      changes: { banned: { from: true, to: false } },
+    });
   } else if (action === "ban") {
     const bannedReason = String(formData.get("bannedReason") ?? "").trim();
-    if (!bannedReason) return;
-    const member = await prisma.directoryMember.findFirst({
-      where: { id: memberId, userId, banExempt: false },
-      select: {
-        gamertag: true,
-        allowlistSyncedAt: true,
-        allowlistRemovedAt: true,
-      },
-    });
-    if (!member) return;
+    if (!bannedReason || member.banExempt) return;
     await prisma.directoryMember.updateMany({
-      where: {
-        id: memberId,
-        userId,
-        banExempt: false,
-      },
+      where: { id: memberId, userId, banExempt: false },
       data: { banned: true, bannedReason },
     });
     await enqueueAllowlistRemovalForMember(userId, member);
     await blacklistMinecraftGamertagOnAllWorlds(member.gamertag);
+    await auditPanel(userId, {
+      action: "ban.set",
+      memberId,
+      memberGamertag: member.gamertag,
+      changes: { banned: { from: member.banned, to: true } },
+      details: { reason: bannedReason },
+    });
   }
 
-  revalidatePath("/dashboard");
+  revalidateMemberViews();
 }
 
 export async function toggleDirectoryMemberIsAdmin(id: string) {
@@ -566,16 +746,24 @@ export async function toggleDirectoryMemberIsAdmin(id: string) {
 
   const member = await prisma.directoryMember.findFirst({
     where: { id, userId },
-    select: { isAdmin: true },
+    select: { isAdmin: true, gamertag: true },
   });
   if (!member) return;
 
+  const next = !member.isAdmin;
   await prisma.directoryMember.updateMany({
     where: { id, userId },
-    data: { isAdmin: !member.isAdmin },
+    data: { isAdmin: next },
   });
 
-  revalidatePath("/dashboard");
+  await auditPanel(userId, {
+    action: "member.update",
+    memberId: id,
+    memberGamertag: member.gamertag,
+    changes: { isAdmin: { from: member.isAdmin, to: next } },
+  });
+
+  revalidateMemberViews();
 }
 
 export async function toggleDirectoryMemberBanExempt(id: string) {
@@ -586,7 +774,7 @@ export async function toggleDirectoryMemberBanExempt(id: string) {
 
   const member = await prisma.directoryMember.findFirst({
     where: { id, userId },
-    select: { banExempt: true },
+    select: { banExempt: true, banned: true, gamertag: true },
   });
   if (!member) return;
 
@@ -599,7 +787,18 @@ export async function toggleDirectoryMemberBanExempt(id: string) {
     },
   });
 
-  revalidatePath("/dashboard");
+  const changes: AuditChanges = {
+    banExempt: { from: member.banExempt, to: next },
+  };
+  if (next && member.banned) changes.banned = { from: true, to: false };
+  await auditPanel(userId, {
+    action: "member.update",
+    memberId: id,
+    memberGamertag: member.gamertag,
+    changes,
+  });
+
+  revalidateMemberViews();
 }
 
 export async function setDirectoryMemberLeft(id: string, left: boolean) {
@@ -612,17 +811,20 @@ export async function setDirectoryMemberLeft(id: string, left: boolean) {
     where: { id, userId },
     select: {
       gamertag: true,
+      active: true,
+      leftAt: true,
       allowlistSyncedAt: true,
       allowlistRemovedAt: true,
     },
   });
   if (!member) return;
 
+  const leftAt = left ? new Date() : null;
   await prisma.directoryMember.updateMany({
     where: { id, userId },
     data: left
       ? {
-          leftAt: new Date(),
+          leftAt,
           active: false,
           allowlistAddPending: false,
           absentWithCause: false,
@@ -645,7 +847,20 @@ export async function setDirectoryMemberLeft(id: string, left: boolean) {
     await cancelPendingAllowlistRemoval(userId, member.gamertag);
   }
 
-  revalidatePath("/dashboard");
+  await auditPanel(userId, {
+    action: "member.update",
+    memberId: id,
+    memberGamertag: member.gamertag,
+    changes: {
+      leftAt: {
+        from: member.leftAt ? member.leftAt.toISOString() : null,
+        to: leftAt ? leftAt.toISOString() : null,
+      },
+      active: { from: member.active, to: !left },
+    },
+  });
+
+  revalidateMemberViews();
 }
 
 const MINECRAFT_LOG_MAX_CHARS = 400_000;
@@ -703,6 +918,7 @@ export async function bulkMarkInactiveFromMinecraftLog(
         active: true,
         leftAt: true,
         permanentlyActive: true,
+        permanentlyActiveUntil: true,
         absentWithCause: true,
       },
     });
@@ -716,9 +932,10 @@ export async function bulkMarkInactiveFromMinecraftLog(
     }
 
     const matchedLogTags = new Set<string>();
-    const idsToDeactivate = new Set<string>();
+    const toDeactivate: { id: string; gamertag: string }[] = [];
     let alreadyInactive = 0;
     let skippedLeft = 0;
+    const now = new Date();
 
     for (const g of gamertags) {
       const list = byTagLower.get(g.toLowerCase());
@@ -729,21 +946,21 @@ export async function bulkMarkInactiveFromMinecraftLog(
           skippedLeft++;
           continue;
         }
-        if (row.permanentlyActive) {
+        if (isMemberProtected(row, now)) {
           continue;
         }
         if (!row.active) {
           alreadyInactive++;
           continue;
         }
-        idsToDeactivate.add(row.id);
+        toDeactivate.push({ id: row.id, gamertag: row.gamertag });
       }
     }
 
-    if (idsToDeactivate.size > 0) {
+    if (toDeactivate.length > 0) {
       await prisma.directoryMember.updateMany({
         where: {
-          id: { in: [...idsToDeactivate] },
+          id: { in: toDeactivate.map((row) => row.id) },
           userId,
           active: true,
           leftAt: null,
@@ -751,18 +968,32 @@ export async function bulkMarkInactiveFromMinecraftLog(
         data: { active: false },
       });
       await reconcileDirectoryAbsentActive(userId);
+      const actor = await getPanelActor();
+      if (actor) {
+        await recordAuditEvents(
+          toDeactivate.map((row) => ({
+            userId,
+            actor,
+            action: "member.update" as const,
+            memberId: row.id,
+            memberGamertag: row.gamertag,
+            changes: { active: { from: true, to: false } },
+            details: { source: "mc.log" },
+          })),
+        );
+      }
     }
 
     const notFound = gamertags.filter((g) => !matchedLogTags.has(g.toLowerCase()));
 
-    revalidatePath("/dashboard");
+    revalidateMemberViews();
     revalidatePath("/dashboard/agregar");
     revalidatePath("/dashboard/administracion");
 
     return {
       ok: true,
       parsed: gamertags.length,
-      updated: idsToDeactivate.size,
+      updated: toDeactivate.length,
       alreadyInactive,
       skippedLeft,
       notFound,

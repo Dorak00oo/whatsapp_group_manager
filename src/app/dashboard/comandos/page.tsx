@@ -1,42 +1,32 @@
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftRemoteCommandsPanel } from "@/components/minecraft-remote-commands-panel";
-import {
-  TP_PROTECTED_DESTINATION_GAMERTAG,
-  mergePrivilegedTpOrigin,
-} from "@/lib/minecraft-remote-commands";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import {
+  MINECRAFT_SERVER_DEFAULTS,
+  parseMinecraftServerId,
+} from "@/lib/minecraft-server";
 import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
-import { prisma } from "@/lib/prisma";
+import { listMinecraftServers } from "@/lib/minecraft-servers-db";
+import { requirePanelSession } from "@/lib/panel-session";
 
 export default async function DashboardComandosPage() {
+  const panel = await requirePanelSession();
   const session = await auth();
   if (!session?.user) return null;
 
-  let admins: { id: string; gamertag: string; displayName: string | null }[];
   const serverId = await getSelectedMinecraftServerId();
+  let worldName = MINECRAFT_SERVER_DEFAULTS[serverId].name;
 
   try {
-    const adminRows = await prisma.directoryMember.findMany({
-      where: { isAdmin: true },
-      orderBy: { gamertag: "asc" },
-      select: { id: true, gamertag: true, displayName: true },
-    });
-    const privileged = await prisma.directoryMember.findFirst({
-      where: {
-        gamertag: {
-          equals: TP_PROTECTED_DESTINATION_GAMERTAG,
-          mode: "insensitive",
-        },
-      },
-      select: { id: true, gamertag: true, displayName: true },
-    });
-    admins = mergePrivilegedTpOrigin(adminRows, privileged);
-  } catch (e) {
-    if (isDatabaseUnreachableError(e)) {
+    const servers = await listMinecraftServers();
+    const row = servers.find((server) => parseMinecraftServerId(server.id) === serverId);
+    if (row?.name.trim()) worldName = row.name.trim();
+  } catch (error) {
+    if (isDatabaseUnreachableError(error)) {
       return <DatabaseUnavailable />;
     }
-    throw e;
+    throw error;
   }
 
   return (
@@ -49,7 +39,11 @@ export default async function DashboardComandosPage() {
           Envía órdenes al mundo de Minecraft Bedrock vía el addon PlayerStatus.
         </p>
       </div>
-      <MinecraftRemoteCommandsPanel key={serverId} admins={admins} />
+      <MinecraftRemoteCommandsPanel
+        key={serverId}
+        defaultOriginGamertag={panel.gamertag}
+        worldName={worldName}
+      />
     </section>
   );
 }

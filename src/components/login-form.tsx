@@ -17,17 +17,21 @@ export function LoginForm() {
           Iniciar sesión
         </h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          Usá la cuenta de la comunidad para entrar al panel.
+          Entra con tu gamertag y la contraseña del grupo. El correo no sirve.
         </p>
       </div>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-zinc-800 dark:text-zinc-200">Email</span>
+        <span className="font-medium text-zinc-800 dark:text-zinc-200">Gamertag</span>
         <input
-          name="email"
-          type="email"
+          name="gamertag"
+          type="text"
           required
+          maxLength={64}
           autoComplete="username"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           className={softInputNeutral}
         />
       </label>

@@ -74,7 +74,11 @@ export async function POST(request: Request) {
     const participant = asParticipant((body as { participant?: unknown }).participant);
     if (!participant) return badRequest("Falta participant.jid o participant.username");
     if ("error" in participant) return badRequest(participant.error);
-    const result = await applyWspBotEvent({ action, participant });
+    const result = await applyWspBotEvent({
+      action,
+      participant,
+      actor: (body as { actor?: unknown }).actor,
+    });
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
@@ -93,7 +97,11 @@ export async function POST(request: Request) {
     const markMissingAsLeft = Boolean(
       (body as { markMissingAsLeft?: unknown }).markMissingAsLeft,
     );
-    const result = await applyWspBotSync({ participants, markMissingAsLeft });
+    const result = await applyWspBotSync({
+      participants,
+      markMissingAsLeft,
+      actor: (body as { actor?: unknown }).actor,
+    });
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

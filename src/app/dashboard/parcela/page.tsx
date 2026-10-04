@@ -22,6 +22,7 @@ export default async function DashboardParcelaPage() {
     throw e;
   }
 
+  let data;
   try {
     const serverId = await getSelectedMinecraftServerId();
     const parcels = await ensurePrimaryParcel(serverId);
@@ -45,35 +46,38 @@ export default async function DashboardParcelaPage() {
         .map((e) => [e.parcelId, e]),
     );
 
-    return (
-      <section className="flex flex-col gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Parcelas
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            Elegí una zona o añadí otra para monitorear. El addon acumula
-            eventos y guarda un lote cada 5 minutos. Historial 6 meses.
-          </p>
-        </div>
-        <MinecraftParcelHub
-          key={serverId}
-          parcels={parcels.map((p) => {
-            const last = latestById.get(p.id);
-            return {
-              ...p,
-              lastEventAt: last?.occurredAt.toISOString() ?? null,
-              lastEventType: (last?.eventType as ParcelEventType | undefined) ?? null,
-              lastEventGamertag: last?.gamertag ?? null,
-            };
-          })}
-        />
-      </section>
-    );
+    data = { serverId, parcels, latestById };
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
       return <DatabaseUnavailable />;
     }
     throw e;
   }
+  const { serverId, parcels, latestById } = data;
+
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          Parcelas
+        </h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Elegí una zona o añadí otra para monitorear. El addon acumula
+          eventos y guarda un lote cada 5 minutos. Historial 6 meses.
+        </p>
+      </div>
+      <MinecraftParcelHub
+        key={serverId}
+        parcels={parcels.map((p) => {
+          const last = latestById.get(p.id);
+          return {
+            ...p,
+            lastEventAt: last?.occurredAt.toISOString() ?? null,
+            lastEventType: (last?.eventType as ParcelEventType | undefined) ?? null,
+            lastEventGamertag: last?.gamertag ?? null,
+          };
+        })}
+      />
+    </section>
+  );
 }

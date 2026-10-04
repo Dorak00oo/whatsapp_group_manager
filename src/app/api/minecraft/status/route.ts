@@ -1,16 +1,24 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import type { Prisma } from "@/generated/prisma";
+import { reconcileDirectoryAbsentActive } from "@/lib/directory-absent-clock";
 import { prisma } from "@/lib/prisma";
-import { isActiveByDaysInactive } from "@/lib/minecraft-active";
 import { requireMinecraftAddon } from "@/lib/minecraft-api-context";
-import { syncDirectoryActiveWithMinecraft } from "@/lib/minecraft-directory-sync";
 import {
-  accessListGamertags,
-  mergeMinecraftListState,
-} from "@/lib/minecraft-list-merge";
+  recordMinecraftActiveChanges,
+  syncDirectoryActiveForGamertags,
+} from "@/lib/minecraft-directory-sync";
+import { accessListGamertags } from "@/lib/minecraft-list-merge";
+import {
+  planMinecraftPlayerWrites,
+  planStaleMinecraftPlayers,
+  shouldRevalidateDirectory,
+} from "@/lib/minecraft-status-plan";
 import { ensureMinecraftConfig } from "@/lib/minecraft-servers-db";
 import { purgeOldMinecraftSnapshots } from "@/lib/minecraft-snapshot-purge";
+import { revalidateDirectoryViews } from "@/lib/revalidate-directory";
+
+let lastDirectoryRevalidateAt: number | null = null;
 
 export const runtime = "nodejs";
 
@@ -95,97 +103,69 @@ export async function POST(request: Request) {
       );
     }
 
-    for (const player of body.players) {
-      const name = player.name.trim();
-      if (!name) continue;
+    const existingPlayers = await prisma.minecraftPlayer.findMany({
+      where: { serverId },
+      select: {
+        id: true,
+        gamertag: true,
+        isBlacklisted: true,
+        isWhitelisted: true,
+        inactivityBlacklistExemptUntilSeen: true,
+      },
+    });
+    const writes = planMinecraftPlayerWrites({
+      players: body.players,
+      existing: existingPlayers,
+      daysInactiveThreshold,
+      daysBlacklist,
+    });
+    const stale = planStaleMinecraftPlayers({
+      existing: existingPlayers,
+      seenNames: body.players.map((p) => p.name),
+      totalReported: body.serverInfo?.totalPlayers ?? 0,
+      reportedCount: body.players.length,
+    });
 
-      const existing = await prisma.minecraftPlayer.findFirst({
-        where: {
-          serverId,
-          gamertag: { equals: name, mode: "insensitive" },
-        },
-      });
-
-      const lists = mergeMinecraftListState({
-        existing: existing
-          ? {
-              isBlacklisted: existing.isBlacklisted,
-              isWhitelisted: existing.isWhitelisted,
-              inactivityBlacklistExemptUntilSeen:
-                existing.inactivityBlacklistExemptUntilSeen,
-            }
-          : null,
-        daysInactive: player.daysInactive,
-        daysInactiveThreshold,
-        daysBlacklist,
-      });
-
-      const active = isActiveByDaysInactive(
-        player.daysInactive,
-        daysInactiveThreshold,
+    await prisma.$transaction(async (tx) => {
+      const creates = writes.flatMap((w) =>
+        w.op === "create"
+          ? [{ serverId, gamertag: w.gamertag, ...w.data }]
+          : [],
       );
-
-      if (existing) {
-        await prisma.minecraftPlayer.update({
-          where: { id: existing.id },
-          data: {
-            lastSeen: new Date(player.lastSeen),
-            active,
-            daysInactive: player.daysInactive,
-            isBlacklisted: lists.isBlacklisted,
-            isWhitelisted: lists.isWhitelisted,
-            inactivityBlacklistExemptUntilSeen:
-              lists.inactivityBlacklistExemptUntilSeen,
-          },
-        });
-      } else {
-        await prisma.minecraftPlayer.create({
-          data: {
-            serverId,
-            gamertag: name,
-            lastSeen: new Date(player.lastSeen),
-            active,
-            daysInactive: player.daysInactive,
-            isBlacklisted: lists.isBlacklisted,
-            isWhitelisted: lists.isWhitelisted,
-            inactivityBlacklistExemptUntilSeen:
-              lists.inactivityBlacklistExemptUntilSeen,
-          },
+      if (creates.length > 0) {
+        await tx.minecraftPlayer.createMany({ data: creates });
+      }
+      for (const w of writes) {
+        if (w.op !== "update") continue;
+        await tx.minecraftPlayer.update({
+          where: { id: w.id },
+          data: w.data,
         });
       }
-      await syncDirectoryActiveWithMinecraft(name);
-    }
-
-    const totalReported = body.serverInfo?.totalPlayers ?? 0;
-    const isFullRoster =
-      totalReported > 0 && body.players.length >= totalReported;
-    if (isFullRoster) {
-      const seen = new Set(
-        body.players
-          .map((p) => p.name.trim().toLowerCase())
-          .filter(Boolean),
-      );
-      const stale = await prisma.minecraftPlayer.findMany({
-        where: { serverId },
-        select: { id: true, gamertag: true },
-      });
-      const staleRows = stale.filter(
-        (r) => !seen.has(r.gamertag.toLowerCase()),
-      );
-      const staleIds = staleRows.map((r) => r.id);
-      if (staleIds.length > 0) {
-        await prisma.minecraftPlayer.updateMany({
-          where: { id: { in: staleIds } },
+      if (stale.ids.length > 0) {
+        await tx.minecraftPlayer.updateMany({
+          where: { id: { in: stale.ids } },
           data: { active: false },
         });
-        for (const row of staleRows) {
-          await syncDirectoryActiveWithMinecraft(row.gamertag);
-        }
       }
+    });
+
+    const affected = [
+      ...writes.map((w) => w.gamertag),
+      ...stale.gamertags,
+    ];
+    const synced = await syncDirectoryActiveForGamertags(affected);
+    if (synced.userId) {
+      await reconcileDirectoryAbsentActive(synced.userId);
+      await recordMinecraftActiveChanges(synced.userId, synced.changes);
     }
 
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/minecraft");
+    const nowMs = Date.now();
+    if (shouldRevalidateDirectory(lastDirectoryRevalidateAt, nowMs)) {
+      lastDirectoryRevalidateAt = nowMs;
+      revalidateDirectoryViews();
+      revalidatePath("/dashboard/minecraft");
+    }
 
     const roster = await prisma.minecraftPlayer.findMany({
       where: { serverId },

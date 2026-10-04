@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { MOBILE_TOP_NAV_TOP_CSS } from "@/lib/dashboard-mobile-top-nav";
+import { DashboardSignedIn } from "@/components/dashboard-signed-in";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -29,31 +30,28 @@ function MenuIcon({ className }: { className?: string }) {
 
 type Props = {
   defaultThemeDark: boolean;
+  gamertag: string;
+  isPanelOwner: boolean;
 };
 
 const panelClass =
   "w-[min(18.5rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] rounded-2xl border border-zinc-200/90 bg-background p-4 shadow-xl ring-1 ring-zinc-900/[0.04] dark:border-zinc-700/90 dark:bg-zinc-950 dark:ring-zinc-100/[0.06]";
+
+const subscribeNoop = () => () => {};
 
 /**
  * Menú «Más»: overlay en un nodo propio de `document.body`.
  * Evita que el `backdrop-filter` del nav bar lo adopte como containing block.
  * `touch-manipulation` en el botón elimina el retraso de 300 ms del click en Android.
  */
-export function DashboardMobileMoreDrawer({ defaultThemeDark }: Props) {
+export function DashboardMobileMoreDrawer({
+  defaultThemeDark,
+  gamertag,
+  isPanelOwner,
+}: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const portalRoot = useRef<HTMLDivElement | null>(null);
-  const [portalReady, setPortalReady] = useState(false);
+  const isClient = useSyncExternalStore(subscribeNoop, () => true, () => false);
   const menuId = useId();
-
-  /* Nodo dedicado en body para que el backdrop-filter del nav bar no lo afecte */
-  useLayoutEffect(() => {
-    const el = document.createElement("div");
-    el.setAttribute("data-more-menu", "1");
-    document.body.appendChild(el);
-    portalRoot.current = el;
-    setPortalReady(true);
-    return () => { document.body.removeChild(el); };
-  }, []);
 
   const closeMenu = useCallback(() => { setMenuOpen(false); }, []);
 
@@ -79,7 +77,7 @@ export function DashboardMobileMoreDrawer({ defaultThemeDark }: Props) {
       id={menuId}
       role="dialog"
       aria-modal="true"
-      aria-label="Más: tema y cerrar sesión"
+      aria-label="Más: cuenta, tema y cerrar sesión"
       style={{
         display: menuOpen ? "flex" : "none",
         position: "fixed",
@@ -100,10 +98,12 @@ export function DashboardMobileMoreDrawer({ defaultThemeDark }: Props) {
         style={{ maxHeight: "min(100dvh, 32rem)", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Claro u oscuro
-        </p>
-        <div className="mt-2">
+        <DashboardSignedIn
+          gamertag={gamertag}
+          isPanelOwner={isPanelOwner}
+          layout="drawer"
+        />
+        <div className="mt-4">
           <ThemeToggle
             defaultDark={defaultThemeDark}
             layout="segmented"
@@ -136,7 +136,7 @@ export function DashboardMobileMoreDrawer({ defaultThemeDark }: Props) {
         aria-expanded={menuOpen}
         aria-haspopup="dialog"
         aria-controls={menuId}
-        aria-label="Más: tema y cerrar sesión"
+        aria-label="Más: cuenta, tema y cerrar sesión"
       >
         <MenuIcon className="size-[1.125rem] shrink-0 pointer-events-none" />
         <span className="pointer-events-none text-[10px] font-medium leading-none">
@@ -144,8 +144,9 @@ export function DashboardMobileMoreDrawer({ defaultThemeDark }: Props) {
         </span>
       </button>
 
-      {portalReady && portalRoot.current
-        ? createPortal(overlay, portalRoot.current)
+      {/* Nodo dedicado en body para que el backdrop-filter del nav bar no lo afecte */}
+      {isClient
+        ? createPortal(<div data-more-menu="1">{overlay}</div>, document.body)
         : null}
     </div>
   );

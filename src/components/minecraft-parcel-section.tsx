@@ -835,7 +835,7 @@ export function MinecraftParcelSection({
                           </td>
                           <td className="px-3 py-2 font-medium">
                             <Link
-                              href={`/dashboard?q=${encodeURIComponent(ev.gamertag)}`}
+                              href={`/dashboard/lista?q=${encodeURIComponent(ev.gamertag)}`}
                               className="underline-offset-2 hover:underline"
                             >
                               {ev.gamertag}
@@ -874,7 +874,7 @@ export function MinecraftParcelSection({
                       </span>
                     </div>
                     <Link
-                      href={`/dashboard?q=${encodeURIComponent(ev.gamertag)}`}
+                      href={`/dashboard/lista?q=${encodeURIComponent(ev.gamertag)}`}
                       className="mt-2 block text-base font-semibold text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
                     >
                       {ev.gamertag}

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { resolveAddonIdentityFromRequest } from "@/lib/minecraft-installs-db";
 import {
   heartbeatFromRequestAndBody,
@@ -7,6 +6,8 @@ import {
 } from "@/lib/minecraft-server";
 import { touchMinecraftServerHeartbeat } from "@/lib/minecraft-servers-db";
 import { selectedMinecraftServerId } from "@/lib/minecraft-world";
+import { getPanelSession } from "@/lib/panel-session";
+import { bearerMatches } from "@/lib/wsp-bot-auth";
 
 export function unauthorizedMinecraft() {
   return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -57,7 +58,7 @@ async function authenticateAddon(
     };
   }
   const token = getMinecraftBearerToken(request);
-  if (!token || token !== secret) {
+  if (!token || !bearerMatches(secret, token)) {
     return { ok: false, response: unauthorizedMinecraft() };
   }
   const identity = await resolveAddonIdentityFromRequest(request, body);
@@ -87,8 +88,8 @@ export async function requireMinecraftAddon(
 
 /** Panel: sesión + cookie `mc_world`. */
 export async function requireMinecraftPanel(): Promise<MinecraftApiContext> {
-  const session = await auth();
-  if (!session?.user) {
+  const session = await getPanelSession();
+  if (!session) {
     return { ok: false, response: unauthorizedMinecraft() };
   }
   return {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import {
   addDirectoryStrike,
@@ -132,6 +132,19 @@ function StrikeSlotsGrid({
   );
 }
 
+function resolveSelectedId(
+  selectedId: string,
+  roster: PlayerAdminMember[],
+  filtered: PlayerAdminMember[],
+): string {
+  if (roster.length === 0) return "";
+  if (filtered.length > 0 && !filtered.some((m) => m.id === selectedId)) {
+    return filtered[0]!.id;
+  }
+  if (!roster.some((m) => m.id === selectedId)) return roster[0]!.id;
+  return selectedId;
+}
+
 export function PlayerAdminStrikePanel({ members }: Props) {
   const roster = useMemo(
     () =>
@@ -159,22 +172,8 @@ export function PlayerAdminStrikePanel({ members }: Props) {
     );
   }, [roster, debouncedFilter]);
 
-  useEffect(() => {
-    if (roster.length === 0) {
-      setSelectedId("");
-      return;
-    }
-    if (!roster.some((m) => m.id === selectedId)) {
-      setSelectedId(roster[0]!.id);
-    }
-  }, [roster, selectedId]);
-
-  useEffect(() => {
-    if (filtered.length === 0) return;
-    if (!filtered.some((m) => m.id === selectedId)) {
-      setSelectedId(filtered[0]!.id);
-    }
-  }, [filtered, selectedId]);
+  const resolvedId = resolveSelectedId(selectedId, roster, filtered);
+  if (resolvedId !== selectedId) setSelectedId(resolvedId);
 
   const selected = useMemo(
     () => roster.find((m) => m.id === selectedId) ?? null,

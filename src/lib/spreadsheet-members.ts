@@ -1,20 +1,116 @@
-import * as XLSX from "xlsx";
+import { parseDirectoryAge } from "@/lib/directory-age";
+import { normalizePhoneFreeform } from "@/lib/phone-normalize";
+import { normalizeWhatsAppUsername } from "@/lib/whatsapp-username";
+import {
+  findMemberByPhone,
+  findMemberByUsername,
+} from "@/lib/wsp-bot-directory";
 
-export type SheetMemberInput = {
-  /** Nombre de la hoja en el libro (vacío en casos de un solo bloque sin nombre útil). */
-  sheetName: string;
-  /** Número de fila en esa hoja (1 = cabecera). */
+/** Tope de filas de datos por archivo (el directorio cabe y puede crecer). */
+export const CSV_MAX_ROWS = 5000;
+
+/**
+ * Mismas columnas al exportar y en la plantilla.
+ * `protegido` = exento de ban (como el import histórico).
+ * `activo_permanente` = el flag manual, distinto de la protección de 5 días.
+ * `situacion`: se_salio | ausente | permanente | activo | inactivo.
+ * `activo` distingue ausente en la columna de activos o de inactivos.
+ */
+export const DIRECTORY_CSV_HEADERS = [
+  "gamertag",
+  "nombre",
+  "telefono",
+  "pais",
+  "usuario_whatsapp",
+  "edad",
+  "situacion",
+  "activo",
+  "causa_ausencia",
+  "admin",
+  "protegido",
+  "activo_permanente",
+  "baneado",
+  "motivo_ban",
+  "notas",
+] as const;
+
+export type DirectoryCsvSituation =
+  | "se_salio"
+  | "ausente"
+  | "permanente"
+  | "activo"
+  | "inactivo";
+
+export type DirectoryCsvRecord = {
+  gamertag: string;
+  displayName: string | null;
+  phone: string | null;
+  phoneCountry: string | null;
+  whatsappUsername: string | null;
+  age: number | null;
+  situation: DirectoryCsvSituation;
+  active: boolean;
+  absentReason: string | null;
+  isAdmin: boolean;
+  banExempt: boolean;
+  permanentlyActive: boolean;
+  banned: boolean;
+  bannedReason: string | null;
+  notes: string | null;
+};
+
+export type CsvMemberInput = {
   rowNumber: number;
   gamertag: string;
-  /** Columna «nombres» / nombre real; el principal para la app es gamertag. */
   displayName: string | null;
   telefono: string;
   pais: string;
-  activo: boolean;
-  admin: boolean;
-  protegido: boolean;
-  seSalio: boolean;
-  notas: string | null;
+  whatsappUsername: string | null;
+  usernameError: string | null;
+  age: number | null;
+  ageError: string | null;
+  left: boolean;
+  absent: boolean;
+  active: boolean;
+  absentReason: string | null;
+  isAdmin: boolean;
+  banExempt: boolean;
+  permanentlyActive: boolean;
+  banned: boolean;
+  bannedReason: string | null;
+  notes: string | null;
+};
+
+export type CsvExistingIdentity = {
+  gamertag: string;
+  phone: string | null;
+  whatsappUsername: string | null;
+};
+
+export type CsvCreateRow = {
+  rowNumber: number;
+  gamertag: string;
+  displayName: string | null;
+  phone: string | null;
+  phoneCountry: string | null;
+  whatsappUsername: string | null;
+  age: number | null;
+  active: boolean;
+  left: boolean;
+  absent: boolean;
+  absentReason: string | null;
+  isAdmin: boolean;
+  banExempt: boolean;
+  permanentlyActive: boolean;
+  banned: boolean;
+  bannedReason: string | null;
+  notes: string | null;
+};
+
+export type CsvImportPlan = {
+  create: CsvCreateRow[];
+  skipped: { rowNumber: number; gamertag: string; reason: string }[];
+  errors: { rowNumber: number; message: string }[];
 };
 
 type MemberColumn =
@@ -22,11 +118,107 @@ type MemberColumn =
   | "gamertag"
   | "telefono"
   | "pais"
+  | "usuario"
+  | "edad"
+  | "situacion"
   | "activo"
+  | "causaAusencia"
   | "admin"
   | "protegido"
+  | "activoPermanente"
   | "seSalio"
+  | "baneado"
+  | "motivoBan"
   | "notas";
+
+const EXACT_HEADERS: Record<string, MemberColumn> = {
+  gamertag: "gamertag",
+  gamertags: "gamertag",
+  nombre: "nombre",
+  nombres: "nombre",
+  telefono: "telefono",
+  pais: "pais",
+  usuario_whatsapp: "usuario",
+  usuario: "usuario",
+  edad: "edad",
+  situacion: "situacion",
+  activo: "activo",
+  causa_ausencia: "causaAusencia",
+  admin: "admin",
+  protegido: "protegido",
+  activo_permanente: "activoPermanente",
+  se_salio: "seSalio",
+  baneado: "baneado",
+  motivo_ban: "motivoBan",
+  notas: "notas",
+};
+
+const KEYWORDS: Record<MemberColumn, readonly string[]> = {
+  nombre: ["nombres", "nombre", "nombre completo", "real name", "contact name"],
+  gamertag: [
+    "gamertag",
+    "gamertags",
+    "gamer tag",
+    "nick",
+    "apodo",
+    "alias",
+    "ign",
+  ],
+  telefono: [
+    "telefono",
+    "tel",
+    "celular",
+    "movil",
+    "phone",
+    "mobile",
+    "whatsapp",
+    "numero",
+  ],
+  pais: ["pais", "country", "iso", "nacionalidad"],
+  usuario: [
+    "usuario de whatsapp",
+    "usuario whatsapp",
+    "whatsapp username",
+    "usuario",
+    "@usuario",
+  ],
+  edad: ["edad", "age", "anos", "años"],
+  situacion: ["situacion", "situation", "estado en la comunidad"],
+  activo: ["activo", "active", "roster", "en roster", "miembro activo"],
+  causaAusencia: [
+    "causa de ausencia",
+    "causa ausencia",
+    "motivo ausencia",
+    "absent reason",
+  ],
+  admin: ["admin", "administrador", "es admin", "is admin", "moderador", "staff"],
+  protegido: [
+    "protegido",
+    "protegidos",
+    "sin ban",
+    "protected",
+    "exento de ban",
+    "ban exempt",
+  ],
+  activoPermanente: [
+    "activo permanente",
+    "activa permanente",
+    "permanent",
+    "permanently active",
+  ],
+  seSalio: [
+    "se salio",
+    "se salió",
+    "salio",
+    "left",
+    "se fue",
+    "baja",
+    "los que se salieron",
+  ],
+  baneado: ["baneado", "banned", "ban"],
+  motivoBan: ["motivo del ban", "motivo ban", "razon del ban", "banned reason"],
+  notas: ["notas", "notes", "nota", "comentario", "observaciones"],
+};
 
 function normHeader(s: unknown): string {
   return String(s ?? "")
@@ -40,227 +232,49 @@ function compactAlnum(s: string): string {
   return s.replace(/[^a-z0-9]+/g, "");
 }
 
-/**
- * Palabras clave por columna: nombres técnicos, sinónimos y textos parecidos a la UI
- * (filtros «Grupo», situación en formulario, etc.). La cabecera puede ser parecida
- * (typo, sin acentos, frase larga) y aun así encajar.
- */
-const KEYWORDS: Record<MemberColumn, readonly string[]> = {
-  nombre: [
-    "nombres",
-    "nombre",
-    "nombre completo",
-    "nombre y apellido",
-    "real name",
-    "contact name",
-    "nombre contacto",
-  ],
-  /** Identificador principal en juego / red: no usar sinónimos de «nombre real». */
-  gamertag: [
-    "gamertag",
-    "gamertags",
-    "gamer tag",
-    "gamer_tag",
-    "gamer",
-    "nick",
-    "apodo",
-    "alias",
-    "handle",
-    "tag",
-    "id jugador",
-    "psn",
-    "xbox",
-    "steam",
-    "userid",
-    "user id",
-    "cuenta",
-    "ign",
-  ],
-  telefono: [
-    "telefono",
-    "teléfono",
-    "tel",
-    "celular",
-    "cel",
-    "movil",
-    "móvil",
-    "phone",
-    "mobile",
-    "whatsapp",
-    "wa",
-    "numero",
-    "número",
-    "numero telefonico",
-    "número telefónico",
-    "contacto",
-    "tfn",
-    "telefono movil",
-    "whatsapp number",
-  ],
-  pais: [
-    "pais",
-    "país",
-    "country",
-    "codigo pais",
-    "código país",
-    "codigo_pais",
-    "iso",
-    "iso country",
-    "region",
-    "región",
-    "nacionalidad",
-    "prefijo",
-    "prefix",
-    "country code",
-  ],
-  activo: [
-    "activo",
-    "active",
-    "roster",
-    "en roster",
-    "participa",
-    "participacion",
-    "participación",
-    "alta",
-    "enabled",
-    "on",
-    "los que estuvieron activos",
-    "estuvo activo",
-    "sigue activo",
-    "miembro activo",
-    "lista activa",
-  ],
-  admin: [
-    "admin",
-    "admins",
-    "administrador",
-    "administradores",
-    "es admin",
-    "is admin",
-    "es_admin",
-    "is_admin",
-    "rol admin",
-    "moderador",
-    "moderator",
-    "mod",
-    "staff",
-    "superuser",
-  ],
-  protegido: [
-    "protegido",
-    "protegidos",
-    "sin ban",
-    "sin_ban",
-    "ban exempt",
-    "banexempt",
-    "exempt",
-    "protected",
-    "inmunidad",
-    "no ban",
-    "exento ban",
-    "exento de ban",
-    "grupo protegidos",
-    "protegidos sin ban",
-  ],
-  seSalio: [
-    "se_salio",
-    "se salio",
-    "se salió",
-    "salio",
-    "salió",
-    "left",
-    "se fue",
-    "abandono",
-    "abandonó",
-    "baja",
-    "se retiro",
-    "se retiró",
-    "los que se salieron",
-    "salida comunidad",
-    "salida de la comunidad",
-    "ya no esta",
-    "ya no está",
-    "marcado left",
-    "marked left",
-    "de baja",
-    "se marcho",
-    "se marchó",
-  ],
-  notas: [
-    "notas",
-    "notes",
-    "nota",
-    "comentario",
-    "comentarios",
-    "observaciones",
-    "observacion",
-    "observación",
-    "memo",
-    "description",
-    "descripcion",
-    "descripción",
-    "detalles",
-    "info extra",
-  ],
-};
-
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0;
   if (!a.length) return b.length;
   if (!b.length) return a.length;
-  const m = a.length;
-  const n = b.length;
-  const row = new Uint16Array(n + 1);
-  for (let j = 0; j <= n; j++) row[j] = j;
-  for (let i = 1; i <= m; i++) {
-    let prev = row[0];
+  const row = new Uint16Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) row[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]!;
     row[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const tmp = row[j];
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = row[j]!;
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+      row[j] = Math.min(row[j]! + 1, row[j - 1]! + 1, prev + cost);
       prev = tmp;
     }
   }
-  return row[n];
+  return row[b.length]!;
 }
 
 function similarityRatio(a: string, b: string): number {
   if (!a.length && !b.length) return 1;
-  const d = levenshtein(a, b);
-  return 1 - d / Math.max(a.length, b.length, 1);
+  return 1 - levenshtein(a, b) / Math.max(a.length, b.length, 1);
 }
 
-/**
- * Mejor puntuación de una celda de cabecera frente a un conjunto de palabras clave.
- */
 function scoreHeaderAgainstKeywords(
   headerCell: unknown,
   keywords: readonly string[],
 ): number {
   const raw = normHeader(headerCell);
   if (!raw) return 0;
-
   const hWords = raw.replace(/[_]+/g, " ").trim();
   const hCompact = compactAlnum(hWords);
-
   let best = 0;
-
   for (const phrase of keywords) {
     const kNorm = normHeader(phrase);
     if (!kNorm) continue;
     const kWords = kNorm.replace(/[_]+/g, " ").trim();
     const kCompact = compactAlnum(kWords);
-
-    if (hWords === kWords) {
-      best = 1;
-      break;
-    }
+    if (hWords === kWords) return 1;
     if (hCompact === kCompact && kCompact.length >= 2) {
       best = Math.max(best, 0.99);
       continue;
     }
-
     if (kCompact.length >= 3 && hCompact.includes(kCompact)) {
       best = Math.max(best, 0.94);
       continue;
@@ -269,74 +283,56 @@ function scoreHeaderAgainstKeywords(
       best = Math.max(best, 0.92);
       continue;
     }
-
-    const toks = kWords.split(/\s+/).filter((t) => t.length >= 3);
-    if (toks.length >= 2) {
-      const allIn = toks.every((t) => hWords.includes(t));
-      if (allIn) {
-        best = Math.max(best, 0.93);
-        continue;
-      }
-    }
-
     const sim = similarityRatio(hCompact, kCompact);
-    if (sim >= 0.72) {
-      best = Math.max(best, sim);
-    }
-
-    const simWords = similarityRatio(hWords, kWords);
-    if (simWords >= 0.72) {
-      best = Math.max(best, simWords * 0.98);
-    }
+    if (sim >= 0.72) best = Math.max(best, sim);
   }
-
   return best;
 }
 
-/**
- * Asigna columnas por cabecera. Reserva primero coincidencias exactas típicas de Sheets
- * («nombres» vs «gamertags») para no mezclar nombre real con gamertag.
- */
-function assignHeaderIndices(headerRow: unknown[]): Map<MemberColumn, number> {
-  const n = headerRow.length;
+function assignHeaderIndices(headerRow: string[]): Map<MemberColumn, number> {
   const used = new Set<number>();
   const out = new Map<MemberColumn, number>();
-
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < headerRow.length; i++) {
     const h = normHeader(headerRow[i]).replace(/\s+/g, " ").trim();
-    if (h === "gamertags" || h === "gamertag") {
-      if (!out.has("gamertag")) {
-        out.set("gamertag", i);
-        used.add(i);
-      }
-    } else if (h === "nombres" || h === "nombre") {
-      if (!out.has("nombre")) {
-        out.set("nombre", i);
-        used.add(i);
-      }
-    }
+    const col = EXACT_HEADERS[h];
+    if (!col || out.has(col)) continue;
+    out.set(col, i);
+    used.add(i);
   }
-
-  const order: { col: MemberColumn; required: boolean; minScore: number }[] = [
-    { col: "gamertag", required: true, minScore: 0.72 },
-    { col: "telefono", required: true, minScore: 0.72 },
-    { col: "nombre", required: false, minScore: 0.78 },
-    { col: "pais", required: false, minScore: 0.8 },
-    { col: "admin", required: false, minScore: 0.8 },
-    { col: "protegido", required: false, minScore: 0.8 },
-    { col: "seSalio", required: false, minScore: 0.8 },
-    { col: "activo", required: false, minScore: 0.8 },
-    { col: "notas", required: false, minScore: 0.78 },
+  const order: { col: MemberColumn; minScore: number }[] = [
+    { col: "gamertag", minScore: 0.72 },
+    { col: "telefono", minScore: 0.72 },
+    { col: "usuario", minScore: 0.8 },
+    { col: "nombre", minScore: 0.78 },
+    { col: "pais", minScore: 0.8 },
+    { col: "edad", minScore: 0.8 },
+    { col: "situacion", minScore: 0.8 },
+    { col: "admin", minScore: 0.8 },
+    { col: "protegido", minScore: 0.8 },
+    { col: "activoPermanente", minScore: 0.8 },
+    { col: "seSalio", minScore: 0.8 },
+    { col: "baneado", minScore: 0.85 },
+    { col: "motivoBan", minScore: 0.8 },
+    { col: "causaAusencia", minScore: 0.8 },
+    { col: "activo", minScore: 0.8 },
+    { col: "notas", minScore: 0.78 },
   ];
-
   for (const { col, minScore } of order) {
     if (out.has(col)) continue;
     let bestI = -1;
     let bestScore = minScore;
-    const kws = KEYWORDS[col];
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < headerRow.length; i++) {
       if (used.has(i)) continue;
-      const s = scoreHeaderAgainstKeywords(headerRow[i], kws);
+      const headerNorm = normHeader(headerRow[i]);
+      if (col === "telefono" && headerNorm.includes("usuario")) continue;
+      if (
+        col === "usuario" &&
+        !headerNorm.includes("usuario") &&
+        !headerNorm.includes("username")
+      ) {
+        continue;
+      }
+      const s = scoreHeaderAgainstKeywords(headerRow[i], KEYWORDS[col]);
       if (s >= bestScore) {
         bestScore = s;
         bestI = i;
@@ -347,223 +343,484 @@ function assignHeaderIndices(headerRow: unknown[]): Map<MemberColumn, number> {
       out.set(col, bestI);
     }
   }
-
   return out;
 }
 
 function cellStr(v: unknown): string {
-  if (v == null || v === "") return "";
-  if (typeof v === "number" && Number.isFinite(v)) {
-    if (Number.isInteger(v)) return String(v);
-    return String(v);
-  }
+  if (v == null) return "";
   return String(v).trim();
 }
 
 function parseBool(v: unknown, defaultVal: boolean): boolean {
-  if (typeof v === "boolean") return v;
   const s = cellStr(v)
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{M}/gu, "");
   if (!s) return defaultVal;
   if (
-    [
-      "0",
-      "no",
-      "false",
-      "f",
-      "n",
-      "falso",
-      "off",
-      "deshabilitado",
-      "deshabilitada",
-      "apagado",
-      "apagada",
-      "disabled",
-    ].includes(s)
+    ["0", "no", "false", "f", "n", "falso", "off", "disabled"].includes(s)
   ) {
     return false;
   }
   if (
-    [
-      "1",
-      "si",
-      "yes",
-      "true",
-      "y",
-      "t",
-      "verdadero",
-      "on",
-      "x",
-      "✓",
-      "ok",
-      "habilitado",
-      "habilitada",
-      "encendido",
-      "encendida",
-      "enabled",
-    ].includes(s)
+    ["1", "si", "yes", "true", "y", "t", "verdadero", "on", "x", "ok"].includes(
+      s,
+    )
   ) {
     return true;
   }
   return defaultVal;
 }
 
-const MAX_ROWS = 400;
+function parseSituation(raw: string): DirectoryCsvSituation | null {
+  const s = normHeader(raw).replace(/[_]+/g, " ").trim();
+  const c = compactAlnum(s);
+  if (!c) return null;
+  if (
+    c === "sesalio" ||
+    c === "salio" ||
+    c === "left" ||
+    c === "baja" ||
+    c === "sefue" ||
+    s.includes("se salio")
+  ) {
+    return "se_salio";
+  }
+  if (c === "ausente" || c === "absent" || s.startsWith("ausente")) {
+    return "ausente";
+  }
+  if (c.includes("permanente") || c === "permanent") return "permanente";
+  if (c === "inactivo" || c === "inactive" || s.startsWith("inactivo")) {
+    return "inactivo";
+  }
+  if (c === "activo" || c === "active" || c === "normal") return "activo";
+  return null;
+}
+
+function yn(value: boolean): string {
+  return value ? "si" : "no";
+}
+
+function csvEscape(value: string): string {
+  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
+  return value;
+}
+
+export function directorySituationForExport(m: {
+  leftAt: Date | string | null;
+  absentWithCause: boolean;
+  permanentlyActive: boolean;
+  active: boolean;
+}): DirectoryCsvSituation {
+  if (m.leftAt) return "se_salio";
+  if (m.absentWithCause) return "ausente";
+  if (m.permanentlyActive) return "permanente";
+  if (m.active) return "activo";
+  return "inactivo";
+}
+
+export function memberToDirectoryCsvRecord(m: {
+  gamertag: string;
+  displayName: string | null;
+  phone: string | null;
+  phoneCountry: string | null;
+  whatsappUsername: string | null;
+  age: number | null;
+  active: boolean;
+  permanentlyActive: boolean;
+  absentWithCause: boolean;
+  absentReason: string | null;
+  leftAt: Date | string | null;
+  isAdmin: boolean;
+  banExempt: boolean;
+  banned: boolean;
+  bannedReason: string | null;
+  notes: string | null;
+}): DirectoryCsvRecord {
+  const situation = directorySituationForExport(m);
+  return {
+    gamertag: m.gamertag,
+    displayName: m.displayName,
+    phone: m.phone,
+    phoneCountry: m.phoneCountry,
+    whatsappUsername: m.whatsappUsername,
+    age: m.age,
+    situation,
+    active: situation === "se_salio" ? false : m.active,
+    absentReason: situation === "ausente" ? m.absentReason : null,
+    isAdmin: m.isAdmin,
+    banExempt: m.banExempt,
+    permanentlyActive: m.permanentlyActive,
+    banned: m.banned,
+    bannedReason: m.banned ? m.bannedReason : null,
+    notes: m.notes,
+  };
+}
+
+/** UTF-8 con BOM y separador coma, para que Excel en español no parta las columnas. */
+export function serializeDirectoryCsv(records: DirectoryCsvRecord[]): string {
+  const lines = [DIRECTORY_CSV_HEADERS.join(",")];
+  for (const r of records) {
+    const cells = [
+      r.gamertag,
+      r.displayName ?? "",
+      r.phone ?? "",
+      r.phoneCountry ?? "",
+      r.whatsappUsername ?? "",
+      r.age == null ? "" : String(r.age),
+      r.situation,
+      yn(r.active),
+      r.absentReason ?? "",
+      yn(r.isAdmin),
+      yn(r.banExempt),
+      yn(r.permanentlyActive),
+      yn(r.banned),
+      r.bannedReason ?? "",
+      r.notes ?? "",
+    ];
+    lines.push(cells.map(csvEscape).join(","));
+  }
+  return `\uFEFF${lines.join("\r\n")}\r\n`;
+}
+
+export function directoryCsvTemplate(): string {
+  return serializeDirectoryCsv([]);
+}
 
 function stripBom(s: string): string {
   if (s.charCodeAt(0) === 0xfeff) return s.slice(1);
   return s;
 }
 
-function firstNonEmptyLine(text: string): string {
-  const lines = text.split("\n");
-  for (const line of lines) {
-    const t = line.trimEnd();
-    if (t.length > 0) return t;
-  }
-  return "";
+function stripSepHint(text: string): { text: string; forced: string | null } {
+  const match = text.match(/^sep=(.)\r?\n/i);
+  if (!match) return { text, forced: null };
+  return { text: text.slice(match[0].length), forced: match[1] ?? null };
 }
 
-/** Heurística para CSV de Google Sheets / Excel según región (coma vs punto y coma). */
-function guessCsvDelimiter(firstLine: string): string {
-  const tab = (firstLine.match(/\t/g) ?? []).length;
-  const semi = (firstLine.match(/;/g) ?? []).length;
-  const comma = (firstLine.match(/,/g) ?? []).length;
+function guessDelimiter(text: string, forced: string | null): "," | ";" | "\t" {
+  if (forced === "," || forced === ";" || forced === "\t") return forced;
+  let line = "";
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]!;
+    if (c === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if ((c === "\n" || c === "\r") && !inQuotes) break;
+    line += c;
+  }
+  const count = (d: string) => {
+    let n = 0;
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i]!;
+      if (c === '"') {
+        if (q && line[i + 1] === '"') {
+          i++;
+          continue;
+        }
+        q = !q;
+        continue;
+      }
+      if (!q && c === d) n++;
+    }
+    return n;
+  };
+  const comma = count(",");
+  const semi = count(";");
+  const tab = count("\t");
   if (tab > 0 && tab >= semi && tab >= comma) return "\t";
   if (semi > comma) return ";";
   return ",";
 }
 
-function readWorkbookFromUpload(buffer: Buffer, fileName: string): XLSX.WorkBook {
-  const lower = fileName.toLowerCase();
-
-  if (lower.endsWith(".tsv")) {
-    const str = stripBom(buffer.toString("utf8"))
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n");
-    return XLSX.read(str, { type: "string", FS: "\t", cellDates: false });
-  }
-
-  if (lower.endsWith(".csv")) {
-    const str = stripBom(buffer.toString("utf8"))
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n");
-    const fs = guessCsvDelimiter(firstNonEmptyLine(str));
-    return XLSX.read(str, { type: "string", FS: fs, cellDates: false });
-  }
-
-  return XLSX.read(buffer, { type: "buffer", cellDates: false });
-}
-
-type ParseSheetResult =
-  | "skip"
-  | "bad-headers"
-  | SheetMemberInput[];
-
-function parseMemberRowsForSheet(
-  matrix: unknown[][],
-  sheetName: string,
-): ParseSheetResult {
-  if (matrix.length < 2) return "skip";
-
-  const headerRow = matrix[0] ?? [];
-  const idx = assignHeaderIndices(headerRow);
-  const ig = idx.get("gamertag") ?? -1;
-  const it = idx.get("telefono") ?? -1;
-  const idn = idx.get("nombre") ?? -1;
-  const ip = idx.get("pais") ?? -1;
-  const ia = idx.get("activo") ?? -1;
-  const iad = idx.get("admin") ?? -1;
-  const ipr = idx.get("protegido") ?? -1;
-  const il = idx.get("seSalio") ?? -1;
-  const ino = idx.get("notas") ?? -1;
-
-  if (ig < 0 || it < 0) return "bad-headers";
-
-  const out: SheetMemberInput[] = [];
-
-  for (let r = 1; r < matrix.length; r++) {
-    const row = matrix[r] ?? [];
-    const gamertag = cellStr(row[ig]);
-    const telefono = cellStr(row[it]);
-    const displayNameRaw = idn >= 0 ? cellStr(row[idn]) : "";
-    const displayName = displayNameRaw ? displayNameRaw : null;
-    if (!gamertag && !telefono) continue;
-
-    const pais = ip >= 0 ? cellStr(row[ip]) : "";
-    const activo = ia >= 0 ? parseBool(row[ia], true) : true;
-    const admin = iad >= 0 ? parseBool(row[iad], false) : false;
-    const protegido = ipr >= 0 ? parseBool(row[ipr], false) : false;
-    const seSalio = il >= 0 ? parseBool(row[il], false) : false;
-    const notas = ino >= 0 ? cellStr(row[ino]) || null : null;
-
-    out.push({
-      sheetName,
-      rowNumber: r + 1,
-      gamertag,
-      displayName,
-      telefono,
-      pais,
-      activo,
-      admin,
-      protegido,
-      seSalio,
-      notas,
-    });
-  }
-
-  return out;
-}
-
-/**
- * Lee todas las hojas del libro (Excel) o la única tabla de un CSV/TSV.
- * Cada hoja con cabeceras válidas (gamertag + teléfono) aporta filas; las demás se omiten.
- * `fileName` fija el formato: `.csv`, `.tsv`, `.xlsx`, `.xls`.
- */
-export function parseMemberSpreadsheet(buffer: Buffer, fileName: string): SheetMemberInput[] {
-  const wb = readWorkbookFromUpload(buffer, fileName);
-  const names = wb.SheetNames;
-  if (!names.length) {
-    throw new Error("El archivo no tiene ninguna hoja ni datos.");
-  }
-
-  const combined: SheetMemberInput[] = [];
-  let sawBadHeaders = false;
-  let sawOkSheet = false;
-
-  for (const sheetName of names) {
-    if (/^sin[_\s-]*telefono$/i.test(sheetName.trim())) continue;
-    const sheet = wb.Sheets[sheetName];
-    if (!sheet) continue;
-    const matrix = XLSX.utils.sheet_to_json<(string | number | boolean | undefined)[]>(
-      sheet,
-      { header: 1, defval: "", raw: false },
-    ) as unknown[][];
-
-    const parsed = parseMemberRowsForSheet(matrix, sheetName);
-    if (parsed === "skip") continue;
-    if (parsed === "bad-headers") {
-      sawBadHeaders = true;
+export function parseCsvTable(text: string): string[][] {
+  const stripped = stripSepHint(stripBom(text).replace(/^\uFEFF/, ""));
+  const delimiter = guessDelimiter(stripped.text, stripped.forced);
+  const src = stripped.text;
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i]!;
+    if (inQuotes) {
+      if (c === '"') {
+        if (src[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cell += c;
+      }
       continue;
     }
-    sawOkSheet = true;
-    for (const row of parsed) {
-      if (combined.length >= MAX_ROWS) {
-        throw new Error(
-          `Máximo ${MAX_ROWS} filas de datos en total por archivo (sumando todas las hojas).`,
-        );
-      }
-      combined.push(row);
+    if (c === '"') {
+      inQuotes = true;
+      continue;
     }
+    if (c === delimiter) {
+      row.push(cell);
+      cell = "";
+      continue;
+    }
+    if (c === "\r") continue;
+    if (c === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+    cell += c;
   }
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+}
 
-  if (combined.length === 0 && sawBadHeaders && !sawOkSheet) {
+function at(row: string[], idx: Map<MemberColumn, number>, col: MemberColumn): string {
+  const i = idx.get(col);
+  if (i == null) return "";
+  return cellStr(row[i]);
+}
+
+export function parseDirectoryCsv(bufferOrText: Buffer | string): CsvMemberInput[] {
+  const text =
+    typeof bufferOrText === "string"
+      ? bufferOrText
+      : bufferOrText.toString("utf8");
+  const matrix = parseCsvTable(text).filter((row) =>
+    row.some((cell) => cell.trim() !== ""),
+  );
+  if (matrix.length === 0) {
+    throw new Error("El archivo no tiene datos.");
+  }
+  const header = matrix[0] ?? [];
+  const idx = assignHeaderIndices(header);
+  if (!idx.has("gamertag") || (!idx.has("telefono") && !idx.has("usuario"))) {
     throw new Error(
-      "Ninguna hoja tiene columnas reconocibles: hace falta gamertag (o «gamertags») y teléfono. La columna «nombres» es opcional y va aparte. Descarga la plantilla actualizada.",
+      "El CSV no tiene columnas reconocibles: hace falta gamertag y teléfono o usuario de WhatsApp. Descarga la plantilla.",
     );
   }
 
-  return combined;
+  const out: CsvMemberInput[] = [];
+  for (let r = 1; r < matrix.length; r++) {
+    const row = matrix[r] ?? [];
+    const gamertag = at(row, idx, "gamertag");
+    const telefono = at(row, idx, "telefono");
+    const usuarioRaw = at(row, idx, "usuario");
+    const displayNameRaw = at(row, idx, "nombre");
+    if (!gamertag && !telefono && !usuarioRaw && !displayNameRaw) continue;
+
+    const usernameParsed = usuarioRaw
+      ? normalizeWhatsAppUsername(usuarioRaw)
+      : null;
+    const ageParsed = idx.has("edad")
+      ? parseDirectoryAge(at(row, idx, "edad"))
+      : { ok: true as const, age: null };
+
+    const sit = idx.has("situacion")
+      ? parseSituation(at(row, idx, "situacion"))
+      : null;
+    const activoCol = idx.has("activo")
+      ? parseBool(row[idx.get("activo")!], true)
+      : null;
+    const seSalioCol = idx.has("seSalio")
+      ? parseBool(row[idx.get("seSalio")!], false)
+      : false;
+    const permCol = idx.has("activoPermanente")
+      ? parseBool(row[idx.get("activoPermanente")!], false)
+      : false;
+
+    let left = false;
+    let absent = false;
+    let active = true;
+    let permanentlyActive = permCol;
+    if (sit === "se_salio") {
+      left = true;
+      active = false;
+    } else if (sit === "ausente") {
+      absent = true;
+      active = activoCol ?? true;
+    } else if (sit === "permanente") {
+      permanentlyActive = true;
+      active = true;
+    } else if (sit === "inactivo") {
+      active = false;
+    } else if (sit === "activo") {
+      active = true;
+    } else {
+      left = seSalioCol;
+      active = left ? false : (activoCol ?? true);
+      if (permanentlyActive && !left) active = true;
+    }
+    if (permanentlyActive && !left && sit !== "ausente" && sit !== "inactivo") {
+      active = true;
+    }
+
+    out.push({
+      rowNumber: r + 1,
+      gamertag,
+      displayName: displayNameRaw || null,
+      telefono,
+      pais: at(row, idx, "pais"),
+      whatsappUsername:
+        usernameParsed && usernameParsed.ok ? usernameParsed.username : null,
+      usernameError:
+        usernameParsed && !usernameParsed.ok && !usernameParsed.empty
+          ? usernameParsed.error
+          : null,
+      age: ageParsed.ok ? ageParsed.age : null,
+      ageError: ageParsed.ok ? null : ageParsed.error,
+      left,
+      absent,
+      active,
+      absentReason: at(row, idx, "causaAusencia") || null,
+      isAdmin: idx.has("admin")
+        ? parseBool(row[idx.get("admin")!], false)
+        : false,
+      banExempt: idx.has("protegido")
+        ? parseBool(row[idx.get("protegido")!], false)
+        : false,
+      permanentlyActive,
+      banned: idx.has("baneado")
+        ? parseBool(row[idx.get("baneado")!], false)
+        : false,
+      bannedReason: at(row, idx, "motivoBan") || null,
+      notes: at(row, idx, "notas") || null,
+    });
+    if (out.length > CSV_MAX_ROWS) {
+      throw new Error(`Máximo ${CSV_MAX_ROWS} filas de datos por archivo.`);
+    }
+  }
+  return out;
+}
+
+function gamertagKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+/**
+ * Salta filas que ya existen (teléfono, @usuario o gamertag) y las repetidas
+ * dentro del mismo archivo. No pisa datos.
+ */
+export function planCsvImport(
+  rows: CsvMemberInput[],
+  existing: CsvExistingIdentity[],
+): CsvImportPlan {
+  const known: CsvExistingIdentity[] = existing.map((e) => ({
+    gamertag: e.gamertag,
+    phone: e.phone,
+    whatsappUsername: e.whatsappUsername,
+  }));
+  const create: CsvCreateRow[] = [];
+  const skipped: CsvImportPlan["skipped"] = [];
+  const errors: CsvImportPlan["errors"] = [];
+
+  for (const row of rows) {
+    const tag = row.gamertag.trim();
+    let phone: { phone: string; phoneCountry: string | null } | null = null;
+    let phoneError: string | null = null;
+    if (row.telefono.trim()) {
+      const parsed = normalizePhoneFreeform(row.telefono, row.pais);
+      if (parsed.ok) {
+        phone = { phone: parsed.phone, phoneCountry: parsed.phoneCountry };
+      } else {
+        phoneError = parsed.error;
+      }
+    }
+
+    const byPhone = phone
+      ? findMemberByPhone(known, phone.phone)
+      : undefined;
+    if (byPhone) {
+      skipped.push({
+        rowNumber: row.rowNumber,
+        gamertag: tag || byPhone.gamertag,
+        reason: "Mismo teléfono",
+      });
+      continue;
+    }
+    const byUser = row.whatsappUsername
+      ? findMemberByUsername(known, row.whatsappUsername)
+      : undefined;
+    if (byUser) {
+      skipped.push({
+        rowNumber: row.rowNumber,
+        gamertag: tag || byUser.gamertag,
+        reason: "Mismo usuario de WhatsApp",
+      });
+      continue;
+    }
+    if (tag && known.some((e) => gamertagKey(e.gamertag) === gamertagKey(tag))) {
+      skipped.push({
+        rowNumber: row.rowNumber,
+        gamertag: tag,
+        reason: "Mismo gamertag",
+      });
+      continue;
+    }
+
+    if (!tag) {
+      errors.push({ rowNumber: row.rowNumber, message: "Falta el gamertag" });
+      continue;
+    }
+    if (phoneError) {
+      errors.push({ rowNumber: row.rowNumber, message: phoneError });
+      continue;
+    }
+    if (row.usernameError) {
+      errors.push({ rowNumber: row.rowNumber, message: row.usernameError });
+      continue;
+    }
+    if (row.ageError) {
+      errors.push({ rowNumber: row.rowNumber, message: row.ageError });
+      continue;
+    }
+    if (!phone && !row.whatsappUsername) {
+      errors.push({
+        rowNumber: row.rowNumber,
+        message: "Falta el teléfono o el usuario de WhatsApp",
+      });
+      continue;
+    }
+
+    create.push({
+      rowNumber: row.rowNumber,
+      gamertag: tag,
+      displayName: row.displayName,
+      phone: phone?.phone ?? null,
+      phoneCountry: phone?.phoneCountry ?? null,
+      whatsappUsername: row.whatsappUsername,
+      age: row.age,
+      active: row.active,
+      left: row.left,
+      absent: row.absent,
+      absentReason: row.absent ? row.absentReason : null,
+      isAdmin: row.isAdmin,
+      banExempt: row.banExempt,
+      permanentlyActive: row.permanentlyActive,
+      banned: row.banned && !row.banExempt,
+      bannedReason: row.banned && !row.banExempt ? row.bannedReason : null,
+      notes: row.notes,
+    });
+    known.push({
+      gamertag: tag,
+      phone: phone?.phone ?? null,
+      whatsappUsername: row.whatsappUsername,
+    });
+  }
+
+  return { create, skipped, errors };
 }

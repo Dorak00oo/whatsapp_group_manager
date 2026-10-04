@@ -1,158 +1,236 @@
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
-import { DirectorySection } from "@/components/directory-section";
+import {
+  HomeOverview,
+  type HomeAlert,
+  type HomeAuditItem,
+  type HomeJoiner,
+  type HomeWorld,
+} from "@/components/home-overview";
+import { describeAuditEvent } from "@/lib/audit-format";
 import { reconcileDirectoryAbsentActive } from "@/lib/directory-absent-clock";
 import {
-  directoryMemberWhere,
-  directoryMemberWhereIgnoringListStatus,
-  parseDirectoryFilters,
+  directoryHomeCountWhere,
+  directoryListRedirectQuery,
+  type DirectoryHomeCountKey,
 } from "@/lib/directory-query";
-import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
-import { activeOnByGamertagMap } from "@/lib/minecraft-directory-sync";
+import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { fetchHomeBotStatus, presentHomeBot } from "@/lib/home-bot-status";
+import { formatAlertTypeBreakdown } from "@/lib/minecraft-monitor";
+import { listActiveMonitorAlerts } from "@/lib/minecraft-monitor-alerts";
+import {
+  asOnlinePlayersQueueData,
+  isOnlineRosterFresh,
+  normalizeOnlinePlayerNames,
+} from "@/lib/minecraft-online-players";
+import { readMinecraftQueueRow } from "@/lib/minecraft-queue";
+import {
+  MINECRAFT_SERVER_DEFAULTS,
+  MINECRAFT_SERVER_IDS,
+  minecraftLinkStatus,
+  minecraftLinkStatusLabel,
+  parseMinecraftServerId,
+  type MinecraftServerId,
+} from "@/lib/minecraft-server";
+import { listMinecraftServers } from "@/lib/minecraft-servers-db";
+import { selectedMinecraftServerId } from "@/lib/minecraft-world";
+import { requirePanelSession } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
+import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
-import type { DirectoryMemberDTO } from "@/types/directory";
+import { redirect } from "next/navigation";
 
 type Search = Record<string, string | string[] | undefined>;
 
-export default async function DashboardPage({
+async function readOnline(serverId: MinecraftServerId): Promise<{
+  state: HomeWorld["playersState"];
+  players: string[];
+}> {
+  try {
+    const found = await readMinecraftQueueRow(serverId, "online_players");
+    const data = asOnlinePlayersQueueData(found?.data);
+    if (!isOnlineRosterFresh(data.reportedAt)) {
+      return { state: "unknown", players: [] };
+    }
+    const players = normalizeOnlinePlayerNames(data.players);
+    return {
+      state: players.length === 0 ? "empty" : "online",
+      players,
+    };
+  } catch {
+    return { state: "unknown", players: [] };
+  }
+}
+
+export default async function DashboardHomePage({
   searchParams,
 }: {
   searchParams: Promise<Search>;
 }) {
-  const session = await auth();
-  if (!session?.user) return null;
-
-  let userId: string | null;
-  try {
-    userId = await resolveDirectoryUserId(session);
-  } catch (e) {
-    if (isDatabaseUnreachableError(e)) {
-      return <DatabaseUnavailable />;
-    }
-    throw e;
-  }
-  if (!userId) return null;
-
+  const panel = await requirePanelSession();
   const sp = await searchParams;
-  const filters = parseDirectoryFilters(sp);
+  const redirectQuery = directoryListRedirectQuery(sp);
+  if (redirectQuery) redirect(`/dashboard/lista?${redirectQuery}`);
 
-  const whereMembers = directoryMemberWhere(userId, filters);
-  const whereForRosterCounts = directoryMemberWhereIgnoringListStatus(
-    userId,
-    filters,
-  );
-
-  let membersRaw: Awaited<
-    ReturnType<typeof prisma.directoryMember.findMany<{ include: { strikes: true } }>>
-  >;
-  let countryRows: { phoneCountry: string | null }[];
-  let rosterCounts: { active: number; inactive: number; left: number };
-
-  let activeOnByTag = new Map<string, ("vanilla" | "mods")[]>();
+  const botPromise = fetchHomeBotStatus(2000);
+  const now = new Date();
 
   try {
+    const authSession = await auth();
+    const userId =
+      (await resolveDirectoryUserId(authSession)) ?? panel.userId;
     await reconcileDirectoryAbsentActive(userId);
-    const [raw, countries, counts, onMap] = await Promise.all([
-      prisma.directoryMember.findMany({
-        where: whereMembers,
-        include: {
-          strikes: { orderBy: { createdAt: "desc" } },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.directoryMember.findMany({
-        where: { userId, phoneCountry: { not: null } },
-        select: { phoneCountry: true },
-        distinct: ["phoneCountry"],
-      }),
-      (async () => {
-        const [active, inactive, left] = await Promise.all([
-          prisma.directoryMember.count({
-            where: {
-              AND: [
-                whereForRosterCounts,
-                { leftAt: null, active: true },
-              ],
-            },
-          }),
-          prisma.directoryMember.count({
-            where: {
-              AND: [
-                whereForRosterCounts,
-                { leftAt: null, active: false },
-              ],
-            },
-          }),
-          prisma.directoryMember.count({
-            where: {
-              AND: [whereForRosterCounts, { leftAt: { not: null } }],
-            },
-          }),
-        ]);
-        return { active, inactive, left };
-      })(),
-      activeOnByGamertagMap().catch(() => new Map()),
-    ]);
-    membersRaw = raw;
-    countryRows = countries;
-    rosterCounts = counts;
-    activeOnByTag = onMap;
-  } catch (e) {
-    if (isDatabaseUnreachableError(e)) {
+
+    const countKeys: DirectoryHomeCountKey[] = [
+      "active",
+      "inactive",
+      "new",
+      "absent",
+      "left",
+    ];
+    const selectedId = await selectedMinecraftServerId();
+
+    const [countRows, protectedCount, servers, events, joiners, vanillaAlerts, modsAlerts, vanillaOnline, modsOnline] =
+      await Promise.all([
+        Promise.all(
+          countKeys.map((key) =>
+            prisma.directoryMember.count({
+              where: directoryHomeCountWhere(userId, key, now),
+            }),
+          ),
+        ),
+        prisma.directoryMember.count({
+          where: { userId, banExempt: true },
+        }),
+        listMinecraftServers(),
+        prisma.auditEvent.findMany({
+          where: { userId: panel.userId },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 8,
+          select: {
+            id: true,
+            createdAt: true,
+            actorType: true,
+            actorGamertag: true,
+            actorPhone: true,
+            actorName: true,
+            action: true,
+            memberId: true,
+            memberGamertag: true,
+            changes: true,
+            details: true,
+          },
+        }),
+        prisma.directoryMember.findMany({
+          where: { userId },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 5,
+          select: {
+            id: true,
+            gamertag: true,
+            displayName: true,
+            createdAt: true,
+            leftAt: true,
+          },
+        }),
+        listActiveMonitorAlerts("vanilla"),
+        listActiveMonitorAlerts("mods"),
+        readOnline("vanilla"),
+        readOnline("mods"),
+      ]);
+
+    const [active, inactive, newer, absent, left] = countRows;
+    const byId = new Map(servers.map((server) => [server.id, server]));
+    const onlineById = { vanilla: vanillaOnline, mods: modsOnline };
+    const worlds: HomeWorld[] = MINECRAFT_SERVER_IDS.map((id) => {
+      const row = byId.get(id);
+      const parsed = parseMinecraftServerId(row?.id ?? id) ?? id;
+      const status = minecraftLinkStatus(row?.lastSeenAt ?? null);
+      const online = onlineById[id];
+      return {
+        id: parsed,
+        name: row?.name?.trim() || MINECRAFT_SERVER_DEFAULTS[id].name,
+        selected: parsed === selectedId,
+        linkStatus: status,
+        linkLabel: minecraftLinkStatusLabel(status),
+        playersState: online.state,
+        players: online.players,
+      };
+    });
+
+    const worldName = (id: MinecraftServerId) =>
+      worlds.find((world) => world.id === id)?.name ?? MINECRAFT_SERVER_DEFAULTS[id].name;
+
+    const mergedAlerts = [
+      ...vanillaAlerts.map((alert) => ({ ...alert, worldName: worldName("vanilla") })),
+      ...modsAlerts.map((alert) => ({ ...alert, worldName: worldName("mods") })),
+    ].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt));
+
+    const alerts: HomeAlert[] = mergedAlerts.slice(0, 8).map((alert) => {
+      const time = formatInstantMexicoColombia(new Date(alert.lastEventAt));
+      const summary = formatAlertTypeBreakdown(alert.counts).trim();
+      return {
+        id: alert.id,
+        worldName: alert.worldName,
+        gamertag: alert.gamertag,
+        summary: summary || `${alert.eventCount} eventos`,
+        timeMexico: time.mexico,
+        timeColombia: time.colombia,
+      };
+    });
+
+    const history: HomeAuditItem[] = events.map((event) => {
+      const time = formatInstantMexicoColombia(event.createdAt);
+      return {
+        id: event.id,
+        iso: event.createdAt.toISOString(),
+        timeMexico: time.mexico,
+        timeColombia: time.colombia,
+        memberId: event.memberId,
+        parts: describeAuditEvent(event).parts,
+      };
+    });
+
+    const newest: HomeJoiner[] = joiners.map((member) => {
+      const time = formatInstantMexicoColombia(member.createdAt);
+      const name = member.displayName?.trim();
+      return {
+        id: member.id,
+        gamertag: member.gamertag,
+        detail: member.leftAt ? "Se salió" : name || "En el directorio",
+        timeMexico: time.mexico,
+      };
+    });
+
+    const commandWorld =
+      worlds.find((world) => world.selected) ?? worlds[0];
+
+    return (
+      <HomeOverview
+        counts={{
+          active: active ?? 0,
+          inactive: inactive ?? 0,
+          newer: newer ?? 0,
+          absent: absent ?? 0,
+          protected: protectedCount,
+          left: left ?? 0,
+        }}
+        bot={presentHomeBot(await botPromise)}
+        worlds={worlds}
+        newest={newest}
+        alerts={alerts}
+        alertTotal={mergedAlerts.length}
+        alertsUnknown={false}
+        events={history}
+        originGamertag={panel.gamertag}
+        commandWorldName={commandWorld?.name ?? MINECRAFT_SERVER_DEFAULTS[selectedId].name}
+        commandWorldId={commandWorld?.id ?? selectedId}
+      />
+    );
+  } catch (error) {
+    if (isDatabaseUnreachableError(error)) {
       return <DatabaseUnavailable />;
     }
-    throw e;
+    throw error;
   }
-
-  const countryCodes = countryRows
-    .map((r) => r.phoneCountry)
-    .filter((c): c is string => Boolean(c));
-
-  const members: DirectoryMemberDTO[] = membersRaw.map((m) => ({
-    id: m.id,
-    gamertag: m.gamertag,
-    displayName: m.displayName,
-    age: m.age,
-    phone: m.phone,
-    phoneCountry: m.phoneCountry,
-    whatsappUsername: m.whatsappUsername,
-    active: m.active,
-    activeOn: activeOnByTag.get(m.gamertag.trim().toLowerCase()) ?? [],
-    permanentlyActive: m.permanentlyActive,
-    absentWithCause: m.absentWithCause,
-    absentReason: m.absentReason,
-    isAdmin: m.isAdmin,
-    banExempt: m.banExempt,
-    leftAt: m.leftAt?.toISOString() ?? null,
-    banned: m.banned,
-    bannedReason: m.bannedReason,
-    notes: m.notes,
-    createdAt: m.createdAt.toISOString(),
-    strikes: m.strikes.map((s) => ({
-      id: s.id,
-      kind: s.kind === "definitive" ? "definitive" : "pending",
-      reason: s.reason,
-      createdAt: s.createdAt.toISOString(),
-    })),
-  }));
-
-  return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Personas
-        </h2>
-        <p className="mt-1 text-sm text-zinc-500">
-          Gamertag, celular, edad, strikes, baneos y filtros por rol o situación.
-        </p>
-      </div>
-      <DirectorySection
-        filters={filters}
-        countryCodes={countryCodes}
-        members={members}
-        rosterCounts={rosterCounts}
-      />
-    </section>
-  );
 }

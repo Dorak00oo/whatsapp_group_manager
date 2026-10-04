@@ -19,73 +19,75 @@ export default async function DashboardAjustesPage() {
 
   const serverId = await getSelectedMinecraftServerId();
 
+  let data;
   try {
-    const [server, config, servers, installs] = await Promise.all([
+    data = await Promise.all([
       getMinecraftServer(serverId),
       ensureMinecraftConfig(serverId),
       listMinecraftServers(),
       listMinecraftInstalls(),
     ]);
-
-    return (
-      <section className="flex flex-col gap-6">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Ajustes de {server.name}
-          </h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            Arriba ves si Vanilla y Mods están hablando con el panel y asignás
-            cada dedicated. Si cambiás el mundo, borrá esa conexión y asigná el
-            UUID nuevo. Abajo se edita el mundo seleccionado. Sincronizar
-            ajustes empuja umbrales y listas de config al addon; las
-            blacklist/whitelist se sincronizan en Jugadores → Listas.
-          </p>
-        </div>
-
-        <MinecraftServersConnection
-          selectedWorld={serverId}
-          initialServers={servers.map((s) => ({
-            id: s.id,
-            name: s.name,
-            flavor: s.flavor,
-            edition: s.edition,
-            lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
-            lastVersion: s.lastVersion,
-            lastWorldName: s.lastWorldName,
-          }))}
-          initialInstalls={installs.map((row) => ({
-            id: row.id,
-            serverId: row.serverId,
-            lastWorldName: row.lastWorldName,
-            lastVersion: row.lastVersion,
-            lastSeenAt: row.lastSeenAt.toISOString(),
-            assignedAt: row.assignedAt?.toISOString() ?? null,
-          }))}
-        />
-
-        <MinecraftWorldSettingsForm
-          key={`${serverId}-settings`}
-          serverId={serverId}
-          initialName={server.name}
-          config={{
-            daysInactive: config.daysInactive,
-            daysBlacklist: config.daysBlacklist,
-            daysPurge: config.daysPurge,
-            snapshotRetentionDays: config.snapshotRetentionDays,
-            snapshotKeepMinimum: config.snapshotKeepMinimum,
-          }}
-        />
-
-        <MinecraftBannedItemsSection
-          key={`${serverId}-banned`}
-          initialItems={parseBannedItems(config.bannedItemsJson)}
-        />
-      </section>
-    );
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
       return <DatabaseUnavailable />;
     }
     throw e;
   }
+  const [server, config, servers, installs] = data;
+
+  return (
+    <section className="flex flex-col gap-6">
+      <div>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          Ajustes de {server.name}
+        </h2>
+        <p className="mt-1 text-sm text-zinc-500">
+          Arriba ves si Vanilla y Mods están hablando con el panel y asignás
+          cada dedicated. Si cambiás el mundo, borrá esa conexión y asigná el
+          UUID nuevo. Abajo se edita el mundo seleccionado. Sincronizar
+          ajustes empuja umbrales y listas de config al addon; las
+          blacklist/whitelist se sincronizan en Jugadores → Listas.
+        </p>
+      </div>
+
+      <MinecraftServersConnection
+        selectedWorld={serverId}
+        initialServers={servers.map((s) => ({
+          id: s.id,
+          name: s.name,
+          flavor: s.flavor,
+          edition: s.edition,
+          lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
+          lastVersion: s.lastVersion,
+          lastWorldName: s.lastWorldName,
+        }))}
+        initialInstalls={installs.map((row) => ({
+          id: row.id,
+          serverId: row.serverId,
+          lastWorldName: row.lastWorldName,
+          lastVersion: row.lastVersion,
+          lastSeenAt: row.lastSeenAt.toISOString(),
+          assignedAt: row.assignedAt?.toISOString() ?? null,
+        }))}
+      />
+
+      <MinecraftWorldSettingsForm
+        key={`${serverId}-settings`}
+        serverId={serverId}
+        initialName={server.name}
+        config={{
+          daysInactive: config.daysInactive,
+          daysBlacklist: config.daysBlacklist,
+          daysPurge: config.daysPurge,
+          snapshotRetentionDays: config.snapshotRetentionDays,
+          snapshotKeepMinimum: config.snapshotKeepMinimum,
+        }}
+      />
+
+      <MinecraftBannedItemsSection
+        key={`${serverId}-banned`}
+        initialItems={parseBannedItems(config.bannedItemsJson)}
+      />
+    </section>
+  );
 }

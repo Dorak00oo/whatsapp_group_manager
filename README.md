@@ -1,6 +1,6 @@
 # Panel de directorio (WhatsApp / comunidad)
 
-Aplicación web para gestionar un **directorio de personas** (gamertag, teléfono, situación en la comunidad, strikes y baneos). Incluye autenticación con una sola cuenta comunitaria, filtros por rol o situación e **importación masiva desde Excel o archivos exportados de Google Sheets**.
+Aplicación web para gestionar un **directorio de personas** (gamertag, teléfono, situación en la comunidad, strikes y baneos). Incluye acceso por gamertag para los admins (ver [Entrar al panel y cuentas](#entrar-al-panel-y-cuentas)), historial de cambios, filtros por rol o situación e **importación y exportación CSV**.
 
 ## Stack
 
@@ -8,7 +8,6 @@ Aplicación web para gestionar un **directorio de personas** (gamertag, teléfon
 - **PostgreSQL** con **Prisma** 7 y adaptador `pg` (p. ej. [Neon](https://neon.tech))
 - **Auth.js** (NextAuth v5) con proveedor **Credentials** (sin registro público)
 - **Tailwind CSS** 4
-- **SheetJS** (`xlsx`) para lectura de hojas de cálculo
 
 ## Requisitos
 
@@ -35,7 +34,10 @@ Aplicación web para gestionar un **directorio de personas** (gamertag, teléfon
    |----------|-------------|
    | `DATABASE_URL` | URL `postgresql://…` (Neon u otro Postgres) |
    | `AUTH_SECRET` | Secreto para sesiones (`openssl rand -base64 32`) |
-   | `COMMUNITY_EMAIL` / `COMMUNITY_PASSWORD` | Única cuenta de acceso al panel |
+   | `COMMUNITY_EMAIL` | Identifica la fila `User` dueña del directorio. Ya no se escribe al entrar; no lo cambies en producción |
+   | `COMMUNITY_PASSWORD` | Contraseña grupal: la usan las cuentas de admin junto con su gamertag |
+   | `PANEL_OWNER_GAMERTAG` | Dueño del panel (por defecto `Drako274`) |
+   | `PANEL_OWNER_PASSWORD` | Contraseña propia del dueño. Sin ella el dueño no puede entrar |
    | `AUTH_URL` | Origen completo en local si no usas el puerto 3000 (ej. `http://localhost:3001`) |
 
 3. Aplica migraciones y regenera el cliente Prisma (obligatorio tras `git pull` si cambió `prisma/schema.prisma`):
@@ -66,14 +68,28 @@ Aplicación web para gestionar un **directorio de personas** (gamertag, teléfon
 
 `postinstall` ejecuta `prisma generate` (el cliente se genera en `src/generated/prisma`, ignorado en git).
 
+## Entrar al panel y cuentas
+
+- **Login** (`/login`): gamertag + contraseña.
+  - El dueño (`PANEL_OWNER_GAMERTAG`, por defecto Drako274) entra solo con `PANEL_OWNER_PASSWORD`; la contraseña grupal no le sirve.
+  - Cualquier otro gamertag necesita una **cuenta del panel** y entra con `COMMUNITY_PASSWORD`.
+  - Las mayúsculas del gamertag no importan. Si el gamertag no tiene cuenta o la contraseña no es la suya, el mensaje es el mismo, «Gamertag o contraseña incorrectos.», para no revelar qué cuentas existen.
+  - Límite en memoria del proceso: 5 fallos por IP o 10 por gamertag en 15 min bloquean 15 min. La IP sale de `cf-connecting-ip`, luego `x-forwarded-for`, luego `x-real-ip`. Reiniciar el contenedor borra los contadores.
+- **Cuentas e historial** (`/dashboard/cuentas`):
+  - **Historial** (lo ven todas las cuentas): quién hizo qué, sobre quién y cuándo, desde el panel, el bot de WhatsApp o el sistema. Filtros por miembro, por quién lo hizo y por acción; 50 por página. Desde *Editar* de un miembro, **Ver historial** abre `?member=<id>`.
+  - **Cuentas** (solo el dueño, validado en el servidor): buscar miembros del directorio que siguen en la comunidad, darles cuenta o quitarla. Cada alta o baja queda en el historial.
+- **Sesiones**: duran 30 días, pero se revalidan en cada petición. Quitar una cuenta cierra su sesión en su siguiente clic (cuando es el mismo proceso, al instante; si no, en ≤ 3 s). Cambiar `COMMUNITY_PASSWORD` cierra las sesiones de todas las cuentas; cambiar `PANEL_OWNER_PASSWORD`, las del dueño. Las sesiones de antes de este cambio (con email) piden entrar de nuevo.
+- Para registrar eventos desde otros módulos: `recordAuditEvent()` en `src/lib/audit-log.ts` (nunca lanza; si falla solo deja `console.error`) y `getPanelActor()` en `src/lib/panel-session.ts` para el actor del panel.
+
 ## Funcionalidades del panel
 
 - **Lista** (`/dashboard`): búsqueda, filtros por estado, país, cohortes (nuevos, activos, inactivos, se salieron, admins, protegidos, etc.). Edad opcional en la tarjeta y en editar. Notas que eran solo la edad (`18`, `18 años`) pasan a esa columna al aplicar la migración.
-- **Agregar** (`/dashboard/agregar`): alta manual (gamertag, nombre, **edad**, celular o @usuario) y bloque **Importar desde Excel o Google Sheets**.
-  - Formatos: `.xlsx`, `.xls`, `.csv`, `.tsv`.
-  - Se procesan **todas las hojas** del libro que tengan cabeceras reconocibles (jugador + teléfono).
-  - Plantillas: `GET /dashboard/agregar/plantilla` (Excel) y `?format=csv` (CSV).
-  - Sin `+` en el número hace falta columna de **país** (ISO2, ej. `MX`) o número en formato internacional.
+- **Agregar** (`/dashboard/agregar`): alta manual (gamertag, nombre, **edad**, celular o @usuario) y, al final, **Importar y exportar (CSV)**.
+  - **Exportar CSV** (`GET /dashboard/agregar/exportar`): todo el directorio, UTF-8 con BOM y separador coma.
+  - **Descargar plantilla** (`GET /dashboard/agregar/plantilla`): las mismas columnas, vacía.
+  - **Importar CSV**: coma o punto y coma. Quien ya esté (mismo teléfono, @usuario o gamertag) se salta y se lista; no se pisa. Las altas nuevas quedan protegidas 5 días.
+  - Columnas: gamertag, nombre, teléfono, país, usuario de WhatsApp, edad, situación (`activo`, `inactivo`, `permanente`, `ausente`, `se_salio`), activo, causa de ausencia, admin, protegido (sin ban), activo permanente, baneado, motivo del ban y notas.
+  - Sin `+` en el número hace falta la columna de **país** (ISO2, ej. `MX`).
 - **Minecraft** (`/dashboard/minecraft`, parcela, monitoreo, comandos, **ajustes**): dos mundos Bedrock (Vanilla y Mods).
   - El selector cambia roster, parcelas, monitoreo y comandos del mundo elegido.
   - Ajustes: conexión en vivo de los dos BDS (asignar o **borrar** el UUID si cambiás el mundo), umbrales e ítems baneados del mundo seleccionado. **Sincronizar ajustes** empuja esa config al addon.
@@ -90,6 +106,7 @@ Guía ordenada (**primero datos y migraciones contra Supabase, después cambio d
    - `DATABASE_URL`
    - `AUTH_SECRET`
    - `COMMUNITY_EMAIL` y `COMMUNITY_PASSWORD`
+   - `PANEL_OWNER_PASSWORD` (y `PANEL_OWNER_GAMERTAG` si el dueño no es Drako274)
    - Opcional: `AUTH_URL` con la URL pública del sitio si hiciera falta para el callback de auth.
 3. En **Vercel → Settings → General → Build Command**, usa por ejemplo:
 
@@ -99,11 +116,11 @@ Guía ordenada (**primero datos y migraciones contra Supabase, después cambio d
 
    Así cada despliegue aplica migraciones pendientes en Neon (p. ej. la columna `display_name` para nombre + gamertag). `npm run build` ya incluye `prisma generate`.
 
-La sección de importación Excel está en **`/dashboard/agregar`**, debajo del formulario manual (no en la vista solo-lista).
+La sección de CSV está en **`/dashboard/agregar`**, debajo del formulario manual.
 
 ### «El nombre es opcional, ¿por qué falla la importación?»
 
-En la app el nombre es opcional, pero en PostgreSQL hace falta la **columna** `display_name` (puede ser NULL en todas las filas). Si el código nuevo se desplegó pero **no** ejecutaste `npx prisma migrate deploy` en esa base, cualquier alta (Excel o formulario) fallará hasta aplicar la migración.
+En la app el nombre es opcional, pero en PostgreSQL hace falta la **columna** `display_name` (puede ser NULL en todas las filas). Si el código nuevo se desplegó pero **no** ejecutaste `npx prisma migrate deploy` en esa base, cualquier alta (CSV o formulario) fallará hasta aplicar la migración.
 
 ## Documentación Next.js
 

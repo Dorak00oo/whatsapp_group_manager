@@ -24,17 +24,14 @@ function regionLabel(code: string | null): string | null {
 
 function MemberNotesBlock({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
-  const [canToggle, setCanToggle] = useState(false);
+  const [overflows, setOverflows] = useState(false);
   const pRef = useRef<HTMLParagraphElement>(null);
+  const canToggle = expanded || overflows;
 
   const measure = useCallback(() => {
     const el = pRef.current;
-    if (!el) return;
-    if (expanded) {
-      setCanToggle(true);
-      return;
-    }
-    setCanToggle(el.scrollHeight > el.clientHeight + 1);
+    if (!el || expanded) return;
+    setOverflows(el.scrollHeight > el.clientHeight + 1);
   }, [expanded]);
 
   useLayoutEffect(() => {

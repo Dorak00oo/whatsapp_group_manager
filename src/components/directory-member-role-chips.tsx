@@ -1,4 +1,6 @@
 import { memberIsNew } from "@/lib/directory-cohort";
+import { hasTemporaryProtection } from "@/lib/directory-protection";
+import { temporaryProtectionCopy } from "@/lib/directory-protection-label";
 import { memberRosterSituation } from "@/lib/directory-situation";
 import type { DirectoryMemberDTO } from "@/types/directory";
 
@@ -14,9 +16,20 @@ type Props = { m: DirectoryMemberDTO; compact?: boolean };
 export function DirectoryMemberRoleChips({ m, compact }: Props) {
   const isNew = memberIsNew(m.createdAt, m.leftAt);
   const situation = memberRosterSituation(m);
+  const until = m.permanentlyActiveUntil ? new Date(m.permanentlyActiveUntil) : null;
+  const temporary =
+    until != null &&
+    !m.permanentlyActive &&
+    hasTemporaryProtection({ permanentlyActiveUntil: until });
+  const temporaryCopy = temporary && until ? temporaryProtectionCopy(until) : null;
 
-  const chips: { key: string; label: string; short: string; className: string }[] =
-    [];
+  const chips: {
+    key: string;
+    label: string;
+    short: string;
+    className: string;
+    title?: string;
+  }[] = [];
 
   if (m.isAdmin) {
     chips.push({
@@ -87,6 +100,15 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       className: `${base} bg-slate-200 text-slate-900 ring-slate-400/90 dark:bg-slate-800/90 dark:text-slate-100 dark:ring-slate-500/70`,
     });
   }
+  if (temporaryCopy) {
+    chips.push({
+      key: "temp-permanent",
+      label: temporaryCopy.chip,
+      short: temporaryCopy.chip,
+      title: `Colombia: ${temporaryCopy.colombia}`,
+      className: `${base} bg-amber-200 text-amber-950 ring-amber-400/85 tabular-nums dark:bg-amber-950/75 dark:text-amber-100 dark:ring-amber-700/65`,
+    });
+  }
   if (isNew && !m.leftAt) {
     chips.push({
       key: "new",
@@ -115,11 +137,20 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       ) : null}
       <div className="flex flex-wrap gap-2">
         {chips.map((c) => (
-          <span key={c.key} className={compact ? `${c.className} py-0.5` : `${c.className} px-3 py-1`}>
+          <span
+            key={c.key}
+            title={c.title}
+            className={compact ? `${c.className} py-0.5` : `${c.className} px-3 py-1`}
+          >
             {compact ? c.short : c.label}
           </span>
         ))}
       </div>
+      {temporaryCopy && !compact ? (
+        <p className="text-[11px] font-medium tabular-nums text-amber-950/80 dark:text-amber-100/80">
+          Colombia: {temporaryCopy.colombia}
+        </p>
+      ) : null}
     </div>
   );
 }

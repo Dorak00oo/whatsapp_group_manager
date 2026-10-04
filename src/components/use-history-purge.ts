@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   runHistoryPurge,
   type HistoryPurgeTick,
@@ -13,7 +13,9 @@ export function useHistoryPurge(url: string, onCleared: () => void) {
   const [error, setError] = useState<string | null>(null);
   const purgingRef = useRef(false);
   const onClearedRef = useRef(onCleared);
-  onClearedRef.current = onCleared;
+  useEffect(() => {
+    onClearedRef.current = onCleared;
+  }, [onCleared]);
 
   const start = useCallback(
     async (total: number) => {
