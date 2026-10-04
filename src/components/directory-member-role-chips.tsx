@@ -29,6 +29,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
     short: string;
     className: string;
     title?: string;
+    wide?: boolean;
   }[] = [];
 
   if (m.isAdmin) {
@@ -100,15 +101,6 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       className: `${base} bg-slate-200 text-slate-900 ring-slate-400/90 dark:bg-slate-800/90 dark:text-slate-100 dark:ring-slate-500/70`,
     });
   }
-  if (temporaryCopy) {
-    chips.push({
-      key: "temp-permanent",
-      label: temporaryCopy.chip,
-      short: temporaryCopy.chip,
-      title: `Colombia: ${temporaryCopy.colombia}`,
-      className: `${base} bg-amber-200 text-amber-950 ring-amber-400/85 tabular-nums dark:bg-amber-950/75 dark:text-amber-100 dark:ring-amber-700/65`,
-    });
-  }
   if (isNew && !m.leftAt) {
     chips.push({
       key: "new",
@@ -125,8 +117,20 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       className: `${base} bg-red-200 text-red-950 ring-2 ring-red-600/95 dark:bg-red-950/85 dark:text-red-50 dark:ring-red-500`,
     });
   }
+  if (temporaryCopy) {
+    chips.push({
+      key: "temp-permanent",
+      label: temporaryCopy.chip,
+      short: temporaryCopy.chip,
+      title: `Colombia: ${temporaryCopy.colombia}`,
+      wide: true,
+      className: `${base} bg-amber-200 text-amber-950 ring-amber-400/85 tabular-nums dark:bg-amber-950/75 dark:text-amber-100 dark:ring-amber-700/65`,
+    });
+  }
 
-  const wrap = compact ? "mt-0" : "mt-2 flex flex-col gap-2";
+  const shortChips = chips.filter((c) => !c.wide);
+  const wideChips = chips.filter((c) => c.wide);
+  const wrap = compact ? "mt-2" : "mt-2 flex flex-col gap-2";
 
   return (
     <div className={wrap}>
@@ -135,8 +139,21 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
           Roles y situación
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        {chips.map((c) => (
+      <div className="flex flex-col items-start gap-2">
+        {shortChips.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {shortChips.map((c) => (
+              <span
+                key={c.key}
+                title={c.title}
+                className={compact ? `${c.className} py-0.5` : `${c.className} px-3 py-1`}
+              >
+                {compact ? c.short : c.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {wideChips.map((c) => (
           <span
             key={c.key}
             title={c.title}

@@ -16,10 +16,11 @@ test("los nuevos duran 5 días, igual que la protección", () => {
   assert.equal(memberIsNew(created, "2026-10-02T00:00:00.000Z", still), false);
 });
 
-test("la insignia temporal dice hasta la hora de México", () => {
+test("la insignia temporal dice el día, sin la hora", () => {
   const copy = temporaryProtectionCopy(new Date("2026-10-09T18:00:00Z"));
   assert.match(copy.chip, /^Activo permanente · temporal · hasta /);
-  assert.ok(copy.mexico.length > 0);
+  assert.match(copy.chip, /9/);
+  assert.doesNotMatch(copy.chip, /\d:\d{2}|[ap]\.\s*m/i);
+  assert.doesNotMatch(copy.mexico, /\d:\d{2}|[ap]\.\s*m/i);
   assert.ok(copy.colombia.length > 0);
-  assert.notEqual(copy.chip, copy.colombia);
 });

@@ -1,4 +1,12 @@
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+const DATE_ONLY: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+};
+
+function formatDate(d: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("es-MX", { ...DATE_ONLY, timeZone }).format(d);
+}
 
 /** Insignia de activo permanente cuando la protección es solo la de los 5 días. */
 export function temporaryProtectionCopy(until: Date): {
@@ -6,10 +14,11 @@ export function temporaryProtectionCopy(until: Date): {
   mexico: string;
   colombia: string;
 } {
-  const zones = formatInstantMexicoColombia(until);
+  const mexico = formatDate(until, "America/Mexico_City");
+  const colombia = formatDate(until, "America/Bogota");
   return {
-    chip: `Activo permanente · temporal · hasta ${zones.mexico}`,
-    mexico: zones.mexico,
-    colombia: zones.colombia,
+    chip: `Activo permanente · temporal · hasta ${mexico}`,
+    mexico,
+    colombia,
   };
 }
