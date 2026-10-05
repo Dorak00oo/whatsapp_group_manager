@@ -316,24 +316,26 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
             onClick={startGamertagCompare}
             className={softBtnLavender}
           >
-            {isPending ? "Comparando…" : "Conciliar gamertags"}
+            {isPending ? "Comparando…" : "Comparar activos"}
           </button>
-          <button
-            type="button"
-            disabled={candidates.length === 0}
-            onClick={() => {
-              setMessage(null);
-              setDialogOpen(true);
-            }}
-            className={softBtnPeach}
-            title={
-              candidates.length === 0
-                ? "No hay activos en MC fuera del directorio o del grupo"
-                : undefined
-            }
-          >
-            Conciliar blacklist
-          </button>
+          {compared ? (
+            <button
+              type="button"
+              disabled={candidates.length === 0 || isPending}
+              onClick={() => {
+                setMessage(null);
+                setDialogOpen(true);
+              }}
+              className={softBtnPeach}
+              title={
+                candidates.length === 0
+                  ? "No hay activos en MC fuera del directorio o del grupo"
+                  : undefined
+              }
+            >
+              Actualizar blacklist
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -345,8 +347,8 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
 
       {!compared ? (
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Pulsa <span className="font-medium">Conciliar gamertags</span> para
-          comparar las listas (orden alfabético).
+          Pulsa <span className="font-medium">Comparar activos</span> para
+          ver las dos listas en orden alfabético.
         </p>
       ) : (
         <>

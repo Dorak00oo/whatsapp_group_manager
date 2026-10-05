@@ -199,11 +199,7 @@ export function GamertagAuditPanel() {
         onClick={start}
         className={`${softBtnPrimary} self-start`}
       >
-        {running
-          ? "Comparando…"
-          : phase === "done"
-            ? "Volver a comparar"
-            : "Iniciar comparación"}
+        {running ? "Conciliando…" : "Conciliar gamertags"}
       </button>
 
       {error ? (
