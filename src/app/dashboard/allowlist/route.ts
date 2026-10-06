@@ -1,3 +1,4 @@
+import { memberMcAccounts } from "@/lib/member-mc-accounts";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -19,13 +20,14 @@ export async function GET() {
 
   const members = await prisma.directoryMember.findMany({
     where: { userId, active: true, leftAt: null },
-    select: { gamertag: true, isAdmin: true },
+    select: { gamertag: true, mcAccount2: true, mcAccount3: true, isAdmin: true },
     orderBy: { gamertag: "asc" },
   });
 
   const allowlist = members
-    .map((m) => ({ gamertag: m.gamertag.trim(), isAdmin: m.isAdmin }))
-    .filter((m) => m.gamertag.length > 0)
+    .flatMap((m) =>
+      memberMcAccounts(m).map((gamertag) => ({ gamertag, isAdmin: m.isAdmin })),
+    )
     .map((m) => ({
       ignoresPlayerLimit: m.isAdmin,
       name: m.gamertag,

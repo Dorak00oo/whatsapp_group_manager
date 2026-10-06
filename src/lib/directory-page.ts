@@ -13,6 +13,7 @@ import {
   type DirectoryPageCursor,
   type DirectoryUrlFilters,
 } from "@/lib/directory-query";
+import { memberActiveOnWorlds } from "@/lib/member-mc-accounts";
 import { activeOnByGamertagMap } from "@/lib/minecraft-directory-sync";
 import { prisma } from "@/lib/prisma";
 import type { DirectoryMemberDTO } from "@/types/directory";
@@ -30,13 +31,15 @@ function toDirectoryMemberDto(
   return {
     id: member.id,
     gamertag: member.gamertag,
+    mcAccount2: member.mcAccount2,
+    mcAccount3: member.mcAccount3,
     displayName: member.displayName,
     age: member.age,
     phone: member.phone,
     phoneCountry: member.phoneCountry,
     whatsappUsername: member.whatsappUsername,
     active: member.active,
-    activeOn: activeOnByTag.get(member.gamertag.trim().toLowerCase()) ?? [],
+    activeOn: memberActiveOnWorlds(member, activeOnByTag),
     permanentlyActive: member.permanentlyActive,
     permanentlyActiveUntil: member.permanentlyActiveUntil?.toISOString() ?? null,
     absentWithCause: member.absentWithCause,

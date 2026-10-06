@@ -1,3 +1,4 @@
+import { memberMcAccounts } from "@/lib/member-mc-accounts";
 import { prisma } from "@/lib/prisma";
 import {
   allowlistRemovalServerIds,
@@ -156,10 +157,14 @@ export async function enqueueAllowlistRemovalForMember(
   userId: string,
   member: {
     gamertag: string;
+    mcAccount2?: string | null;
+    mcAccount3?: string | null;
     allowlistSyncedAt: Date | null;
     allowlistRemovedAt: Date | null;
   },
 ): Promise<void> {
   if (!member.allowlistSyncedAt || member.allowlistRemovedAt) return;
-  await enqueueAllowlistRemoval(userId, member.gamertag, "all");
+  for (const tag of memberMcAccounts(member)) {
+    await enqueueAllowlistRemoval(userId, tag, "all");
+  }
 }

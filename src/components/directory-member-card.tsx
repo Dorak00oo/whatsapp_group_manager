@@ -155,6 +155,12 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
                     {m.strikes.length} strike{m.strikes.length === 1 ? "" : "s"}
                   </span>
                 </div>
+                {m.mcAccount2 || m.mcAccount3 ? (
+                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    También:{" "}
+                    {[m.mcAccount2, m.mcAccount3].filter(Boolean).join(" · ")}
+                  </p>
+                ) : null}
                 {m.displayName ? (
                   <p className="mt-0.5 text-sm text-zinc-600 dark:text-zinc-400">
                     {m.displayName.trim()}

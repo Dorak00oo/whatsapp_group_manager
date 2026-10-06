@@ -25,6 +25,12 @@ model User {
 model DirectoryMember {
   id                     String                      @id @default(cuid())
   gamertag               String
+  /**
+   * Otras cuentas de Minecraft de la misma persona. El gamertag principal
+   * sigue siendo el de la ficha y el del ingreso al panel.
+   */
+  mcAccount2             String?                     @map("mc_account_2")
+  mcAccount3             String?                     @map("mc_account_3")
   displayName            String?                     @map("display_name")
   /**
    * Edad opcional (antes se escribía en notes).

@@ -1,3 +1,4 @@
+import { memberMcAccounts } from "@/lib/member-mc-accounts";
 import { prisma } from "@/lib/prisma";
 import {
   alreadyRemovedAllowlistGamertags,
@@ -123,18 +124,16 @@ export async function pendingCorrectedAllowlistSync(
         active: true,
         allowlistAddPending: true,
       },
-      select: { gamertag: true },
+      select: { gamertag: true, mcAccount2: true, mcAccount3: true },
     }),
     prisma.directoryMember.findMany({
       where: { userId, leftAt: null, active: true },
-      select: { gamertag: true },
+      select: { gamertag: true, mcAccount2: true, mcAccount3: true },
     }),
   ]);
 
   const activeRoster = new Set(
-    activeMembers
-      .map((m) => m.gamertag.trim().toLowerCase())
-      .filter(Boolean),
+    activeMembers.flatMap((m) => memberMcAccounts(m).map((tag) => tag.toLowerCase())),
   );
 
   const byMember = new Map<string, PendingCorrectionRow[]>();
@@ -198,11 +197,12 @@ export async function pendingCorrectedAllowlistSync(
   }
 
   for (const member of reactivations) {
-    const tag = member.gamertag.trim();
-    if (!tag || !isPlausibleGamertag(tag) || seenAdd.has(tag)) continue;
-    if (!activeRoster.has(tag.toLowerCase())) continue;
-    seenAdd.add(tag);
-    toAdd.push(tag);
+    for (const tag of memberMcAccounts(member)) {
+      if (!isPlausibleGamertag(tag) || seenAdd.has(tag)) continue;
+      if (!activeRoster.has(tag.toLowerCase())) continue;
+      seenAdd.add(tag);
+      toAdd.push(tag);
+    }
   }
 
   const removedAlready = await alreadyRemovedAllowlistGamertags(

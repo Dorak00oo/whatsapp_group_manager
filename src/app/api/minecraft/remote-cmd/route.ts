@@ -10,6 +10,7 @@ import {
 } from "@/lib/allowlist-removal";
 import { recordAuditEvent } from "@/lib/audit-log";
 import { DIRECTORY_NEW_MEMBER_DAYS } from "@/lib/directory-cohort";
+import { memberMcAccounts } from "@/lib/member-mc-accounts";
 import {
   requireMinecraftAddon,
   requireMinecraftPanel,
@@ -80,14 +81,17 @@ async function auditWorldName(serverId: MinecraftServerId): Promise<string> {
   return MINECRAFT_SERVER_DEFAULTS[serverId].name;
 }
 
-function dedupedTrimmedGamertags(members: { gamertag: string }[]): string[] {
+function dedupedTrimmedGamertags(
+  members: { gamertag: string; mcAccount2?: string | null; mcAccount3?: string | null }[],
+): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const m of members) {
-    const tag = m.gamertag.trim();
-    if (!tag || seen.has(tag)) continue;
-    seen.add(tag);
-    out.push(tag);
+    for (const tag of memberMcAccounts(m)) {
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      out.push(tag);
+    }
   }
   return out;
 }
@@ -119,7 +123,7 @@ async function newMemberGamertags(
         allowlistSyncedAt: null,
         createdAt: { gte: cutoff },
       },
-      select: { gamertag: true },
+      select: { gamertag: true, mcAccount2: true, mcAccount3: true },
     }),
   );
   return dedupedTrimmedGamertags(members).filter(

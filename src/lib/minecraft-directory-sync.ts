@@ -22,6 +22,7 @@ import {
   type MinecraftServerId,
 } from "@/lib/minecraft-server";
 import { ensureMinecraftServers } from "@/lib/minecraft-servers-db";
+import { memberMcAccounts } from "@/lib/member-mc-accounts";
 
 const MC_SYNC_ACTOR = {
   actorType: "sistema" as const,
@@ -94,12 +95,17 @@ export async function syncDirectoryActiveForGamertags(
   const tags = uniqueTags(gamertags);
   if (tags.length === 0) return { userId, changes: [] };
 
-  const tagWhere = tags.map((t) => ({
+  const playerWhere = tags.map((t) => ({
     gamertag: { equals: t, mode: "insensitive" as const },
   }));
+  const memberWhere = tags.flatMap((t) => [
+    { gamertag: { equals: t, mode: "insensitive" as const } },
+    { mcAccount2: { equals: t, mode: "insensitive" as const } },
+    { mcAccount3: { equals: t, mode: "insensitive" as const } },
+  ]);
   const [players, members] = await Promise.all([
     prisma.minecraftPlayer.findMany({
-      where: { OR: tagWhere },
+      where: { OR: playerWhere },
       select: {
         gamertag: true,
         serverId: true,
@@ -108,10 +114,12 @@ export async function syncDirectoryActiveForGamertags(
       },
     }),
     prisma.directoryMember.findMany({
-      where: { userId, OR: tagWhere },
+      where: { userId, OR: memberWhere },
       select: {
         id: true,
         gamertag: true,
+        mcAccount2: true,
+        mcAccount3: true,
         active: true,
         permanentlyActive: true,
         permanentlyActiveUntil: true,
@@ -127,6 +135,15 @@ export async function syncDirectoryActiveForGamertags(
   for (const tag of tags) {
     const key = tag.toLowerCase();
     mc.set(key, isCommunityActiveFromWorlds(grouped.get(key) ?? []));
+  }
+  for (const member of members) {
+    const accounts = memberMcAccounts(member).map((tag) => tag.toLowerCase());
+    const known = accounts.filter((key) => mc.has(key));
+    if (known.length === 0) continue;
+    mc.set(
+      member.gamertag.trim().toLowerCase(),
+      known.some((key) => mc.get(key) === true),
+    );
   }
   const plan = planHeartbeatDirectoryActive({
     members,
@@ -234,6 +251,8 @@ export async function syncDirectoryMembersFromMinecraftTable(
     select: {
       id: true,
       gamertag: true,
+      mcAccount2: true,
+      mcAccount3: true,
       displayName: true,
       active: true,
       permanentlyActive: true,
@@ -248,11 +267,10 @@ export async function syncDirectoryMembersFromMinecraftTable(
   let matchedGamertags = 0;
   for (const m of members) {
     const key = m.gamertag.trim().toLowerCase();
-    let activeInMc = mc.get(key);
-    if (activeInMc === undefined) {
-      activeInMc = isCommunityActiveFromWorlds(byTag.get(key) ?? []);
-      mc.set(key, activeInMc);
-    }
+    const activeInMc = memberMcAccounts(m).some((tag) =>
+      isCommunityActiveFromWorlds(byTag.get(tag.toLowerCase()) ?? []),
+    );
+    mc.set(key, activeInMc);
     if (activeInMc) matchedGamertags += 1;
   }
 

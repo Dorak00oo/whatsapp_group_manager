@@ -8,6 +8,10 @@ export type StrikeDTO = {
 export type DirectoryMemberDTO = {
   id: string;
   gamertag: string;
+  /** Segunda cuenta de Minecraft. Vacía si no tiene. */
+  mcAccount2: string | null;
+  /** Tercera cuenta de Minecraft. Vacía si no tiene. */
+  mcAccount3: string | null;
   /** Nombre real u hoja «nombres»; el identificador principal sigue siendo gamertag. */
   displayName: string | null;
   /** Edad opcional (1–99). */

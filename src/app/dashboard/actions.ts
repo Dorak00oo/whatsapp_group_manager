@@ -17,8 +17,14 @@ import {
 } from "@/lib/directory-strikes";
 import {
   cancelPendingAllowlistRemoval,
+  enqueueAllowlistRemoval,
   enqueueAllowlistRemovalForMember,
 } from "@/lib/allowlist-removal";
+import {
+  duplicateMcAccountMessage,
+  memberMcAccounts,
+  parseOptionalMcAccount,
+} from "@/lib/member-mc-accounts";
 import { prisma } from "@/lib/prisma";
 import { parseDirectoryAge } from "@/lib/directory-age";
 import { resolveDirectoryWhatsAppContact } from "@/lib/directory-whatsapp-contact";
@@ -58,6 +64,8 @@ const STALE_SESSION_ERROR =
 
 const PROFILE_AUDIT_FIELDS = [
   "gamertag",
+  "mcAccount2",
+  "mcAccount3",
   "displayName",
   "age",
   "phone",
@@ -311,6 +319,8 @@ export async function deleteDirectoryMember(id: string) {
     where: { id, userId },
     select: {
       gamertag: true,
+      mcAccount2: true,
+      mcAccount3: true,
       allowlistSyncedAt: true,
       allowlistRemovedAt: true,
     },
@@ -348,6 +358,8 @@ export async function updateDirectoryMemberNotes(
   const notes = String(formData.get("notes") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "").trim();
   const gamertag = String(formData.get("gamertag") ?? "").trim();
+  const mcAccount2 = parseOptionalMcAccount(formData.get("mcAccount2"));
+  const mcAccount3 = parseOptionalMcAccount(formData.get("mcAccount3"));
   const usernameRaw = String(formData.get("whatsappUsername") ?? "").trim();
   const phoneIso = String(formData.get("phoneCountry") ?? "")
     .trim()
@@ -357,6 +369,9 @@ export async function updateDirectoryMemberNotes(
   if (!ageParsed.ok) return { error: ageParsed.error };
   if (!id) return { error: "Falta el identificador" };
   if (!gamertag) return { error: "El gamertag es obligatorio" };
+  const accountTags = memberMcAccounts({ gamertag, mcAccount2, mcAccount3 });
+  const duplicateAccounts = duplicateMcAccountMessage(accountTags);
+  if (duplicateAccounts) return { error: duplicateAccounts };
 
   const contact = resolveDirectoryWhatsAppContact({
     phoneIso,
@@ -367,6 +382,8 @@ export async function updateDirectoryMemberNotes(
 
   const afterProfile = {
     gamertag,
+    mcAccount2,
+    mcAccount3,
     displayName: displayName || null,
     age: ageParsed.age,
     phone: contact.phone,
@@ -381,6 +398,8 @@ export async function updateDirectoryMemberNotes(
       where: { id, userId },
       select: {
         gamertag: true,
+        mcAccount2: true,
+        mcAccount3: true,
         displayName: true,
         age: true,
         phone: true,
@@ -390,6 +409,24 @@ export async function updateDirectoryMemberNotes(
       },
     });
     if (!before) return { error: "No encontrado" };
+
+    const taken = await prisma.directoryMember.findFirst({
+      where: {
+        userId,
+        id: { not: id },
+        OR: accountTags.flatMap((tag) => [
+          { gamertag: { equals: tag, mode: "insensitive" as const } },
+          { mcAccount2: { equals: tag, mode: "insensitive" as const } },
+          { mcAccount3: { equals: tag, mode: "insensitive" as const } },
+        ]),
+      },
+      select: { gamertag: true },
+    });
+    if (taken) {
+      return {
+        error: `Esa cuenta de Minecraft ya está en ${taken.gamertag}.`,
+      };
+    }
 
     profileChanges = diffAuditChanges(before, afterProfile, PROFILE_AUDIT_FIELDS);
 
@@ -401,6 +438,23 @@ export async function updateDirectoryMemberNotes(
 
     if (before.gamertag.trim() !== gamertag) {
       await recordPendingGamertagCorrection(id, before.gamertag, gamertag);
+    }
+    const beforeKeys = new Set(
+      memberMcAccounts(before).map((tag) => tag.toLowerCase()),
+    );
+    const added = accountTags.filter((tag) => !beforeKeys.has(tag.toLowerCase()));
+    const afterKeys = new Set(accountTags.map((tag) => tag.toLowerCase()));
+    const removed = memberMcAccounts(before).filter(
+      (tag) => !afterKeys.has(tag.toLowerCase()),
+    );
+    if (added.length > 0) {
+      await prisma.directoryMember.updateMany({
+        where: { id, userId },
+        data: { allowlistAddPending: true },
+      });
+    }
+    for (const tag of removed) {
+      await enqueueAllowlistRemoval(userId, tag, "all");
     }
   } catch (e) {
     if (isMissingDisplayNameColumnError(e)) {
@@ -469,6 +523,8 @@ export async function setDirectoryMemberSituation(
       absentReason: true,
       absentActiveSince: true,
       gamertag: true,
+      mcAccount2: true,
+      mcAccount3: true,
       allowlistSyncedAt: true,
       allowlistRemovedAt: true,
     },
@@ -511,7 +567,9 @@ export async function setDirectoryMemberSituation(
   });
 
   if (reactivated) {
-    await cancelPendingAllowlistRemoval(userId, before.gamertag);
+    for (const tag of memberMcAccounts(before)) {
+      await cancelPendingAllowlistRemoval(userId, tag);
+    }
   } else if (deactivated) {
     await enqueueAllowlistRemovalForMember(userId, before);
   }
@@ -697,6 +755,8 @@ export async function setDirectoryMemberBan(formData: FormData) {
     where: { id: memberId, userId },
     select: {
       gamertag: true,
+      mcAccount2: true,
+      mcAccount3: true,
       banned: true,
       banExempt: true,
       allowlistSyncedAt: true,
@@ -811,6 +871,8 @@ export async function setDirectoryMemberLeft(id: string, left: boolean) {
     where: { id, userId },
     select: {
       gamertag: true,
+      mcAccount2: true,
+      mcAccount3: true,
       active: true,
       leftAt: true,
       allowlistSyncedAt: true,
