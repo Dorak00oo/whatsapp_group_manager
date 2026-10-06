@@ -219,7 +219,13 @@ export async function bulkImportDirectoryMembers(
 
   const existing: CsvExistingIdentity[] = await prisma.directoryMember.findMany({
     where: { userId },
-    select: { gamertag: true, phone: true, whatsappUsername: true },
+    select: {
+      gamertag: true,
+      mcAccount2: true,
+      mcAccount3: true,
+      phone: true,
+      whatsappUsername: true,
+    },
   });
   const plan = planCsvImport(parsed, existing);
   const actor = await getPanelActor();
@@ -233,6 +239,8 @@ export async function bulkImportDirectoryMembers(
       const inserted = await prisma.directoryMember.createManyAndReturn({
         data: chunk.map((row) => ({
           gamertag: row.gamertag,
+          mcAccount2: row.mcAccount2,
+          mcAccount3: row.mcAccount3,
           displayName: row.displayName,
           age: row.age,
           phone: row.phone,

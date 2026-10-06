@@ -11,13 +11,17 @@ export const CSV_MAX_ROWS = 5000;
 
 /**
  * Mismas columnas al exportar y en la plantilla.
+ * Si se agrega un dato de la ficha, hay que sumarlo aquí. Ver docs/directorio-csv.md.
  * `protegido` = exento de ban (como el import histórico).
  * `activo_permanente` = el flag manual, distinto de la protección de 5 días.
  * `situacion`: se_salio | ausente | permanente | activo | inactivo.
  * `activo` distingue ausente en la columna de activos o de inactivos.
+ * `cuenta_2` y `cuenta_3` son la segunda y tercera cuenta de Minecraft.
  */
 export const DIRECTORY_CSV_HEADERS = [
   "gamertag",
+  "cuenta_2",
+  "cuenta_3",
   "nombre",
   "telefono",
   "pais",
@@ -43,6 +47,8 @@ export type DirectoryCsvSituation =
 
 export type DirectoryCsvRecord = {
   gamertag: string;
+  mcAccount2: string | null;
+  mcAccount3: string | null;
   displayName: string | null;
   phone: string | null;
   phoneCountry: string | null;
@@ -62,6 +68,8 @@ export type DirectoryCsvRecord = {
 export type CsvMemberInput = {
   rowNumber: number;
   gamertag: string;
+  mcAccount2: string | null;
+  mcAccount3: string | null;
   displayName: string | null;
   telefono: string;
   pais: string;
@@ -85,11 +93,15 @@ export type CsvExistingIdentity = {
   gamertag: string;
   phone: string | null;
   whatsappUsername: string | null;
+  mcAccount2?: string | null;
+  mcAccount3?: string | null;
 };
 
 export type CsvCreateRow = {
   rowNumber: number;
   gamertag: string;
+  mcAccount2: string | null;
+  mcAccount3: string | null;
   displayName: string | null;
   phone: string | null;
   phoneCountry: string | null;
@@ -116,6 +128,8 @@ export type CsvImportPlan = {
 type MemberColumn =
   | "nombre"
   | "gamertag"
+  | "cuenta2"
+  | "cuenta3"
   | "telefono"
   | "pais"
   | "usuario"
@@ -134,6 +148,16 @@ type MemberColumn =
 const EXACT_HEADERS: Record<string, MemberColumn> = {
   gamertag: "gamertag",
   gamertags: "gamertag",
+  cuenta_2: "cuenta2",
+  cuenta2: "cuenta2",
+  segunda_cuenta: "cuenta2",
+  mc_account_2: "cuenta2",
+  gamertag_2: "cuenta2",
+  cuenta_3: "cuenta3",
+  cuenta3: "cuenta3",
+  tercera_cuenta: "cuenta3",
+  mc_account_3: "cuenta3",
+  gamertag_3: "cuenta3",
   nombre: "nombre",
   nombres: "nombre",
   telefono: "telefono",
@@ -163,6 +187,18 @@ const KEYWORDS: Record<MemberColumn, readonly string[]> = {
     "apodo",
     "alias",
     "ign",
+  ],
+  cuenta2: [
+    "cuenta 2",
+    "segunda cuenta",
+    "segunda cuenta de minecraft",
+    "gamertag 2",
+  ],
+  cuenta3: [
+    "cuenta 3",
+    "tercera cuenta",
+    "tercera cuenta de minecraft",
+    "gamertag 3",
   ],
   telefono: [
     "telefono",
@@ -300,6 +336,8 @@ function assignHeaderIndices(headerRow: string[]): Map<MemberColumn, number> {
     used.add(i);
   }
   const order: { col: MemberColumn; minScore: number }[] = [
+    { col: "cuenta2", minScore: 0.8 },
+    { col: "cuenta3", minScore: 0.8 },
     { col: "gamertag", minScore: 0.72 },
     { col: "telefono", minScore: 0.72 },
     { col: "usuario", minScore: 0.8 },
@@ -421,6 +459,8 @@ export function directorySituationForExport(m: {
 
 export function memberToDirectoryCsvRecord(m: {
   gamertag: string;
+  mcAccount2?: string | null;
+  mcAccount3?: string | null;
   displayName: string | null;
   phone: string | null;
   phoneCountry: string | null;
@@ -440,6 +480,8 @@ export function memberToDirectoryCsvRecord(m: {
   const situation = directorySituationForExport(m);
   return {
     gamertag: m.gamertag,
+    mcAccount2: m.mcAccount2?.trim() || null,
+    mcAccount3: m.mcAccount3?.trim() || null,
     displayName: m.displayName,
     phone: m.phone,
     phoneCountry: m.phoneCountry,
@@ -463,6 +505,8 @@ export function serializeDirectoryCsv(records: DirectoryCsvRecord[]): string {
   for (const r of records) {
     const cells = [
       r.gamertag,
+      r.mcAccount2 ?? "",
+      r.mcAccount3 ?? "",
       r.displayName ?? "",
       r.phone ?? "",
       r.phoneCountry ?? "",
@@ -672,6 +716,8 @@ export function parseDirectoryCsv(bufferOrText: Buffer | string): CsvMemberInput
     out.push({
       rowNumber: r + 1,
       gamertag,
+      mcAccount2: at(row, idx, "cuenta2") || null,
+      mcAccount3: at(row, idx, "cuenta3") || null,
       displayName: displayNameRaw || null,
       telefono,
       pais: at(row, idx, "pais"),
@@ -711,6 +757,12 @@ function gamertagKey(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function identityGamertagKeys(identity: CsvExistingIdentity): string[] {
+  return [identity.gamertag, identity.mcAccount2, identity.mcAccount3]
+    .map((tag) => gamertagKey(tag ?? ""))
+    .filter(Boolean);
+}
+
 /**
  * Salta filas que ya existen (teléfono, @usuario o gamertag) y las repetidas
  * dentro del mismo archivo. No pisa datos.
@@ -723,6 +775,8 @@ export function planCsvImport(
     gamertag: e.gamertag,
     phone: e.phone,
     whatsappUsername: e.whatsappUsername,
+    mcAccount2: e.mcAccount2,
+    mcAccount3: e.mcAccount3,
   }));
   const create: CsvCreateRow[] = [];
   const skipped: CsvImportPlan["skipped"] = [];
@@ -763,10 +817,22 @@ export function planCsvImport(
       });
       continue;
     }
-    if (tag && known.some((e) => gamertagKey(e.gamertag) === gamertagKey(tag))) {
+    const rowTags = [tag, row.mcAccount2, row.mcAccount3]
+      .map((value) => gamertagKey(value ?? ""))
+      .filter(Boolean);
+    if (new Set(rowTags).size !== rowTags.length) {
+      errors.push({
+        rowNumber: row.rowNumber,
+        message: "Las cuentas de Minecraft no pueden repetirse en la misma fila",
+      });
+      continue;
+    }
+    const knownTags = new Set(known.flatMap(identityGamertagKeys));
+    const repeated = rowTags.find((key) => knownTags.has(key));
+    if (repeated) {
       skipped.push({
         rowNumber: row.rowNumber,
-        gamertag: tag,
+        gamertag: tag || repeated,
         reason: "Mismo gamertag",
       });
       continue;
@@ -799,6 +865,8 @@ export function planCsvImport(
     create.push({
       rowNumber: row.rowNumber,
       gamertag: tag,
+      mcAccount2: row.mcAccount2,
+      mcAccount3: row.mcAccount3,
       displayName: row.displayName,
       phone: phone?.phone ?? null,
       phoneCountry: phone?.phoneCountry ?? null,
@@ -819,6 +887,8 @@ export function planCsvImport(
       gamertag: tag,
       phone: phone?.phone ?? null,
       whatsappUsername: row.whatsappUsername,
+      mcAccount2: row.mcAccount2,
+      mcAccount3: row.mcAccount3,
     });
   }
 

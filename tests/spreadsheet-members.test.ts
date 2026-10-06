@@ -11,6 +11,8 @@ import {
 
 const sample: DirectoryCsvRecord = {
   gamertag: "Steve",
+  mcAccount2: "SteveAlt",
+  mcAccount3: null,
   displayName: "Ana, la nota",
   phone: "+52 55 1234 5678",
   phoneCountry: "MX",
@@ -47,7 +49,7 @@ test("exportar e importar el mismo CSV no crea a nadie", () => {
   };
   const csv = serializeDirectoryCsv([sample, other]);
   assert.equal(csv.charCodeAt(0), 0xfeff);
-  assert.match(csv, /^﻿gamertag,nombre,telefono,/);
+  assert.match(csv, /^﻿gamertag,cuenta_2,cuenta_3,nombre,telefono,/);
 
   const parsed = parseDirectoryCsv(csv);
   assert.equal(parsed.length, 2);
@@ -57,6 +59,8 @@ test("exportar e importar el mismo CSV no crea a nadie", () => {
   assert.equal(parsed[0]?.active, true);
   assert.equal(parsed[1]?.permanentlyActive, true);
   assert.equal(parsed[1]?.whatsappUsername, "alex_mc");
+  assert.equal(parsed[0]?.mcAccount2, "SteveAlt");
+  assert.equal(parsed[0]?.mcAccount3, null);
 
   const plan = planCsvImport(parsed, [
     {
@@ -98,6 +102,16 @@ test("cabeceras flexibles de la hoja vieja", () => {
   assert.equal(parsed[0]?.displayName, "Ana");
   assert.equal(parsed[0]?.gamertag, "Steve");
   assert.equal(parsed[0]?.banExempt, true);
+});
+
+test("salta si la segunda cuenta ya es el gamertag de otra persona", () => {
+  const csv =
+    "gamertag,cuenta_2,telefono\nNuevo,Steve,+57 300 999 8877\n";
+  const plan = planCsvImport(parseDirectoryCsv(csv), [
+    { gamertag: "Steve", phone: null, whatsappUsername: null },
+  ]);
+  assert.equal(plan.create.length, 0);
+  assert.equal(plan.skipped[0]?.reason, "Mismo gamertag");
 });
 
 test("salta por teléfono aunque el gamertag sea nuevo", () => {
