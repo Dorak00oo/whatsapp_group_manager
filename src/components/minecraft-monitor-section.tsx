@@ -19,7 +19,7 @@ import {
   MONITOR_PAGE_SIZE,
   type MonitorEventType,
 } from "@/lib/minecraft-monitor";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { useFormatInstant } from "@/components/viewer-clock";
 import { HistoryPurgeDialog } from "@/components/history-purge-dialog";
 import { HistoryPurgeProgress } from "@/components/history-purge-progress";
 import { useHistoryPurge } from "@/components/use-history-purge";
@@ -42,8 +42,7 @@ export type MonitorEventRow = {
   gamertag: string;
   event: MonitorEventType;
   occurredAt: string;
-  timeMexico: string;
-  timeColombia: string;
+  timeLabel: string;
   x: number | null;
   y: number | null;
   z: number | null;
@@ -103,15 +102,12 @@ function mapApiEvents(
     fireId: string | null;
     relatedFireId: string | null;
   }>,
+  formatTime: (d: Date) => string,
 ): MonitorEventRow[] {
-  return raw.map((e) => {
-    const zones = formatInstantMexicoColombia(new Date(e.occurredAt));
-    return {
-      ...e,
-      timeMexico: zones.mexico,
-      timeColombia: zones.colombia,
-    };
-  });
+  return raw.map((e) => ({
+    ...e,
+    timeLabel: formatTime(new Date(e.occurredAt)),
+  }));
 }
 
 /** Páginas a mostrar: siempre 1 y última; ventana centrada en `current`. */
@@ -142,6 +138,7 @@ export function MinecraftMonitorSection({
   alerts: initialAlerts,
   monitorExclude: initialExclude,
 }: Props) {
+  const formatTime = useFormatInstant();
   const [events, setEvents] = useState(initialEvents);
   const [totalEvents, setTotalEvents] = useState(initialTotal);
   const [page, setPage] = useState(1);
@@ -228,9 +225,9 @@ export function MinecraftMonitorSection({
       page: data.page ?? pageNum,
       totalPages: pages,
       alerts: data.alerts ?? [],
-      events: mapApiEvents(data.events),
+      events: mapApiEvents(data.events, formatTime),
     };
-  }, [appliedQuery]);
+  }, [appliedQuery, formatTime]);
 
   function applyLoaded(
     data: NonNullable<Awaited<ReturnType<typeof loadPage>>>,
@@ -690,10 +687,7 @@ export function MinecraftMonitorSection({
                       className="border-t border-zinc-200/70 dark:border-zinc-800/70"
                     >
                       <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
-                        <div>{e.timeMexico}</div>
-                        <div className="text-[10px] opacity-70">
-                          {e.timeColombia}
-                        </div>
+                        {e.timeLabel}
                       </td>
                       <td className="px-3 py-2">
                         <Link
@@ -725,10 +719,7 @@ export function MinecraftMonitorSection({
                 <div className="flex items-start justify-between gap-2">
                   <MonitorActionLabel event={e} />
                   <span className="shrink-0 text-right text-xs text-zinc-600 dark:text-zinc-400">
-                    <span className="block">{e.timeMexico}</span>
-                    <span className="block text-[11px] opacity-70">
-                      {e.timeColombia}
-                    </span>
+                    {e.timeLabel}
                   </span>
                 </div>
                 <Link

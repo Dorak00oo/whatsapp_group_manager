@@ -2,18 +2,23 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftParcelSection } from "@/components/minecraft-parcel-section";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { formatInstant } from "@/lib/format-instant";
 import { PARCEL_PAGE_SIZE, isParcelDimension } from "@/lib/minecraft-parcel";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
+import { getPanelSession } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
+import { resolveViewerClock } from "@/lib/resolve-viewer-clock";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export default async function DashboardParcelaDetailPage({ params }: Ctx) {
   const session = await auth();
   if (!session?.user) return null;
+  const panel = await getPanelSession();
+  if (!panel) return null;
+  const clock = await resolveViewerClock(panel);
 
   const { id } = await params;
   const parcelId = id?.trim();
@@ -104,14 +109,12 @@ export default async function DashboardParcelaDetailPage({ params }: Ctx) {
           }}
           totalEvents={eventTotal}
           events={events.map((e) => {
-            const zones = formatInstantMexicoColombia(e.occurredAt);
             return {
               id: e.id,
               gamertag: e.gamertag,
               event: e.eventType as "enter" | "exit" | "chest_open",
               occurredAt: e.occurredAt.toISOString(),
-              timeMexico: zones.mexico,
-              timeColombia: zones.colombia,
+              timeLabel: formatInstant(e.occurredAt, clock.timeZone),
               x: e.posX,
               y: e.posY,
               z: e.posZ,

@@ -93,7 +93,7 @@ type Props = {
     active: number;
     inactive: number;
     blacklisted: number;
-    lastUpdate: { mexico: string; colombia: string } | null;
+    lastUpdate: string | null;
   } | null;
 };
 
@@ -286,18 +286,7 @@ export function MinecraftPlayersSection({
               <p className="font-medium text-zinc-600 dark:text-zinc-400">
                 Última actualización
               </p>
-              <p>
-                <span className="text-zinc-400 dark:text-zinc-500">
-                  México:{" "}
-                </span>
-                {summary.lastUpdate.mexico}
-              </p>
-              <p>
-                <span className="text-zinc-400 dark:text-zinc-500">
-                  Colombia:{" "}
-                </span>
-                {summary.lastUpdate.colombia}
-              </p>
+              <p>{summary.lastUpdate}</p>
             </div>
           )}
         </div>

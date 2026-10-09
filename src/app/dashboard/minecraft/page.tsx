@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftPlayersSection } from "@/components/minecraft-players-section";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { formatInstant } from "@/lib/format-instant";
 import {
   buildRosterFromSnapshot,
   playersOnAccessLists,
@@ -9,11 +9,16 @@ import {
 } from "@/lib/minecraft-active";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
+import { getPanelSession } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
+import { resolveViewerClock } from "@/lib/resolve-viewer-clock";
 
 export default async function MinecraftPage() {
   const session = await auth();
   if (!session?.user) return null;
+  const panel = await getPanelSession();
+  if (!panel) return null;
+  const clock = await resolveViewerClock(panel);
 
   let players: Awaited<ReturnType<typeof prisma.minecraftPlayer.findMany>>;
   let lastSnapshot: Awaited<
@@ -74,8 +79,8 @@ export default async function MinecraftPage() {
   const summaryInactive =
     lastSnapshot?.inactivePlayers ?? inactiveCount;
 
-  const lastUpdateZones = lastSnapshot
-    ? formatInstantMexicoColombia(lastSnapshot.timestamp)
+  const lastUpdate = lastSnapshot
+    ? formatInstant(lastSnapshot.timestamp, clock.timeZone)
     : null;
 
   return (
@@ -103,7 +108,7 @@ export default async function MinecraftPage() {
                 active: summaryActive,
                 inactive: summaryInactive,
                 blacklisted: blacklistedCount,
-                lastUpdate: lastUpdateZones,
+                lastUpdate,
               }
             : null
         }

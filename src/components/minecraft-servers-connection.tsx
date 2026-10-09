@@ -7,7 +7,7 @@ import {
   deleteMinecraftInstallAction,
 } from "@/app/dashboard/minecraft-install-actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { useFormatInstant } from "@/components/viewer-clock";
 import {
   MINECRAFT_SERVER_IDS,
   flavorLabel,
@@ -86,6 +86,7 @@ export function MinecraftServersConnection({
 }: Props) {
   const [servers, setServers] = useState(() => sortServers(initialServers));
   const [installs, setInstalls] = useState(initialInstalls);
+  const formatTime = useFormatInstant();
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -226,7 +227,7 @@ export function MinecraftServersConnection({
           </p>
           <ul className="mt-3 flex flex-col gap-3">
             {pending.map((row) => {
-              const seen = formatInstantMexicoColombia(new Date(row.lastSeenAt));
+              const seen = formatTime(new Date(row.lastSeenAt));
               return (
                 <li key={row.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -237,7 +238,7 @@ export function MinecraftServersConnection({
                       </span>
                     </p>
                     <p className="text-xs text-zinc-500">
-                      Último ping: {seen.mexico} (MX) · {seen.colombia} (CO)
+                      Último ping: {seen}
                       {row.lastVersion ? ` · ${row.lastVersion}` : ""}
                     </p>
                   </div>
@@ -283,7 +284,7 @@ export function MinecraftServersConnection({
           const id = parseMinecraftServerId(row.id) ?? "vanilla";
           const status = minecraftLinkStatus(row.lastSeenAt, nowMs);
           const lastSeen = row.lastSeenAt
-            ? formatInstantMexicoColombia(new Date(row.lastSeenAt))
+            ? formatTime(new Date(row.lastSeenAt))
             : null;
           const selected = id === selectedWorld;
           const linked = assignedByWorld.get(id);
@@ -315,7 +316,7 @@ export function MinecraftServersConnection({
               </p>
               <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
                 {lastSeen
-                  ? `Último ping: ${lastSeen.mexico} (MX) · ${lastSeen.colombia} (CO)`
+                  ? `Último ping: ${lastSeen}`
                   : "Este BDS todavía no ha llamado al panel."}
               </p>
               {linked ? (

@@ -12,7 +12,7 @@ import {
   type AuditEventRow,
   type AuditFilters,
 } from "@/lib/audit-log";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { formatInstant } from "@/lib/format-instant";
 import {
   MobileListItem,
   ResponsiveDataList,
@@ -43,8 +43,7 @@ const ACTION_TONE: Record<string, AuditActionTone> = {
 type AuditHistoryItem = {
   id: string;
   iso: string;
-  timeMexico: string;
-  timeColombia: string;
+  timeLabel: string;
   actionLabel: string;
   tone: AuditActionTone;
   originLabel: string;
@@ -52,13 +51,11 @@ type AuditHistoryItem = {
   parts: AuditLinePart[];
 };
 
-function toHistoryItem(row: AuditEventRow): AuditHistoryItem {
-  const time = formatInstantMexicoColombia(row.createdAt);
+function toHistoryItem(row: AuditEventRow, timeZone: string): AuditHistoryItem {
   return {
     id: row.id,
     iso: row.createdAt.toISOString(),
-    timeMexico: time.mexico,
-    timeColombia: time.colombia,
+    timeLabel: formatInstant(row.createdAt, timeZone),
     actionLabel: auditActionLabel(row.action),
     tone: ACTION_TONE[row.action] ?? "neutral",
     originLabel: auditActorTypeLabel(row.actorType),
@@ -136,10 +133,7 @@ function EventTime({ item, align = "left" }: { item: AuditHistoryItem; align?: "
       dateTime={item.iso}
       className={`block tabular-nums text-xs text-zinc-600 dark:text-zinc-400 ${align === "right" ? "text-right" : ""}`}
     >
-      <span className="block">{item.timeMexico}</span>
-      <span className="block text-[11px] text-zinc-500 dark:text-zinc-500">
-        {item.timeColombia} (CO)
-      </span>
+      {item.timeLabel}
     </time>
   );
 }
@@ -152,6 +146,7 @@ type Props = {
   filters: AuditFilters;
   /** Gamertag del miembro cuando se filtra por `?member=<id>`. */
   memberLabel: string | null;
+  timeZone: string;
 };
 
 export function AuditHistoryPanel({
@@ -161,8 +156,9 @@ export function AuditHistoryPanel({
   totalPages,
   filters,
   memberLabel,
+  timeZone,
 }: Props) {
-  const items = rows.map(toHistoryItem);
+  const items = rows.map((row) => toHistoryItem(row, timeZone));
   const hasFilters = Boolean(
     filters.memberId || filters.memberQuery || filters.actorQuery || filters.action,
   );
@@ -276,7 +272,7 @@ export function AuditHistoryPanel({
               <thead className="bg-zinc-100/80 text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-900/60 dark:text-zinc-400">
                 <tr>
                   <th scope="col" className="w-48 px-4 py-2.5 font-semibold">
-                    Cuándo (MX)
+                    Cuándo
                   </th>
                   <th scope="col" className="w-44 px-4 py-2.5 font-semibold">
                     Acción

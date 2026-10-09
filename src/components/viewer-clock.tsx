@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useCallback, useContext } from "react";
 import { formatInstant } from "@/lib/format-instant";
 
 const ViewerClockContext = createContext<string | null>(null);
@@ -27,5 +27,5 @@ export function useViewerTimeZone(): string {
 
 export function useFormatInstant() {
   const timeZone = useViewerTimeZone();
-  return (d: Date) => formatInstant(d, timeZone);
+  return useCallback((d: Date) => formatInstant(d, timeZone), [timeZone]);
 }

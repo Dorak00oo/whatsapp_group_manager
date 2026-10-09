@@ -10,19 +10,24 @@ import {
   STRIKE_KIND_DEFINITIVE,
   STRIKE_KIND_PENDING,
 } from "@/lib/directory-strikes";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { formatInstant } from "@/lib/format-instant";
 import {
   buildRosterFromSnapshot,
   snapshotStatusByGamertag,
 } from "@/lib/minecraft-active";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
+import { getPanelSession } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
+import { resolveViewerClock } from "@/lib/resolve-viewer-clock";
 
 export default async function DashboardAdministracionPage() {
   const session = await auth();
   if (!session?.user) return null;
+  const panel = await getPanelSession();
+  if (!panel) return null;
+  const clock = await resolveViewerClock(panel);
 
   let userId: string | null;
   try {
@@ -99,7 +104,7 @@ export default async function DashboardAdministracionPage() {
 
     compareData = buildActiveCompareData(waMembers, displayPlayers);
     snapshotAt = lastSnapshot
-      ? formatInstantMexicoColombia(lastSnapshot.timestamp).mexico
+      ? formatInstant(lastSnapshot.timestamp, clock.timeZone)
       : null;
     activeCount = waMembers.filter(
       (m) => m.active && m.leftAt == null,

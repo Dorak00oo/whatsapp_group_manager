@@ -29,7 +29,7 @@ export type HomeJoiner = {
   id: string;
   gamertag: string;
   detail: string;
-  timeMexico: string;
+  timeLabel: string;
 };
 
 export type HomeAlert = {
@@ -37,15 +37,13 @@ export type HomeAlert = {
   worldName: string;
   gamertag: string;
   summary: string;
-  timeMexico: string;
-  timeColombia: string;
+  timeLabel: string;
 };
 
 export type HomeAuditItem = {
   id: string;
   iso: string;
-  timeMexico: string;
-  timeColombia: string;
+  timeLabel: string;
   memberId: string | null;
   parts: AuditLinePart[];
 };
@@ -285,7 +283,7 @@ export function HomeOverview({
                         </span>
                         <span className="shrink-0 text-right text-sm text-zinc-700 dark:text-zinc-300">
                           <span className="block">{person.detail}</span>
-                          <span className="block tabular-nums text-zinc-500">{person.timeMexico}</span>
+                          <span className="block tabular-nums text-zinc-500">{person.timeLabel}</span>
                         </span>
                       </Link>
                     </li>
@@ -338,10 +336,7 @@ export function HomeOverview({
                         <time
                           className="shrink-0 text-right text-xs tabular-nums text-zinc-600 dark:text-zinc-400"
                         >
-                          <span className="block">{alert.timeMexico}</span>
-                          <span className="block text-[11px] text-zinc-500">
-                            {alert.timeColombia} (CO)
-                          </span>
+                          {alert.timeLabel}
                         </time>
                       </div>
                       <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
@@ -385,10 +380,7 @@ export function HomeOverview({
                     dateTime={event.iso}
                     className="text-xs tabular-nums text-zinc-600 dark:text-zinc-400"
                   >
-                    <span className="block">{event.timeMexico}</span>
-                    <span className="block text-[11px] text-zinc-500">
-                      {event.timeColombia} (CO)
-                    </span>
+                    {event.timeLabel}
                   </time>
                   <EventLine item={event} />
                 </li>

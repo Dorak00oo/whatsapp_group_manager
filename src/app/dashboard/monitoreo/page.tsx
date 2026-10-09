@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftMonitorSection } from "@/components/minecraft-monitor-section";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { formatInstant } from "@/lib/format-instant";
 import {
   DEFAULT_MONITOR_EXCLUDE,
   MONITOR_PAGE_SIZE,
@@ -11,11 +11,16 @@ import {
 import { listActiveMonitorAlerts } from "@/lib/minecraft-monitor-alerts";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
+import { getPanelSession } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
+import { resolveViewerClock } from "@/lib/resolve-viewer-clock";
 
 export default async function DashboardMonitoreoPage() {
   const session = await auth();
   if (!session?.user) return null;
+  const panel = await getPanelSession();
+  if (!panel) return null;
+  const clock = await resolveViewerClock(panel);
 
   let data;
   try {
@@ -32,14 +37,12 @@ export default async function DashboardMonitoreoPage() {
     ]);
 
     const mapped = events.map((e) => {
-      const zones = formatInstantMexicoColombia(e.occurredAt);
       return {
         id: e.id,
         gamertag: e.gamertag,
         event: e.eventType as MonitorEventType,
         occurredAt: e.occurredAt.toISOString(),
-        timeMexico: zones.mexico,
-        timeColombia: zones.colombia,
+        timeLabel: formatInstant(e.occurredAt, clock.timeZone),
         x: e.posX,
         y: e.posY,
         z: e.posZ,

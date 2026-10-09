@@ -7,18 +7,13 @@ import {
 import { listAuditEvents, parseAuditFilters } from "@/lib/audit-log";
 import { getPanelAuthEnv } from "@/lib/community-env";
 import { listPanelAccounts } from "@/lib/panel-accounts";
+import { formatInstantDate } from "@/lib/format-instant";
 import { requirePanelSession } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import { resolveViewerClock } from "@/lib/resolve-viewer-clock";
 
 type Search = Record<string, string | string[] | undefined>;
-
-const sinceFormat = new Intl.DateTimeFormat("es-MX", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "America/Mexico_City",
-});
 
 async function memberLabelFor(userId: string, memberId: string): Promise<string | null> {
   const member = await prisma.directoryMember.findFirst({
@@ -40,6 +35,7 @@ export default async function CuentasPage({
   searchParams: Promise<Search>;
 }) {
   const session = await requirePanelSession();
+  const clock = await resolveViewerClock(session);
   const filters = parseAuditFilters(await searchParams);
   const ownerGamertag = getPanelAuthEnv().ownerGamertag;
 
@@ -59,7 +55,7 @@ export default async function CuentasPage({
               displayName: r.displayName,
               isAdmin: r.isAdmin,
               hasLeft: r.leftAt !== null,
-              sinceLabel: sinceFormat.format(r.createdAt),
+              sinceLabel: formatInstantDate(r.createdAt, clock.timeZone),
               createdBy: r.createdBy,
             })),
           )
@@ -96,6 +92,7 @@ export default async function CuentasPage({
         totalPages={history.totalPages}
         filters={{ ...filters, page: history.page }}
         memberLabel={memberLabel}
+        timeZone={clock.timeZone}
       />
     </section>
   );

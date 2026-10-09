@@ -14,7 +14,7 @@ import {
   directoryListRedirectQuery,
   type DirectoryHomeCountKey,
 } from "@/lib/directory-query";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { formatInstant } from "@/lib/format-instant";
 import { fetchHomeBotStatus, presentHomeBot } from "@/lib/home-bot-status";
 import { formatAlertTypeBreakdown } from "@/lib/minecraft-monitor";
 import { listActiveMonitorAlerts } from "@/lib/minecraft-monitor-alerts";
@@ -38,6 +38,7 @@ import { requirePanelSession } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { resolveDirectoryUserId } from "@/lib/resolve-directory-user";
+import { resolveViewerClock } from "@/lib/resolve-viewer-clock";
 import { redirect } from "next/navigation";
 
 type Search = Record<string, string | string[] | undefined>;
@@ -68,6 +69,7 @@ export default async function DashboardHomePage({
   searchParams: Promise<Search>;
 }) {
   const panel = await requirePanelSession();
+  const clock = await resolveViewerClock(panel);
   const sp = await searchParams;
   const redirectQuery = directoryListRedirectQuery(sp);
   if (redirectQuery) redirect(`/dashboard/lista?${redirectQuery}`);
@@ -167,38 +169,33 @@ export default async function DashboardHomePage({
     ].sort((a, b) => b.lastEventAt.localeCompare(a.lastEventAt));
 
     const alerts: HomeAlert[] = mergedAlerts.slice(0, 8).map((alert) => {
-      const time = formatInstantMexicoColombia(new Date(alert.lastEventAt));
       const summary = formatAlertTypeBreakdown(alert.counts).trim();
       return {
         id: alert.id,
         worldName: alert.worldName,
         gamertag: alert.gamertag,
         summary: summary || `${alert.eventCount} eventos`,
-        timeMexico: time.mexico,
-        timeColombia: time.colombia,
+        timeLabel: formatInstant(new Date(alert.lastEventAt), clock.timeZone),
       };
     });
 
     const history: HomeAuditItem[] = events.map((event) => {
-      const time = formatInstantMexicoColombia(event.createdAt);
       return {
         id: event.id,
         iso: event.createdAt.toISOString(),
-        timeMexico: time.mexico,
-        timeColombia: time.colombia,
+        timeLabel: formatInstant(event.createdAt, clock.timeZone),
         memberId: event.memberId,
         parts: describeAuditEvent(event).parts,
       };
     });
 
     const newest: HomeJoiner[] = joiners.map((member) => {
-      const time = formatInstantMexicoColombia(member.createdAt);
       const name = member.displayName?.trim();
       return {
         id: member.id,
         gamertag: member.gamertag,
         detail: member.leftAt ? "Se salió" : name || "En el directorio",
-        timeMexico: time.mexico,
+        timeLabel: formatInstant(member.createdAt, clock.timeZone),
       };
     });
 

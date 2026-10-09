@@ -20,7 +20,7 @@ import {
   canDeleteParcel,
   type ParcelConfigPayload,
 } from "@/lib/minecraft-parcel";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { useFormatInstant } from "@/components/viewer-clock";
 import { tryParseCoordNumber } from "@/lib/xyz-coords";
 import { HistoryPurgeDialog } from "@/components/history-purge-dialog";
 import { HistoryPurgeProgress } from "@/components/history-purge-progress";
@@ -48,8 +48,7 @@ export type ParcelEventRow = {
   gamertag: string;
   event: "enter" | "exit" | "chest_open";
   occurredAt: string;
-  timeMexico: string;
-  timeColombia: string;
+  timeLabel: string;
   x: number | null;
   y: number | null;
   z: number | null;
@@ -154,15 +153,12 @@ function mapApiEvents(
     dimension: string | null;
     blockType: string | null;
   }>,
+  formatTime: (d: Date) => string,
 ): ParcelEventRow[] {
-  return raw.map((e) => {
-    const zones = formatInstantMexicoColombia(new Date(e.occurredAt));
-    return {
-      ...e,
-      timeMexico: zones.mexico,
-      timeColombia: zones.colombia,
-    };
-  });
+  return raw.map((e) => ({
+    ...e,
+    timeLabel: formatTime(new Date(e.occurredAt)),
+  }));
 }
 
 export function MinecraftParcelSection({
@@ -174,6 +170,7 @@ export function MinecraftParcelSection({
   directoryByTag,
 }: Props) {
   const router = useRouter();
+  const formatTime = useFormatInstant();
   const [parcelForm, setParcelForm] = useState(initialParcel);
   const [minDraft, setMinDraft] = useState(() =>
     xyzFromParcel(initialParcel, "min"),
@@ -264,9 +261,9 @@ export function MinecraftParcelSection({
       page: data.page ?? pageNum,
       totalPages:
         data.totalPages ?? Math.max(1, Math.ceil(total / PARCEL_PAGE_SIZE)),
-      events: mapApiEvents(data.events),
+      events: mapApiEvents(data.events, formatTime),
     };
-  }, [appliedQuery]);
+  }, [appliedQuery, formatTime]);
 
   function applyLoaded(
     data: NonNullable<Awaited<ReturnType<typeof loadFromApi>>>,
@@ -825,10 +822,7 @@ export function MinecraftParcelSection({
                           }
                         >
                           <td className="whitespace-nowrap px-3 py-2 text-xs text-zinc-600 dark:text-zinc-400">
-                            <div>{ev.timeMexico}</div>
-                            <div className="text-[10px] opacity-70">
-                              {ev.timeColombia}
-                            </div>
+                            {ev.timeLabel}
                           </td>
                           <td className="px-3 py-2">
                             <ParcelEventBadge event={ev} />
@@ -867,10 +861,7 @@ export function MinecraftParcelSection({
                     <div className="flex items-start justify-between gap-2">
                       <ParcelEventBadge event={ev} />
                       <span className="shrink-0 text-right text-xs text-zinc-600 dark:text-zinc-400">
-                        <span className="block">{ev.timeMexico}</span>
-                        <span className="block text-[11px] opacity-70">
-                          {ev.timeColombia}
-                        </span>
+                        {ev.timeLabel}
                       </span>
                     </div>
                     <Link

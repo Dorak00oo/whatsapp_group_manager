@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { formatInstantMexicoColombia } from "@/lib/format-time-mx-co";
+import { useFormatInstant } from "@/components/viewer-clock";
 import {
   MAX_EXTRA_PARCELS,
   canAddExtraParcel,
@@ -24,9 +24,12 @@ type Props = {
   parcels: ParcelHubCard[];
 };
 
-function lastEventLabel(card: ParcelHubCard): string {
+function lastEventLabel(
+  card: ParcelHubCard,
+  formatTime: (d: Date) => string,
+): string {
   if (!card.lastEventAt) return "Sin eventos aún";
-  const zones = formatInstantMexicoColombia(new Date(card.lastEventAt));
+  const time = formatTime(new Date(card.lastEventAt));
   const kind =
     card.lastEventType === "enter"
       ? "Entrada"
@@ -36,11 +39,12 @@ function lastEventLabel(card: ParcelHubCard): string {
           ? "Cofre"
           : "Evento";
   const who = card.lastEventGamertag ? ` · ${card.lastEventGamertag}` : "";
-  return `${kind}${who} · ${zones.mexico}`;
+  return `${kind}${who} · ${time}`;
 }
 
 export function MinecraftParcelHub({ parcels }: Props) {
   const router = useRouter();
+  const formatTime = useFormatInstant();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const extras = parcels.filter((p) => !p.isPrimary).length;
@@ -130,7 +134,7 @@ export function MinecraftParcelHub({ parcels }: Props) {
               {p.dimension} {formatParcelBounds(p)}
             </p>
             <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              {lastEventLabel(p)}
+              {lastEventLabel(p, formatTime)}
             </p>
             <div className="flex flex-wrap gap-2">
               <Link
