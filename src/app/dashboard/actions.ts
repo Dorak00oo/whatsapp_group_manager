@@ -894,7 +894,7 @@ export async function setDirectoryMemberLeft(id: string, left: boolean) {
   await prisma.directoryMember.updateMany({
     where: { id, userId },
     data: left
-      ? fieldsForLeavingGroup(leftAt)
+      ? fieldsForLeavingGroup(leftAt ?? new Date())
       : {
           leftAt: null,
           active: true,
