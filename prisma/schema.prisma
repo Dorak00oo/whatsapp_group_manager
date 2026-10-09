@@ -38,6 +38,7 @@ model DirectoryMember {
   age                    Int?
   phone                  String?
   phoneCountry           String?                     @map("phone_country")
+  timeZone               String?                     @map("time_zone")
   /**
    * Usuario público de WhatsApp (`drak00_oo`), distinto de displayName.
    * Identidad alternativa cuando WhatsApp no entrega el celular (LID).
