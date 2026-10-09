@@ -440,6 +440,10 @@ model GamertagAuditSuggestion {
   minecraftPlayerId String          @map("minecraft_player_id")
   minecraftPlayer   MinecraftPlayer @relation(fields: [minecraftPlayerId], references: [id], onDelete: Cascade)
   /**
+   * Cuenta de la ficha que se corrige: gamertag | mcAccount2 | mcAccount3.
+   */
+  accountSlot       String          @default("gamertag") @map("account_slot")
+  /**
    * Gamertag del directorio en el momento de detectar la sugerencia.
    */
   currentGamertag   String          @map("current_gamertag")

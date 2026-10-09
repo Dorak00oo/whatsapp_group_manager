@@ -5,16 +5,61 @@ import {
   shouldSuggestGamertagChange,
 } from "@/lib/gamertag-similarity";
 
-export type AuditDirectoryMember = { id: string; gamertag: string };
+export type McAccountSlot = "gamertag" | "mcAccount2" | "mcAccount3";
+
+export type AuditDirectoryMember = {
+  id: string;
+  gamertag: string;
+  mcAccount2?: string | null;
+  mcAccount3?: string | null;
+};
 export type AuditMinecraftPlayer = { id: string; gamertag: string };
 
 export type GamertagAuditCandidate = {
   directoryMemberId: string;
   minecraftPlayerId: string;
+  accountSlot: McAccountSlot;
   currentGamertag: string;
+  primaryGamertag: string;
   suggestedGamertag: string;
   similarity: number;
 };
+
+type TagRow = {
+  memberId: string;
+  slot: McAccountSlot;
+  gamertag: string;
+  primaryGamertag: string;
+};
+
+function memberTags(m: AuditDirectoryMember): TagRow[] {
+  const slots: { slot: McAccountSlot; value: string | null | undefined }[] = [
+    { slot: "gamertag", value: m.gamertag },
+    { slot: "mcAccount2", value: m.mcAccount2 },
+    { slot: "mcAccount3", value: m.mcAccount3 },
+  ];
+  const out: TagRow[] = [];
+  const seen = new Set<string>();
+  for (const s of slots) {
+    const tag = (s.value ?? "").trim();
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      memberId: m.id,
+      slot: s.slot,
+      gamertag: tag,
+      primaryGamertag: m.gamertag,
+    });
+  }
+  return out;
+}
+
+/** Valor de BD (string libre) a slot conocido; cualquier otro cae en la principal. */
+export function toAccountSlot(raw: string): McAccountSlot {
+  return raw === "mcAccount2" || raw === "mcAccount3" ? raw : "gamertag";
+}
 
 /**
  * Detecta pares (miembro del directorio, jugador de Minecraft) donde el
@@ -35,16 +80,15 @@ export function findGamertagAuditCandidates(
   players: AuditMinecraftPlayer[],
   threshold: number = GAMERTAG_SIMILARITY_THRESHOLD,
 ): GamertagAuditCandidate[] {
-  const exactMemberTags = new Set(
-    members.map((m) => m.gamertag.trim()).filter((t) => t.length > 0),
-  );
+  const tags = members.flatMap(memberTags);
+  const exactMemberTags = new Set(tags.map((t) => t.gamertag));
   const directoryTags = [...exactMemberTags];
   const minecraftTags = players
     .map((p) => p.gamertag.trim())
     .filter((t) => t.length > 0);
 
   type Pair = {
-    member: AuditDirectoryMember;
+    tag: TagRow;
     player: AuditMinecraftPlayer;
     score: number;
   };
@@ -55,38 +99,39 @@ export function findGamertagAuditCandidates(
     if (!playerTag) continue;
     if (exactMemberTags.has(playerTag)) continue;
 
-    for (const member of members) {
-      const memberTag = member.gamertag.trim();
-      if (!memberTag) continue;
+    for (const tag of tags) {
       if (
-        !shouldSuggestGamertagChange(memberTag, playerTag, {
+        !shouldSuggestGamertagChange(tag.gamertag, playerTag, {
           directoryTags,
           minecraftTags,
         })
       ) {
         continue;
       }
-      const score = gamertagSimilarity(memberTag, playerTag);
+      const score = gamertagSimilarity(tag.gamertag, playerTag);
       if (score >= threshold && score < 1) {
-        pairs.push({ member, player, score });
+        pairs.push({ tag, player, score });
       }
     }
   }
 
   pairs.sort((a, b) => b.score - a.score);
 
-  const usedMembers = new Set<string>();
+  const usedSlots = new Set<string>();
   const usedPlayers = new Set<string>();
   const out: GamertagAuditCandidate[] = [];
 
   for (const p of pairs) {
-    if (usedMembers.has(p.member.id) || usedPlayers.has(p.player.id)) continue;
-    usedMembers.add(p.member.id);
+    const slotKey = `${p.tag.memberId}:${p.tag.slot}`;
+    if (usedSlots.has(slotKey) || usedPlayers.has(p.player.id)) continue;
+    usedSlots.add(slotKey);
     usedPlayers.add(p.player.id);
     out.push({
-      directoryMemberId: p.member.id,
+      directoryMemberId: p.tag.memberId,
       minecraftPlayerId: p.player.id,
-      currentGamertag: p.member.gamertag,
+      accountSlot: p.tag.slot,
+      currentGamertag: p.tag.gamertag,
+      primaryGamertag: p.tag.primaryGamertag,
       suggestedGamertag: p.player.gamertag,
       similarity: Math.round(p.score * 100) / 100,
     });
@@ -139,10 +184,12 @@ async function applyGamertagAuditCandidates(
         currentGamertag: c.currentGamertag,
         suggestedGamertag: c.suggestedGamertag,
         similarity: c.similarity,
+        accountSlot: c.accountSlot,
       },
       create: {
         directoryMemberId: c.directoryMemberId,
         minecraftPlayerId: c.minecraftPlayerId,
+        accountSlot: c.accountSlot,
         currentGamertag: c.currentGamertag,
         suggestedGamertag: c.suggestedGamertag,
         similarity: c.similarity,
@@ -162,7 +209,7 @@ export async function syncGamertagAuditSuggestions(
   const [members, players] = await Promise.all([
     prisma.directoryMember.findMany({
       where: { userId, leftAt: null },
-      select: { id: true, gamertag: true },
+      select: { id: true, gamertag: true, mcAccount2: true, mcAccount3: true },
     }),
     prisma.minecraftPlayer.findMany({
       select: { id: true, gamertag: true },
@@ -176,7 +223,9 @@ export async function syncGamertagAuditSuggestions(
 export type PendingGamertagAuditSuggestion = {
   id: string;
   directoryMemberId: string;
+  accountSlot: McAccountSlot;
   currentGamertag: string;
+  primaryGamertag: string;
   displayName: string | null;
   suggestedGamertag: string;
   similarity: number;
@@ -191,10 +240,11 @@ export async function listPendingGamertagAuditSuggestions(
     select: {
       id: true,
       directoryMemberId: true,
+      accountSlot: true,
       currentGamertag: true,
       suggestedGamertag: true,
       similarity: true,
-      directoryMember: { select: { displayName: true } },
+      directoryMember: { select: { displayName: true, gamertag: true } },
     },
     orderBy: { similarity: "desc" },
   });
@@ -202,7 +252,9 @@ export async function listPendingGamertagAuditSuggestions(
   return rows.map((r) => ({
     id: r.id,
     directoryMemberId: r.directoryMemberId,
+    accountSlot: toAccountSlot(r.accountSlot),
     currentGamertag: r.currentGamertag,
+    primaryGamertag: r.directoryMember.gamertag,
     displayName: r.directoryMember.displayName,
     suggestedGamertag: r.suggestedGamertag,
     similarity: r.similarity,
@@ -230,7 +282,7 @@ export async function runGamertagAuditWithLog(
   log("Cargando gamertags activos del grupo de WhatsApp...");
   const members = await prisma.directoryMember.findMany({
     where: { userId, leftAt: null, active: true },
-    select: { id: true, gamertag: true },
+    select: { id: true, gamertag: true, mcAccount2: true, mcAccount3: true },
   });
   log(`  -> ${members.length} miembro(s) activo(s) cargado(s)`);
 
@@ -244,11 +296,13 @@ export async function runGamertagAuditWithLog(
   const totalMembers = members.length;
   members.forEach((member, i) => {
     const pct = totalMembers > 0 ? Math.round(((i + 1) / totalMembers) * 100) : 100;
-    log(`  Comprobando "${member.gamertag}"... (${i + 1}/${totalMembers} - ${pct}%)`);
+    for (const tag of memberTags(member)) {
+      log(`  Comprobando "${tag.gamertag}"... (${i + 1}/${totalMembers} - ${pct}%)`);
+    }
   });
 
   const exactMemberTags = new Set(
-    members.map((m) => m.gamertag.trim()).filter((t) => t.length > 0),
+    members.flatMap(memberTags).map((t) => t.gamertag),
   );
   const withoutExactMatch = players.filter((p) => {
     const tag = p.gamertag.trim();
@@ -269,7 +323,7 @@ export async function runGamertagAuditWithLog(
   } else {
     for (const c of candidates) {
       log(
-        `  [MATCH] "${c.currentGamertag}" (WhatsApp) ~ "${c.suggestedGamertag}" (Minecraft)`,
+        `  [MATCH] "${c.currentGamertag}" (${c.accountSlot === "gamertag" ? "WhatsApp" : `cuenta extra de ${c.primaryGamertag}`}) ~ "${c.suggestedGamertag}" (Minecraft)`,
       );
     }
   }

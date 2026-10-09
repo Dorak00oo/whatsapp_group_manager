@@ -88,7 +88,16 @@ function SuggestionRow({
           {suggestion.displayName ? `${suggestion.displayName} · ` : ""}
           <span className="line-through opacity-70">
             {suggestion.currentGamertag}
-          </span>{" "}
+          </span>
+          {suggestion.accountSlot !== "gamertag" ? (
+            <>
+              {" "}
+              <span className="text-xs font-normal text-zinc-600 dark:text-zinc-400">
+                (cuenta {suggestion.accountSlot === "mcAccount3" ? 3 : 2} de{" "}
+                {suggestion.primaryGamertag})
+              </span>
+            </>
+          ) : null}{" "}
           <span aria-hidden>→</span>{" "}
           <span className="font-semibold">{suggestion.suggestedGamertag}</span>
         </p>
