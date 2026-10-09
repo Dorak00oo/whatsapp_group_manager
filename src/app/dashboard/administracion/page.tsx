@@ -52,6 +52,8 @@ export default async function DashboardAdministracionPage() {
           id: true;
           gamertag: true;
           displayName: true;
+          mcAccount2: true;
+          mcAccount3: true;
           active: true;
           leftAt: true;
           strikes: { select: { id: true; kind: true; reason: true; createdAt: true } };
@@ -70,6 +72,8 @@ export default async function DashboardAdministracionPage() {
           id: true,
           gamertag: true,
           displayName: true,
+          mcAccount2: true,
+          mcAccount3: true,
           active: true,
           leftAt: true,
           strikes: {

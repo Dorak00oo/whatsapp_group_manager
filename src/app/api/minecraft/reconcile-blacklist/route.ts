@@ -75,6 +75,8 @@ export async function POST(request: Request) {
           id: true,
           gamertag: true,
           displayName: true,
+          mcAccount2: true,
+          mcAccount3: true,
           active: true,
           leftAt: true,
         },

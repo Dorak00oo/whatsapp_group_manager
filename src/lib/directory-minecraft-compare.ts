@@ -1,3 +1,5 @@
+import { memberMcAccounts } from "@/lib/member-mc-accounts";
+
 export type BlacklistReconcileReason = "not_in_directory" | "left_group";
 
 export type ActiveCompareEntry = {
@@ -54,6 +56,8 @@ type WhatsappMember = {
   id: string;
   gamertag: string;
   displayName: string | null;
+  mcAccount2?: string | null;
+  mcAccount3?: string | null;
   active: boolean;
   leftAt: Date | null;
 };
@@ -72,21 +76,36 @@ export function buildActiveCompareData(
 ): ActiveCompareData {
   const waByTag = new Map<string, WhatsappMember>();
   for (const m of waMembers) {
-    const key = tagKey(m.gamertag);
-    if (key) waByTag.set(key, m);
+    for (const tag of memberMcAccounts(m)) {
+      const key = tagKey(tag);
+      if (key) waByTag.set(key, m);
+    }
   }
 
-  const waActive = sortByGamertag(
-    waMembers
-      .filter((m) => m.leftAt == null && m.active)
-      .map((m) => ({
-        id: m.id,
-        gamertag: m.gamertag,
-        label: m.displayName?.trim()
-          ? `${m.displayName.trim()} · ${m.gamertag}`
-          : m.gamertag,
-      })),
-  );
+  const waActiveRows: ActiveCompareEntry[] = [];
+  for (const m of waMembers) {
+    if (m.leftAt != null || !m.active) continue;
+    const seen = new Set<string>();
+    const slots = [
+      ["gamertag", m.gamertag],
+      ["mcAccount2", m.mcAccount2],
+      ["mcAccount3", m.mcAccount3],
+    ] as const;
+    for (const [slot, raw] of slots) {
+      const tag = String(raw ?? "").trim();
+      const key = tagKey(tag);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      const label =
+        slot === "gamertag"
+          ? m.displayName?.trim()
+            ? `${m.displayName.trim()} · ${tag}`
+            : tag
+          : `${tag} · cuenta ${slot === "mcAccount2" ? "2" : "3"} de ${m.gamertag}`;
+      waActiveRows.push({ id: `${m.id}:${slot}`, gamertag: tag, label });
+    }
+  }
+  const waActive = sortByGamertag(waActiveRows);
 
   const ignoredBlacklisted = sortByGamertag(
     mcPlayers
