@@ -56,6 +56,16 @@ function memberTags(m: AuditDirectoryMember): TagRow[] {
   return out;
 }
 
+/** Datos de `directoryMember.update` para escribir `value` en el slot indicado. */
+export function slotUpdateData(
+  slot: McAccountSlot,
+  value: string,
+): { gamertag: string } | { mcAccount2: string } | { mcAccount3: string } {
+  if (slot === "mcAccount2") return { mcAccount2: value };
+  if (slot === "mcAccount3") return { mcAccount3: value };
+  return { gamertag: value };
+}
+
 /** Valor de BD (string libre) a slot conocido; cualquier otro cae en la principal. */
 export function toAccountSlot(raw: string): McAccountSlot {
   return raw === "mcAccount2" || raw === "mcAccount3" ? raw : "gamertag";

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { findGamertagAuditCandidates } from "../src/lib/gamertag-audit.ts";
+import {
+  findGamertagAuditCandidates,
+  slotUpdateData,
+} from "../src/lib/gamertag-audit.ts";
 
 test("un jugador que coincide exacto con un alt no se sugiere", () => {
   const out = findGamertagAuditCandidates(
@@ -20,4 +23,10 @@ test("un typo del alt sugiere corregir mcAccount2", () => {
   assert.equal(out[0]?.currentGamertag, "AnaAlt");
   assert.equal(out[0]?.suggestedGamertag, "Anaalt");
   assert.equal(out[0]?.primaryGamertag, "Ana");
+});
+
+test("slotUpdateData arma el update de cada slot", () => {
+  assert.deepEqual(slotUpdateData("gamertag", "Nuevo"), { gamertag: "Nuevo" });
+  assert.deepEqual(slotUpdateData("mcAccount2", "Alt2"), { mcAccount2: "Alt2" });
+  assert.deepEqual(slotUpdateData("mcAccount3", "Alt3"), { mcAccount3: "Alt3" });
 });

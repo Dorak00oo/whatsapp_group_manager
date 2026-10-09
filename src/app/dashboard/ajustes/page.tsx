@@ -15,7 +15,7 @@ import { listMinecraftInstalls } from "@/lib/minecraft-installs-db";
 import { getPanelSession } from "@/lib/panel-session";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
 import { findViewerMember, resolveViewerClock } from "@/lib/resolve-viewer-clock";
-import { timeZoneOptionsForCountry } from "@/lib/viewer-time-zone";
+import { timeZoneSettingsOptions } from "@/lib/viewer-time-zone";
 
 export default async function DashboardAjustesPage() {
   const session = await auth();
@@ -44,13 +44,11 @@ export default async function DashboardAjustesPage() {
   }
   const [server, config, servers, installs, clock, viewerMember] = data;
 
-  const baseOptions =
-    clock.decision.status === "needs_choice"
-      ? clock.decision.options
-      : timeZoneOptionsForCountry(viewerMember?.phoneCountry ?? null);
-  const timeZoneOptions = baseOptions.some((o) => o.id === clock.timeZone)
-    ? baseOptions
-    : [{ id: clock.timeZone, label: clock.timeZone }, ...baseOptions];
+  const timeZoneOptions = timeZoneSettingsOptions({
+    phoneCountry: viewerMember?.phoneCountry ?? null,
+    phone: viewerMember?.phone ?? null,
+    current: clock.timeZone,
+  });
 
   return (
     <section className="flex flex-col gap-6">

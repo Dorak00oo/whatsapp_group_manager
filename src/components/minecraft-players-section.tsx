@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useFormatInstant } from "@/components/viewer-clock";
 import { useEffect, useState, type ReactNode } from "react";

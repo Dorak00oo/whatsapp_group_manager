@@ -34,7 +34,7 @@ const options: {
   {
     value: "absent",
     label: "Ausente con causa",
-    hint: "Sigue ausente (card azul) en la columna donde esté. Minecraft sí lo mueve entre activos e inactivos. A los 7 días seguidos en activos pasa a activo normal. Hay que indicar la causa.",
+    hint: "Card azul en la columna donde esté. Minecraft lo mueve entre activos e inactivos; si pasa a Activos, deja de estar ausente al instante. Los 7 días solo cuentan si ya estaba en Activos: al cumplirlos pasa a activo normal. Hay que indicar la causa.",
     selected:
       "border-cyan-400 bg-cyan-100 text-cyan-950 dark:border-cyan-600 dark:bg-cyan-950/55 dark:text-cyan-50",
     idle: "border-zinc-300 bg-white text-zinc-700 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-300",

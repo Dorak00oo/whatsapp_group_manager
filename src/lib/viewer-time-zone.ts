@@ -1,3 +1,5 @@
+import { phoneToCountryCode } from "@/lib/phone-country";
+
 export type TimeZoneOption = { id: string; label: string };
 
 export type ViewerTimeZoneDecision =
@@ -52,12 +54,12 @@ const US_OPTIONS: TimeZoneOption[] = [
 ];
 
 const FALLBACK_OPTIONS: TimeZoneOption[] = [
-  ...MX_OPTIONS,
+  ...MX_OPTIONS.map((o) => ({ ...o, label: `México · ${o.label}` })),
   { id: "America/Bogota", label: "Colombia" },
   { id: "America/Lima", label: "Perú" },
   { id: "America/Argentina/Buenos_Aires", label: "Argentina" },
   { id: "Europe/Madrid", label: "España" },
-  ...US_OPTIONS,
+  ...US_OPTIONS.map((o) => ({ ...o, label: `EE. UU. · ${o.label}` })),
 ];
 
 export function isValidTimeZoneId(id: string): boolean {
@@ -78,6 +80,42 @@ export function timeZoneOptionsForCountry(iso: string | null): TimeZoneOption[] 
     return [{ id: zone, label: zone }];
   }
   return FALLBACK_OPTIONS;
+}
+
+/** Reloj del visor cuando Neon no responde: cookie válida o zona provisional, sin selector. */
+export function clockWhenDatabaseUnreachable(cookieZone: string | null): {
+  timeZone: string;
+  decision: ViewerTimeZoneDecision;
+} {
+  const timeZone =
+    cookieZone && isValidTimeZoneId(cookieZone)
+      ? cookieZone
+      : PROVISIONAL_TIME_ZONE;
+  return { timeZone, decision: { status: "ready", timeZone } };
+}
+
+/**
+ * Opciones del control de Ajustes: las del país primero, luego las generales
+ * (así siempre se puede cambiar), sin repetir ids y con la zona actual al final si falta.
+ */
+export function timeZoneSettingsOptions(input: {
+  phoneCountry: string | null;
+  phone: string | null;
+  current: string;
+}): TimeZoneOption[] {
+  const country =
+    input.phoneCountry ?? (input.phone ? phoneToCountryCode(input.phone) : null);
+  const out: TimeZoneOption[] = [];
+  const seen = new Set<string>();
+  for (const o of [...timeZoneOptionsForCountry(country), ...FALLBACK_OPTIONS]) {
+    if (seen.has(o.id)) continue;
+    seen.add(o.id);
+    out.push(o);
+  }
+  if (!seen.has(input.current)) {
+    out.push({ id: input.current, label: input.current });
+  }
+  return out;
 }
 
 export function decideViewerTimeZone(input: {

@@ -121,3 +121,60 @@ test("alt de alguien que se salió sigue siendo left_group", () => {
   );
   assert.equal(data.summary.mcActiveNotInWhatsappActive[0]?.reason, "left_group");
 });
+
+test("un desconocido sigue siendo not_in_directory aunque otros miembros tengan alts", () => {
+  const data = buildActiveCompareData(
+    [
+      {
+        id: "wa-1",
+        gamertag: "Ana",
+        displayName: null,
+        mcAccount2: "AnaAlt",
+        mcAccount3: null,
+        active: true,
+        leftAt: null,
+      },
+    ],
+    [
+      {
+        id: "mc-1",
+        gamertag: "Stranger99",
+        active: true,
+        isBlacklisted: false,
+        daysInactive: 3,
+      },
+    ],
+  );
+  assert.equal(
+    data.summary.mcActiveNotInWhatsappActive[0]?.reason,
+    "not_in_directory",
+  );
+});
+
+test("alt de un miembro inactivo que sigue en el grupo no es candidato a blacklist", () => {
+  const data = buildActiveCompareData(
+    [
+      {
+        id: "wa-1",
+        gamertag: "Ana",
+        displayName: null,
+        mcAccount2: "AnaAlt",
+        mcAccount3: null,
+        active: false,
+        leftAt: null,
+      },
+    ],
+    [
+      {
+        id: "mc-1",
+        gamertag: "AnaAlt",
+        active: true,
+        isBlacklisted: false,
+        daysInactive: 0,
+      },
+    ],
+  );
+  const row = data.summary.mcActiveNotInWhatsappActive[0];
+  assert.equal(row?.detail, "En directorio pero inactivo en WhatsApp");
+  assert.equal(row?.reason, null);
+});

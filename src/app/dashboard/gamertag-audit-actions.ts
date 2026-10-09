@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { recordAuditEvent } from "@/lib/audit-log";
 import type { GamertagAuditRunResult } from "@/lib/gamertag-audit";
-import { runGamertagAuditWithLog, toAccountSlot } from "@/lib/gamertag-audit";
+import {
+  runGamertagAuditWithLog,
+  slotUpdateData,
+  toAccountSlot,
+} from "@/lib/gamertag-audit";
 import { recordPendingGamertagCorrection } from "@/lib/allowlist-corrected";
 import { getPanelActor } from "@/lib/panel-session";
 import { prisma } from "@/lib/prisma";
@@ -66,21 +70,24 @@ export async function approveGamertagAuditSuggestion(
     }
 
     const slot = toAccountSlot(suggestion.accountSlot);
-    const data =
-      slot === "mcAccount2"
-        ? { mcAccount2: suggestion.suggestedGamertag }
-        : slot === "mcAccount3"
-          ? { mcAccount3: suggestion.suggestedGamertag }
-          : { gamertag: suggestion.suggestedGamertag };
+    const data = slotUpdateData(slot, suggestion.suggestedGamertag);
 
-    let primaryGamertag = suggestion.suggestedGamertag;
-    if (slot !== "gamertag") {
-      const member = await prisma.directoryMember.findUnique({
-        where: { id: suggestion.directoryMemberId },
-        select: { gamertag: true },
-      });
-      primaryGamertag = member?.gamertag ?? suggestion.suggestedGamertag;
+    const member = await prisma.directoryMember.findUnique({
+      where: { id: suggestion.directoryMemberId },
+      select: { gamertag: true, mcAccount2: true, mcAccount3: true },
+    });
+    if (!member) {
+      return { error: "El miembro ya no existe." };
     }
+    const slotValue = (member[slot] ?? "").trim();
+    if (slotValue !== suggestion.currentGamertag) {
+      return {
+        error: "La cuenta cambió desde la auditoría; vuelve a correrla.",
+      };
+    }
+
+    const primaryGamertag =
+      slot === "gamertag" ? suggestion.suggestedGamertag : member.gamertag;
 
     await prisma.$transaction([
       prisma.directoryMember.update({

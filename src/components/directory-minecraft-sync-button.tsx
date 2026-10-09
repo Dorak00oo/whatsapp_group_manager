@@ -64,9 +64,10 @@ export function DirectoryMinecraftSyncButton() {
           </Link>{" "}
           (mismo gamertag: activo/inactivo y blacklist; no cambia a quienes se
           salieron del grupo ni a los de activo permanente. Los ausentes con
-          causa se quedan ausentes, pero sí pasan a activos o inactivos según
-          Minecraft. Si un ausente lleva 7 días en activos, pasa a activo
-          normal).
+          causa también se mueven entre activos e inactivos según Minecraft;
+          si un ausente pasa a Activos, deja de estar ausente al instante. Los
+          7 días solo cuentan para quien ya estaba en Activos y sigue marcado
+          como ausente: al cumplirlos pasa a activo normal).
         </p>
         <button
           type="button"
