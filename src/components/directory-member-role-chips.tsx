@@ -1,3 +1,6 @@
+"use client";
+
+import { useViewerTimeZone } from "@/components/viewer-clock";
 import { memberIsNew } from "@/lib/directory-cohort";
 import { shouldShowTemporaryProtectionChip } from "@/lib/directory-protection";
 import { temporaryProtectionCopy } from "@/lib/directory-protection-label";
@@ -14,6 +17,7 @@ type Props = { m: DirectoryMemberDTO; compact?: boolean };
  * `compact`: etiquetas cortas y sin título de sección (vista lista).
  */
 export function DirectoryMemberRoleChips({ m, compact }: Props) {
+  const timeZone = useViewerTimeZone();
   const isNew = memberIsNew(m.createdAt, m.leftAt);
   const situation = memberRosterSituation(m);
   const until = m.permanentlyActiveUntil ? new Date(m.permanentlyActiveUntil) : null;
@@ -24,7 +28,7 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       permanentlyActive: m.permanentlyActive,
       permanentlyActiveUntil: until,
     });
-  const temporaryCopy = temporary && until ? temporaryProtectionCopy(until) : null;
+  const temporaryCopy = temporary && until ? temporaryProtectionCopy(until, timeZone) : null;
 
   const chips: {
     key: string;
@@ -125,7 +129,6 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
       key: "temp-permanent",
       label: temporaryCopy.chip,
       short: temporaryCopy.chip,
-      title: `Colombia: ${temporaryCopy.colombia}`,
       wide: true,
       className: `${base} bg-amber-200 text-amber-950 ring-amber-400/85 tabular-nums dark:bg-amber-950/75 dark:text-amber-100 dark:ring-amber-700/65`,
     });
@@ -166,11 +169,6 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
           </span>
         ))}
       </div>
-      {temporaryCopy && !compact ? (
-        <p className="text-[11px] font-medium tabular-nums text-amber-950/80 dark:text-amber-100/80">
-          Colombia: {temporaryCopy.colombia}
-        </p>
-      ) : null}
     </div>
   );
 }

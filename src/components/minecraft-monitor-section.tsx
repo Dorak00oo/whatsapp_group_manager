@@ -481,16 +481,9 @@ export function MinecraftMonitorSection({
                   </span>
                   <div className="mt-0.5 text-[11px] text-zinc-500">
                     Último:{" "}
-                    {new Date(a.lastEventAt).toLocaleString("es-MX", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
+                    {formatTime(new Date(a.lastEventAt))}
                     {" · "}
-                    Expira:{" "}
-                    {new Date(a.expiresAt).toLocaleString("es-MX", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
+                    Expira: {formatTime(new Date(a.expiresAt))}
                   </div>
                 </div>
                 <button

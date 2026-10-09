@@ -7,8 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
+import { useFormatInstant, useViewerTimeZone } from "@/components/viewer-clock";
 import { DirectoryMemberEditorDialog } from "@/components/directory-member-editor-dialog";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
+import { formatInstantDate } from "@/lib/format-instant";
 import { formatWhatsAppUsername } from "@/lib/whatsapp-username";
 import type { DirectoryMemberDTO } from "@/types/directory";
 import { activeOnLabel } from "@/lib/minecraft-server";
@@ -91,6 +93,8 @@ function PencilIcon({ className }: { className?: string }) {
 }
 
 export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
+  const formatTime = useFormatInstant();
+  const timeZone = useViewerTimeZone();
   const [editOpen, setEditOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const country = regionLabel(m.phoneCountry);
@@ -204,7 +208,7 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
                 dateTime={m.createdAt}
                 suppressHydrationWarning
               >
-                {new Date(m.createdAt).toLocaleString("es")}
+                {formatTime(new Date(m.createdAt))}
               </time>
             </div>
 
@@ -220,7 +224,7 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
               <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
                 Salida{" "}
                 <time dateTime={m.leftAt} suppressHydrationWarning>
-                  {new Date(m.leftAt).toLocaleDateString("es")}
+                  {formatInstantDate(new Date(m.leftAt), timeZone)}
                 </time>
               </p>
             ) : null}

@@ -12,6 +12,7 @@ import {
   updateDirectoryMemberNotes,
 } from "@/app/dashboard/actions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useFormatInstant } from "@/components/viewer-clock";
 import { DirectoryMemberRoleChips } from "@/components/directory-member-role-chips";
 import { DirectoryMemberSituationPicker } from "@/components/directory-member-situation-picker";
 import { DirectoryPhoneAgeFields } from "@/components/directory-phone-age-fields";
@@ -51,6 +52,7 @@ function useMdUp() {
 }
 
 export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
+  const formatTime = useFormatInstant();
   const mdUp = useMdUp();
   const [pending, startTransition] = useTransition();
   const [profileState, profileAction, profilePending] = useActionState(
@@ -163,7 +165,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
               ) : null}
               <span className="text-zinc-400"> · </span>
               <time dateTime={m.createdAt} suppressHydrationWarning>
-                Alta {new Date(m.createdAt).toLocaleString("es")}
+                Alta {formatTime(new Date(m.createdAt))}
               </time>
             </p>
           </div>
@@ -196,7 +198,7 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
             <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
               Salida registrada:{" "}
               <time dateTime={m.leftAt} suppressHydrationWarning>
-                {new Date(m.leftAt).toLocaleString("es")}
+                {formatTime(new Date(m.leftAt))}
               </time>
             </p>
           ) : null}

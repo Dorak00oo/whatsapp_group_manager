@@ -3,6 +3,7 @@ import { DatabaseUnavailable } from "@/components/database-unavailable";
 import { MinecraftBannedItemsSection } from "@/components/minecraft-banned-items-section";
 import { MinecraftServersConnection } from "@/components/minecraft-servers-connection";
 import { MinecraftWorldSettingsForm } from "@/components/minecraft-world-settings-form";
+import { TimezoneSettingsCard } from "@/components/timezone-settings-card";
 import { parseBannedItems } from "@/lib/minecraft-banned-items";
 import { getSelectedMinecraftServerId } from "@/lib/minecraft-selected-world";
 import {
@@ -11,11 +12,17 @@ import {
   listMinecraftServers,
 } from "@/lib/minecraft-servers-db";
 import { listMinecraftInstalls } from "@/lib/minecraft-installs-db";
+import { getPanelSession } from "@/lib/panel-session";
 import { isDatabaseUnreachableError } from "@/lib/prisma-errors";
+import { findViewerMember, resolveViewerClock } from "@/lib/resolve-viewer-clock";
+import { timeZoneOptionsForCountry } from "@/lib/viewer-time-zone";
 
 export default async function DashboardAjustesPage() {
   const session = await auth();
   if (!session?.user) return null;
+
+  const panel = await getPanelSession();
+  if (!panel) return null;
 
   const serverId = await getSelectedMinecraftServerId();
 
@@ -26,6 +33,8 @@ export default async function DashboardAjustesPage() {
       ensureMinecraftConfig(serverId),
       listMinecraftServers(),
       listMinecraftInstalls(),
+      resolveViewerClock(panel),
+      findViewerMember(panel),
     ]);
   } catch (e) {
     if (isDatabaseUnreachableError(e)) {
@@ -33,7 +42,15 @@ export default async function DashboardAjustesPage() {
     }
     throw e;
   }
-  const [server, config, servers, installs] = data;
+  const [server, config, servers, installs, clock, viewerMember] = data;
+
+  const baseOptions =
+    clock.decision.status === "needs_choice"
+      ? clock.decision.options
+      : timeZoneOptionsForCountry(viewerMember?.phoneCountry ?? null);
+  const timeZoneOptions = baseOptions.some((o) => o.id === clock.timeZone)
+    ? baseOptions
+    : [{ id: clock.timeZone, label: clock.timeZone }, ...baseOptions];
 
   return (
     <section className="flex flex-col gap-6">
@@ -49,6 +66,8 @@ export default async function DashboardAjustesPage() {
           blacklist/whitelist se sincronizan en Jugadores → Listas.
         </p>
       </div>
+
+      <TimezoneSettingsCard current={clock.timeZone} options={timeZoneOptions} />
 
       <MinecraftServersConnection
         selectedWorld={serverId}

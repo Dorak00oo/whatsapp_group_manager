@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import { useFormatInstant } from "@/components/viewer-clock";
 import { useEffect, useState, type ReactNode } from "react";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useRouter } from "next/navigation";
@@ -433,16 +434,6 @@ type PlayerAction =
   | "remove_blacklist"
   | "remove_whitelist";
 
-function formatLastSeen(iso: string) {
-  return new Date(iso).toLocaleString("es-ES", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function formatDaysInactive(days: number) {
   return days === 0
     ? "Hoy"
@@ -497,6 +488,7 @@ function PlayersRosterTable({
   loading: string | null;
   onAction: (gamertag: string, action: PlayerAction) => void;
 }) {
+  const formatTime = useFormatInstant();
   return (
     <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
       <ResponsiveDataList
@@ -543,7 +535,7 @@ function PlayersRosterTable({
                     <StatusBadge active={player.active} />
                   </td>
                   <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-                    {formatLastSeen(player.lastSeen)}
+                    {formatTime(new Date(player.lastSeen))}
                   </td>
                   <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
                     {formatDaysInactive(player.daysInactive)}
@@ -573,7 +565,7 @@ function PlayersRosterTable({
               <StatusBadge active={player.active} />
             </div>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              {formatLastSeen(player.lastSeen)}
+              {formatTime(new Date(player.lastSeen))}
               {" · "}
               {formatDaysInactive(player.daysInactive)}
             </p>
@@ -622,6 +614,7 @@ function AccessListPanel({
   loading: string | null;
   onAction: (gamertag: string, action: PlayerAction) => void;
 }) {
+  const formatTime = useFormatInstant();
   const headerClass =
     variant === "whitelist"
       ? "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100"
@@ -673,7 +666,7 @@ function AccessListPanel({
                     <StatusBadge active={player.active} />
                   </td>
                   <td className="px-4 py-3 text-sm text-zinc-600 dark:text-zinc-400">
-                    {formatLastSeen(player.lastSeen)}
+                    {formatTime(new Date(player.lastSeen))}
                   </td>
                   <td className="px-4 py-3">
                     {variant === "whitelist" ? (
@@ -718,7 +711,7 @@ function AccessListPanel({
               <StatusBadge active={player.active} />
             </div>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              {formatLastSeen(player.lastSeen)}
+              {formatTime(new Date(player.lastSeen))}
             </p>
             <div className="mt-3">
               {variant === "whitelist" ? (

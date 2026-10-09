@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useFormatInstant } from "@/components/viewer-clock";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import {
   addDirectoryStrike,
@@ -59,6 +60,7 @@ function StrikeSlotsGrid({
   pending: boolean;
   onRemove: (strikeId: string) => void;
 }) {
+  const formatTime = useFormatInstant();
   return (
     <ol className="mt-3 grid gap-2 sm:grid-cols-3">
       {Array.from({ length: MAX_DIRECTORY_STRIKES }, (_, i) => {
@@ -112,7 +114,7 @@ function StrikeSlotsGrid({
                 className="mt-2 block text-[10px] text-zinc-500 dark:text-zinc-500"
                 suppressHydrationWarning
               >
-                {new Date(strike.createdAt).toLocaleString("es")}
+                {formatTime(new Date(strike.createdAt))}
               </time>
             </div>
             {onRemove ? (
@@ -146,6 +148,7 @@ function resolveSelectedId(
 }
 
 export function PlayerAdminStrikePanel({ members }: Props) {
+  const formatTime = useFormatInstant();
   const roster = useMemo(
     () =>
       [...members]
@@ -477,7 +480,7 @@ export function PlayerAdminStrikePanel({ members }: Props) {
                                 className="text-[10px] text-zinc-500"
                                 suppressHydrationWarning
                               >
-                                {new Date(s.createdAt).toLocaleString("es")}
+                                {formatTime(new Date(s.createdAt))}
                               </time>
                             </div>
                           </li>

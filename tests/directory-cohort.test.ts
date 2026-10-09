@@ -4,6 +4,7 @@ import {
   DIRECTORY_NEW_MEMBER_DAYS,
   memberIsNew,
 } from "../src/lib/directory-cohort.ts";
+import { formatInstantDate } from "../src/lib/format-instant.ts";
 import { temporaryProtectionCopy } from "../src/lib/directory-protection-label.ts";
 
 test("los nuevos duran 5 días, igual que la protección", () => {
@@ -16,11 +17,12 @@ test("los nuevos duran 5 días, igual que la protección", () => {
   assert.equal(memberIsNew(created, "2026-10-02T00:00:00.000Z", still), false);
 });
 
-test("la insignia temporal dice el día, sin la hora", () => {
-  const copy = temporaryProtectionCopy(new Date("2026-10-09T18:00:00Z"));
+test("la insignia temporal dice el día, sin la hora, en la zona del visitante", () => {
+  const copy = temporaryProtectionCopy(
+    new Date("2026-10-09T18:00:00Z"),
+    "America/Bogota",
+  );
   assert.match(copy.chip, /^Activo permanente · temporal · hasta /);
-  assert.match(copy.chip, /9/);
+  assert.equal(copy.date, formatInstantDate(new Date("2026-10-09T18:00:00Z"), "America/Bogota"));
   assert.doesNotMatch(copy.chip, /\d:\d{2}|[ap]\.\s*m/i);
-  assert.doesNotMatch(copy.mexico, /\d:\d{2}|[ap]\.\s*m/i);
-  assert.ok(copy.colombia.length > 0);
 });
