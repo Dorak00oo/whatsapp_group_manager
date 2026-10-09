@@ -55,6 +55,7 @@ import {
 import { reconcileDirectoryAbsentActive } from "@/lib/directory-absent-clock";
 import {
   absentActiveSinceForSituation,
+  fieldsForLeavingGroup,
   rosterFieldsForSituation,
   type DirectoryRosterSituation,
 } from "@/lib/directory-situation";
@@ -893,14 +894,7 @@ export async function setDirectoryMemberLeft(id: string, left: boolean) {
   await prisma.directoryMember.updateMany({
     where: { id, userId },
     data: left
-      ? {
-          leftAt,
-          active: false,
-          allowlistAddPending: false,
-          absentWithCause: false,
-          absentReason: null,
-          absentActiveSince: null,
-        }
+      ? fieldsForLeavingGroup(leftAt)
       : {
           leftAt: null,
           active: true,

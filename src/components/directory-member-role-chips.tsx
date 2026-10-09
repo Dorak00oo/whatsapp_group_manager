@@ -1,5 +1,5 @@
 import { memberIsNew } from "@/lib/directory-cohort";
-import { hasTemporaryProtection } from "@/lib/directory-protection";
+import { shouldShowTemporaryProtectionChip } from "@/lib/directory-protection";
 import { temporaryProtectionCopy } from "@/lib/directory-protection-label";
 import { memberRosterSituation } from "@/lib/directory-situation";
 import type { DirectoryMemberDTO } from "@/types/directory";
@@ -19,8 +19,11 @@ export function DirectoryMemberRoleChips({ m, compact }: Props) {
   const until = m.permanentlyActiveUntil ? new Date(m.permanentlyActiveUntil) : null;
   const temporary =
     until != null &&
-    !m.permanentlyActive &&
-    hasTemporaryProtection({ permanentlyActiveUntil: until });
+    shouldShowTemporaryProtectionChip({
+      leftAt: m.leftAt,
+      permanentlyActive: m.permanentlyActive,
+      permanentlyActiveUntil: until,
+    });
   const temporaryCopy = temporary && until ? temporaryProtectionCopy(until) : null;
 
   const chips: {

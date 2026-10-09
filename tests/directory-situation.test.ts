@@ -3,7 +3,9 @@ import { test } from "node:test";
 import {
   DIRECTORY_ABSENT_ACTIVE_DAYS,
   absentActiveSinceForSituation,
+  fieldsForBecomingActive,
   fieldsForExpiredAbsentToNormal,
+  fieldsForLeavingGroup,
   memberRosterSituation,
   rosterFieldsForSituation,
   shouldPromoteAbsentToNormal,
@@ -149,4 +151,21 @@ test("promoción deja activo normal y quita ausencia", () => {
   assert.equal(next.absentWithCause, false);
   assert.equal(next.absentReason, null);
   assert.equal(next.absentActiveSince, null);
+});
+
+test("pasar a activos quita ausente con causa y el reloj", () => {
+  const next = fieldsForBecomingActive();
+  assert.equal(next.active, true);
+  assert.equal(next.absentWithCause, false);
+  assert.equal(next.absentReason, null);
+  assert.equal(next.absentActiveSince, null);
+});
+
+test("salir del grupo quita la protección temporal de nuevo", () => {
+  const now = new Date("2026-10-09T18:00:00Z");
+  const next = fieldsForLeavingGroup(now);
+  assert.equal(next.leftAt.toISOString(), now.toISOString());
+  assert.equal(next.active, false);
+  assert.equal(next.permanentlyActiveUntil, null);
+  assert.equal(next.absentWithCause, false);
 });

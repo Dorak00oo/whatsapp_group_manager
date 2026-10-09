@@ -10,6 +10,7 @@ import {
 } from "@/lib/allowlist-removal";
 import { parseDirectoryAge } from "@/lib/directory-age";
 import { newMemberProtectionUntil } from "@/lib/directory-protection";
+import { fieldsForLeavingGroup } from "@/lib/directory-situation";
 import { prisma } from "@/lib/prisma";
 import { withDbRetry } from "@/lib/prisma-retry";
 import {
@@ -238,14 +239,7 @@ async function applyLeave(
 
   await prisma.directoryMember.updateMany({
     where: { id: plan.memberId, userId },
-    data: {
-      leftAt: new Date(),
-      active: false,
-      allowlistAddPending: false,
-      absentWithCause: false,
-      absentReason: null,
-      absentActiveSince: null,
-    },
+    data: fieldsForLeavingGroup(new Date()),
   });
   existing.leftAt = new Date();
   await enqueueAllowlistRemovalForMember(userId, existing);

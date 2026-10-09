@@ -27,6 +27,16 @@ export function isMemberProtected(m: ProtectionFields, now: Date = new Date()): 
   return m.permanentlyActive || hasTemporaryProtection(m, now);
 }
 
+/** Insignia «Activo permanente · temporal»: no en salidos ni en permanente manual. */
+export function shouldShowTemporaryProtectionChip(
+  m: ProtectionFields & { leftAt: Date | string | null },
+  now: Date = new Date(),
+): boolean {
+  if (m.leftAt) return false;
+  if (m.permanentlyActive) return false;
+  return hasTemporaryProtection(m, now);
+}
+
 export function protectedMemberWhere(
   now: Date = new Date(),
 ): Prisma.DirectoryMemberWhereInput {

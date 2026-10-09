@@ -5,6 +5,7 @@ import {
   planPanelDirectoryActive,
   type ActiveSyncChange,
 } from "@/lib/directory-active-sync-plan";
+import { fieldsForBecomingActive } from "@/lib/directory-situation";
 import { prisma } from "@/lib/prisma";
 import {
   buildRosterFromSnapshot,
@@ -52,10 +53,14 @@ async function updateMemberActive(
 ): Promise<number> {
   let updated = 0;
   const size = 500;
+  const payload =
+    data.active === true
+      ? { ...fieldsForBecomingActive(), ...data }
+      : data;
   for (let i = 0; i < ids.length; i += size) {
     const result = await prisma.directoryMember.updateMany({
       where: { id: { in: ids.slice(i, i + size) } },
-      data,
+      data: payload,
     });
     updated += result.count;
   }

@@ -4,6 +4,7 @@ import {
   hasTemporaryProtection,
   isMemberProtected,
   newMemberProtectionUntil,
+  shouldShowTemporaryProtectionChip,
   NEW_MEMBER_PROTECTION_DAYS,
 } from "../src/lib/directory-protection.ts";
 
@@ -27,4 +28,29 @@ test("protección vigente cuenta como protegido; vencida no", () => {
 test("el activo permanente manual sigue protegido sin fecha", () => {
   assert.equal(isMemberProtected({ permanentlyActive: true, permanentlyActiveUntil: null }, now), true);
   assert.equal(isMemberProtected({ permanentlyActive: false, permanentlyActiveUntil: null }, now), false);
+});
+
+test("un nuevo que se salió no muestra el letrero de permanente temporal", () => {
+  assert.equal(
+    shouldShowTemporaryProtectionChip(
+      {
+        leftAt: "2026-10-04T12:00:00Z",
+        permanentlyActive: false,
+        permanentlyActiveUntil: "2026-10-09T12:00:00Z",
+      },
+      now,
+    ),
+    false,
+  );
+  assert.equal(
+    shouldShowTemporaryProtectionChip(
+      {
+        leftAt: null,
+        permanentlyActive: false,
+        permanentlyActiveUntil: "2026-10-09T12:00:00Z",
+      },
+      now,
+    ),
+    true,
+  );
 });

@@ -88,3 +88,29 @@ export function fieldsForExpiredAbsentToNormal() {
     absentActiveSince: null as Date | null,
   };
 }
+
+/**
+ * Al subir a Activos (Minecraft o panel): deja de ser ausente.
+ * El reloj de 7 días solo aplica a quien ya estaba en Activos y sigue ausente.
+ */
+export function fieldsForBecomingActive() {
+  return {
+    active: true,
+    absentWithCause: false,
+    absentReason: null as string | null,
+    absentActiveSince: null as Date | null,
+  };
+}
+
+/** Salida del grupo: baja de roster y caduca la protección temporal de nuevo. */
+export function fieldsForLeavingGroup(now: Date) {
+  return {
+    leftAt: now,
+    active: false,
+    allowlistAddPending: false,
+    absentWithCause: false,
+    absentReason: null as string | null,
+    absentActiveSince: null as Date | null,
+    permanentlyActiveUntil: null as Date | null,
+  };
+}
