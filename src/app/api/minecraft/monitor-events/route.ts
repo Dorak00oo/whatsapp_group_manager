@@ -7,6 +7,7 @@ import {
   isMonitorEventType,
   MONITOR_PAGE_SIZE,
   MONITOR_RETENTION_DAYS,
+  normalizeMonitorDimension,
   resolveMonitorEventFilter,
   type MonitorEventType,
   type MonitorPriority,
@@ -73,9 +74,9 @@ function parseAddonEvent(raw: unknown): ParsedEvent | null {
     posZ:
       typeof e.z === "number" && Number.isFinite(e.z) ? Math.floor(e.z) : null,
     dimension:
-      typeof e.dimension === "string"
-        ? e.dimension.trim().slice(0, 40)
-        : "overworld",
+      normalizeMonitorDimension(
+        typeof e.dimension === "string" ? e.dimension : null,
+      ) ?? "overworld",
     blockType:
       typeof e.blockType === "string" ? e.blockType.trim().slice(0, 64) : null,
     itemType:
@@ -185,6 +186,7 @@ export async function GET(request: Request) {
   const yRaw = url.searchParams.get("y")?.trim() ?? "";
   const zRaw = url.searchParams.get("z")?.trim() ?? "";
   const radiusRaw = url.searchParams.get("radius")?.trim() ?? "";
+  const dimensionRaw = url.searchParams.get("dimension")?.trim() ?? "";
 
   const pageSizeRaw = Number(url.searchParams.get("pageSize") ?? MONITOR_PAGE_SIZE);
   const pageSize = Number.isFinite(pageSizeRaw)
@@ -196,6 +198,8 @@ export async function GET(request: Request) {
   await purgeOldMonitorEvents();
 
   const where: Record<string, unknown> = { serverId };
+  const dimension = normalizeMonitorDimension(dimensionRaw);
+  if (dimension) where.dimension = dimension;
   if (gamertag) {
     where.gamertag = { contains: gamertag, mode: "insensitive" };
   }

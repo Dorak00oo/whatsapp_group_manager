@@ -1,6 +1,57 @@
 /** Ventana rodante: se purga lo más viejo en cada POST/GET. ~6 meses. */
 export const MONITOR_RETENTION_DAYS = 180;
 
+export const MONITOR_DIMENSIONS = ["overworld", "nether", "the_end"] as const;
+export type MonitorDimension = (typeof MONITOR_DIMENSIONS)[number];
+
+/** Relleno de Nether/End: no loguear place/break (sí debris/netherite/TNT). */
+export const NETHER_END_FILLER: string[] = [
+  "netherrack",
+  "crimson_nylium",
+  "warped_nylium",
+  "end_stone",
+];
+
+export function isMonitorDimension(value: string): value is MonitorDimension {
+  return (MONITOR_DIMENSIONS as readonly string[]).includes(value);
+}
+
+/** Bedrock `minecraft:nether` → `nether`. Desconocido → null. */
+export function normalizeMonitorDimension(
+  raw: string | null | undefined,
+): MonitorDimension | null {
+  const s = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^minecraft:/, "");
+  if (s === "overworld") return "overworld";
+  if (s === "nether") return "nether";
+  if (s === "the_end" || s === "end") return "the_end";
+  return null;
+}
+
+export function monitorDimensionLabel(dim: string | null | undefined): string {
+  const n = normalizeMonitorDimension(dim);
+  if (n === "nether") return "Nether";
+  if (n === "the_end") return "End";
+  if (n === "overworld") return "Overworld";
+  return dim?.trim() || "—";
+}
+
+/** Si la lista aún no tiene netherrack ni end_stone, añade el relleno de fábrica. */
+export function mergeMonitorExcludeWithFiller(list: string[]): string[] {
+  const out = list.map((x) => normalizeBlockId(x)).filter(Boolean);
+  const set = new Set(out);
+  if (set.has("netherrack") || set.has("end_stone")) return out;
+  for (const id of NETHER_END_FILLER) {
+    if (!set.has(id)) {
+      out.push(id);
+      set.add(id);
+    }
+  }
+  return out;
+}
+
 export type MonitorEventType =
   | "block_break"
   | "block_place"
@@ -205,6 +256,7 @@ export const DEFAULT_MONITOR_EXCLUDE: string[] = [
   "candle",
   "scaffolding",
   "string",
+  ...NETHER_END_FILLER,
 ];
 
 /** Siempre se registran (place/break), aunque estén en exclude. */
@@ -230,10 +282,12 @@ export function parseExcludeList(json: string | null | undefined): string[] {
   try {
     const arr = JSON.parse(json) as unknown;
     if (!Array.isArray(arr)) return [...DEFAULT_MONITOR_EXCLUDE];
-    return arr
-      .filter((x): x is string => typeof x === "string")
-      .map((x) => normalizeBlockId(x))
-      .filter(Boolean);
+    return mergeMonitorExcludeWithFiller(
+      arr
+        .filter((x): x is string => typeof x === "string")
+        .map((x) => normalizeBlockId(x))
+        .filter(Boolean),
+    );
   } catch {
     return [...DEFAULT_MONITOR_EXCLUDE];
   }

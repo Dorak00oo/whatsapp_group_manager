@@ -28,11 +28,13 @@ export default async function DashboardMonitoreoPage() {
     const [config, events, eventTotal, alerts] = await Promise.all([
       prisma.minecraftConfig.findUnique({ where: { id: serverId } }),
       prisma.minecraftMonitorEvent.findMany({
-        where: { serverId },
+        where: { serverId, dimension: "overworld" },
         orderBy: { occurredAt: "desc" },
         take: MONITOR_PAGE_SIZE,
       }),
-      prisma.minecraftMonitorEvent.count({ where: { serverId } }),
+      prisma.minecraftMonitorEvent.count({
+        where: { serverId, dimension: "overworld" },
+      }),
       listActiveMonitorAlerts(serverId),
     ]);
 
@@ -72,9 +74,9 @@ export default async function DashboardMonitoreoPage() {
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
           Bloques colocados/rotos, fuego, lava, TNT, wither y animales
-          domésticos/colección en Overworld. El addon envía lotes cada 30 s (o
-          al pedirlos). Historial 6 meses. Alertas 5 días (o hasta
-          descartarlas).
+          domésticos/colección en Overworld, Nether y End. El addon envía
+          lotes cada 30 s (o al pedirlos). Historial 6 meses. Alertas 5 días
+          (o hasta descartarlas).
         </p>
       </div>
       <MinecraftMonitorSection

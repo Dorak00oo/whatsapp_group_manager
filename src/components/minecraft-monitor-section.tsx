@@ -15,8 +15,11 @@ import {
   DEFAULT_MONITOR_EXCLUDE,
   eventLabel,
   formatAlertTypeBreakdown,
+  MONITOR_DIMENSIONS,
   MONITOR_FILTER_OPTIONS,
   MONITOR_PAGE_SIZE,
+  monitorDimensionLabel,
+  type MonitorDimension,
   type MonitorEventType,
 } from "@/lib/minecraft-monitor";
 import { useFormatInstant } from "@/components/viewer-clock";
@@ -80,8 +83,9 @@ const AUTO_REFRESH_MS = 20_000;
 /** Números visibles en la ventana central (sin contar 1 ni última). */
 const PAGE_WINDOW = 9;
 
-function emptyMonitorQuery() {
+function emptyMonitorQuery(dimension: MonitorDimension = "overworld") {
   const p = new URLSearchParams();
+  p.set("dimension", dimension);
   p.set("pageSize", String(MONITOR_PAGE_SIZE));
   return p.toString();
 }
@@ -164,6 +168,8 @@ export function MinecraftMonitorSection({
   const [filterY, setFilterY] = useState("");
   const [filterZ, setFilterZ] = useState("");
   const [filterRadius, setFilterRadius] = useState("");
+  const [filterDimension, setFilterDimension] =
+    useState<MonitorDimension>("overworld");
   const [loading, setLoading] = useState(false);
   const purge = useHistoryPurge("/api/minecraft/monitor-events", () => {
     setEvents([]);
@@ -184,6 +190,7 @@ export function MinecraftMonitorSection({
     if (filterY.trim()) p.set("y", filterY.trim());
     if (filterZ.trim()) p.set("z", filterZ.trim());
     if (filterRadius.trim()) p.set("radius", filterRadius.trim());
+    p.set("dimension", filterDimension);
     p.set("pageSize", String(MONITOR_PAGE_SIZE));
     return p.toString();
   }, [
@@ -196,6 +203,7 @@ export function MinecraftMonitorSection({
     filterY,
     filterZ,
     filterRadius,
+    filterDimension,
   ]);
 
   /** Filtros confirmados con “Aplicar”; el auto-refresh no usa el borrador del form. */
@@ -319,7 +327,16 @@ export function MinecraftMonitorSection({
     setFilterY("");
     setFilterZ("");
     setFilterRadius("");
-    void applyQuery(emptyMonitorQuery());
+    void applyQuery(emptyMonitorQuery(filterDimension));
+  }
+
+  function selectDimension(next: MonitorDimension) {
+    if (next === filterDimension) return;
+    setFilterDimension(next);
+    const p = new URLSearchParams(filterQueryString);
+    p.set("dimension", next);
+    p.set("pageSize", String(MONITOR_PAGE_SIZE));
+    void applyQuery(p.toString());
   }
 
   function handleFilterFormSubmit(e: FormEvent<HTMLFormElement>) {
@@ -545,6 +562,28 @@ export function MinecraftMonitorSection({
           onSubmit={handleFilterFormSubmit}
           onKeyDown={handleFilterFormKeyDown}
         >
+        <div role="tablist" aria-label="Dimensión" className="flex flex-wrap gap-2">
+          {MONITOR_DIMENSIONS.map((dim) => {
+            const active = dim === filterDimension;
+            return (
+              <button
+                key={dim}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                disabled={loading || purge.purging}
+                onClick={() => selectDimension(dim)}
+                className={
+                  active
+                    ? "rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    : "rounded-2xl bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200/90 hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-800"
+                }
+              >
+                {monitorDimensionLabel(dim)}
+              </button>
+            );
+          })}
+        </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <label className="flex flex-col gap-1 text-xs font-semibold">
             Jugador
@@ -669,6 +708,7 @@ export function MinecraftMonitorSection({
                     <th className="px-3 py-2">Jugador</th>
                     <th className="px-3 py-2">Acción</th>
                     <th className="px-3 py-2">Bloque / ítem</th>
+                    <th className="px-3 py-2">Mundo</th>
                     <th className="px-3 py-2">Coords</th>
                     <th className="px-3 py-2">Fuego</th>
                   </tr>
@@ -695,6 +735,9 @@ export function MinecraftMonitorSection({
                       </td>
                       <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">
                         <MonitorItemLabel event={e} />
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                        {monitorDimensionLabel(e.dimension)}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
                         {formatXyz(e.x, e.y, e.z)}
@@ -723,6 +766,9 @@ export function MinecraftMonitorSection({
                 </Link>
                 <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
                   <MonitorItemLabel event={e} />
+                </p>
+                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                  {monitorDimensionLabel(e.dimension)}
                 </p>
                 <p className="mt-1 font-mono text-sm text-zinc-600 dark:text-zinc-400">
                   {formatXyz(e.x, e.y, e.z)}
@@ -793,6 +839,7 @@ export function MinecraftMonitorSection({
         <p className="text-xs text-zinc-500">
           Un id por línea (sin <code>minecraft:</code>). Leaves siguen excluidas
           en place/break; sí se registran si se queman por fuego atribuido.
+          Netherrack, nylium y end stone van excluidos de fábrica (editable).
         </p>
         <textarea
           value={excludeText}
@@ -813,7 +860,7 @@ export function MinecraftMonitorSection({
       <HistoryPurgeDialog
         open={purge.confirmOpen}
         title="Borrar historial de monitoreo"
-        description="Se borra todo el Overworld (bloques, fuego, TNT, wither, animales). Las alertas no se tocan."
+        description="Se borra el historial de Overworld, Nether y End (bloques, fuego, TNT, wither, animales). Las alertas no se tocan."
         eventCount={totalEvents}
         onCancel={() => purge.setConfirmOpen(false)}
         onConfirmed={() => void purge.start(totalEvents)}

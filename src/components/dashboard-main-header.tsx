@@ -62,7 +62,7 @@ export function DashboardMainHeader({ selectedWorld, worldNames }: Props) {
         : isParcela
           ? "Zonas monitoreadas: entradas, salidas y cofres. Historial 6 meses."
           : isMonitoreo
-            ? "Bloques, fuego, lava, TNT y withers en Overworld — filtros por jugador, ítem, hora y coordenadas."
+            ? "Bloques, fuego, lava, TNT y withers en Overworld, Nether y End — filtros por jugador, ítem, hora y coordenadas."
             : isMinecraft
               ? "Estado de actividad de jugadores del servidor de Minecraft."
               : isAdministracion
