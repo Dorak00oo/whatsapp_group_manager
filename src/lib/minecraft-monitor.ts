@@ -148,6 +148,42 @@ export const FIRE_GROUP_EVENT_TYPES: MonitorEventType[] = [
 
 export const MONITOR_PAGE_SIZE = 100;
 
+export type MonitorEventsQueryInput = {
+  gamertag?: string;
+  event?: string;
+  item?: string;
+  from?: string;
+  to?: string;
+  x?: string;
+  y?: string;
+  z?: string;
+  radius?: string;
+  dimension: MonitorDimension;
+};
+
+/** Query GET `/api/minecraft/monitor-events` desde el borrador de filtros. */
+export function buildMonitorEventsQuery(input: MonitorEventsQueryInput): string {
+  const p = new URLSearchParams();
+  const gamertag = input.gamertag?.trim() ?? "";
+  if (gamertag) p.set("gamertag", gamertag);
+  if (input.event) p.set("event", input.event);
+  const item = input.item?.trim() ?? "";
+  if (item) p.set("item", item);
+  if (input.from) p.set("from", input.from);
+  if (input.to) p.set("to", input.to);
+  const x = input.x?.trim() ?? "";
+  if (x) p.set("x", x);
+  const y = input.y?.trim() ?? "";
+  if (y) p.set("y", y);
+  const z = input.z?.trim() ?? "";
+  if (z) p.set("z", z);
+  const radius = input.radius?.trim() ?? "";
+  if (radius) p.set("radius", radius);
+  p.set("dimension", input.dimension);
+  p.set("pageSize", String(MONITOR_PAGE_SIZE));
+  return p.toString();
+}
+
 /** Opciones del filtro Tipo (fuego/lava/quema unificados). */
 export const MONITOR_FILTER_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "block_break", label: "Rompió" },

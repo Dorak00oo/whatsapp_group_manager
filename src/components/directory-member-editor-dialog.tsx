@@ -148,12 +148,9 @@ export function DirectoryMemberEditorDialog({ m, open, onClose }: Props) {
             <p className="mt-1.5 break-words text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
               {country ? `${country} · ` : null}
               {m.phone ? (
-                <a
-                  href={`tel:${m.phone.replace(/\s/g, "")}`}
-                  className="font-medium text-zinc-800 hover:underline dark:text-zinc-200"
-                >
+                <span className="select-all font-medium text-zinc-800 dark:text-zinc-200">
                   {m.phone}
-                </a>
+                </span>
               ) : null}
               {m.whatsappUsername ? (
                 <>

@@ -188,12 +188,9 @@ export function DirectoryMemberCard({ m }: { m: DirectoryMemberDTO }) {
                 <span className="text-zinc-600 dark:text-zinc-400">{country}</span>
               ) : null}
               {m.phone ? (
-                <a
-                  href={`tel:${m.phone.replace(/\s/g, "")}`}
-                  className="font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
-                >
+                <span className="select-all font-medium text-zinc-800 dark:text-zinc-200">
                   {m.phone}
-                </a>
+                </span>
               ) : null}
               {m.whatsappUsername ? (
                 <span className="font-medium text-zinc-800 dark:text-zinc-200">

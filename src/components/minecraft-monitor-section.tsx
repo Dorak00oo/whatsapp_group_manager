@@ -12,6 +12,7 @@ import {
 } from "react";
 import {
   animalLabel,
+  buildMonitorEventsQuery,
   DEFAULT_MONITOR_EXCLUDE,
   eventLabel,
   formatAlertTypeBreakdown,
@@ -84,10 +85,7 @@ const AUTO_REFRESH_MS = 20_000;
 const PAGE_WINDOW = 9;
 
 function emptyMonitorQuery(dimension: MonitorDimension = "overworld") {
-  const p = new URLSearchParams();
-  p.set("dimension", dimension);
-  p.set("pageSize", String(MONITOR_PAGE_SIZE));
-  return p.toString();
+  return buildMonitorEventsQuery({ dimension });
 }
 
 function mapApiEvents(
@@ -179,32 +177,35 @@ export function MinecraftMonitorSection({
     setMessage("Historial de monitoreo borrado.");
   });
 
-  const filterQueryString = useMemo(() => {
-    const p = new URLSearchParams();
-    if (filterGamertag.trim()) p.set("gamertag", filterGamertag.trim());
-    if (filterEvent) p.set("event", filterEvent);
-    if (filterItem.trim()) p.set("item", filterItem.trim());
-    if (filterFrom) p.set("from", new Date(filterFrom).toISOString());
-    if (filterTo) p.set("to", new Date(filterTo).toISOString());
-    if (filterX.trim()) p.set("x", filterX.trim());
-    if (filterY.trim()) p.set("y", filterY.trim());
-    if (filterZ.trim()) p.set("z", filterZ.trim());
-    if (filterRadius.trim()) p.set("radius", filterRadius.trim());
-    p.set("dimension", filterDimension);
-    p.set("pageSize", String(MONITOR_PAGE_SIZE));
-    return p.toString();
-  }, [
-    filterGamertag,
-    filterEvent,
-    filterItem,
-    filterFrom,
-    filterTo,
-    filterX,
-    filterY,
-    filterZ,
-    filterRadius,
-    filterDimension,
-  ]);
+  const filterQueryString = useMemo(
+    () =>
+      buildMonitorEventsQuery({
+        gamertag: filterGamertag,
+        event: filterEvent,
+        item: filterItem,
+        from: filterFrom ? new Date(filterFrom).toISOString() : "",
+        to: filterTo ? new Date(filterTo).toISOString() : "",
+        x: filterX,
+        y: filterY,
+        z: filterZ,
+        radius: filterRadius,
+        dimension: filterDimension,
+      }),
+    [
+      filterGamertag,
+      filterEvent,
+      filterItem,
+      filterFrom,
+      filterTo,
+      filterX,
+      filterY,
+      filterZ,
+      filterRadius,
+      filterDimension,
+    ],
+  );
+
+  const gamertagInputRef = useRef<HTMLInputElement>(null);
 
   /** Filtros confirmados con “Aplicar”; el auto-refresh no usa el borrador del form. */
   const [appliedQuery, setAppliedQuery] = useState(emptyMonitorQuery);
@@ -328,6 +329,20 @@ export function MinecraftMonitorSection({
     setFilterZ("");
     setFilterRadius("");
     void applyQuery(emptyMonitorQuery(filterDimension));
+  }
+
+  function filterHistoryByGamertag(gamertag: string) {
+    const tag = gamertag.trim();
+    setFilterGamertag(tag);
+    const p = new URLSearchParams(filterQueryString);
+    if (tag) p.set("gamertag", tag);
+    else p.delete("gamertag");
+    void applyQuery(p.toString());
+    const input = gamertagInputRef.current;
+    if (input) {
+      input.focus();
+      input.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }
 
   function selectDimension(next: MonitorDimension) {
@@ -463,40 +478,45 @@ export function MinecraftMonitorSection({
         <div
           className={`${softPanel} gap-3 border-red-300/80 dark:border-red-900/60`}
         >
-          <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">
+          <h3 className="text-base font-semibold text-red-800 dark:text-red-200">
             Alertas de vandalismo
           </h3>
-          <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
             ≥3 críticos en 10 min, o un wither. Una alerta por jugador: se suma
             el contador si repite. Duran 5 días o hasta descartarlas.
           </p>
-          <ul className="flex flex-col gap-2">
-            {alerts.map((a) => (
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {alerts.map((a) => {
+              const breakdown =
+                formatAlertTypeBreakdown(a.counts ?? {}) ||
+                `${a.eventCount} evento${a.eventCount === 1 ? "" : "s"} crítico${a.eventCount === 1 ? "" : "s"}${
+                  a.witherCount > 0
+                    ? ` · ${a.witherCount} wither${a.witherCount === 1 ? "" : "s"}`
+                    : ""
+                }`;
+              return (
               <li
                 key={a.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200/80 bg-red-50/60 px-3 py-2 text-sm dark:border-red-900/50 dark:bg-red-950/30"
+                className="flex min-w-0 items-center gap-2 rounded-xl border border-red-200/80 bg-red-50/60 px-3 py-2 text-sm dark:border-red-900/50 dark:bg-red-950/30"
               >
-                <div>
-                  <Link
-                    href={`/dashboard/lista?q=${encodeURIComponent(a.gamertag)}`}
-                    className="font-semibold text-red-900 underline-offset-2 hover:underline dark:text-red-100"
-                  >
-                    {a.gamertag}
-                  </Link>
-                  <span className="text-zinc-600 dark:text-zinc-400">
-                    {" "}
-                    —{" "}
-                    {(() => {
-                      const breakdown = formatAlertTypeBreakdown(a.counts ?? {});
-                      if (breakdown) return breakdown;
-                      return `${a.eventCount} evento${a.eventCount === 1 ? "" : "s"} crítico${a.eventCount === 1 ? "" : "s"}${
-                        a.witherCount > 0
-                          ? ` · ${a.witherCount} wither${a.witherCount === 1 ? "" : "s"}`
-                          : ""
-                      }`;
-                    })()}
-                  </span>
-                  <div className="mt-0.5 text-[11px] text-zinc-500">
+                <div className="min-w-0 flex-1 overflow-hidden">
+                  <div className="flex min-w-0 items-baseline gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => filterHistoryByGamertag(a.gamertag)}
+                      aria-label={`Filtrar historial por ${a.gamertag}`}
+                      className="shrink-0 font-semibold text-red-900 underline-offset-2 hover:underline dark:text-red-100"
+                    >
+                      {a.gamertag}
+                    </button>
+                    <span
+                      className="min-w-0 truncate text-zinc-600 dark:text-zinc-400"
+                      title={breakdown}
+                    >
+                      — {breakdown}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 truncate text-sm text-zinc-500">
                     Último:{" "}
                     {formatTime(new Date(a.lastEventAt))}
                     {" · "}
@@ -507,12 +527,13 @@ export function MinecraftMonitorSection({
                   type="button"
                   disabled={dismissingId === a.id}
                   onClick={() => void dismissAlert(a.id)}
-                  className="min-h-11 rounded-md border border-red-300/80 px-3 py-1 text-sm font-medium text-red-800 hover:bg-red-100/80 disabled:opacity-50 dark:border-red-800 dark:text-red-100 dark:hover:bg-red-950/60"
+                  className="min-h-11 shrink-0 rounded-md border border-red-300/80 px-3 py-1 text-sm font-medium text-red-800 hover:bg-red-100/80 disabled:opacity-50 dark:border-red-800 dark:text-red-100 dark:hover:bg-red-950/60"
                 >
                   {dismissingId === a.id ? "…" : "Descartar"}
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       ) : null}
@@ -520,10 +541,10 @@ export function MinecraftMonitorSection({
       <div className={`${softPanel} gap-4`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+            <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
               Historial de monitoreo
             </h3>
-            <p className="mt-0.5 text-xs text-zinc-500">
+            <p className="mt-0.5 text-sm text-zinc-500">
               {totalEvents} eventos (retención 6 meses). Actualización automática
               cada 20 s; el addon envía cada ~30 s.
               {totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ""}
@@ -575,8 +596,8 @@ export function MinecraftMonitorSection({
                 onClick={() => selectDimension(dim)}
                 className={
                   active
-                    ? "rounded-2xl bg-zinc-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
-                    : "rounded-2xl bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200/90 hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-800"
+                    ? "rounded-2xl bg-zinc-900 px-4 py-2 text-base font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+                    : "rounded-2xl bg-zinc-100 px-4 py-2 text-base font-medium text-zinc-700 ring-1 ring-zinc-200/90 hover:bg-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-800 dark:hover:bg-zinc-800"
                 }
               >
                 {monitorDimensionLabel(dim)}
@@ -585,16 +606,18 @@ export function MinecraftMonitorSection({
           })}
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="flex flex-col gap-1 text-xs font-semibold">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
             Jugador
             <input
+              ref={gamertagInputRef}
+              id="monitor-filter-gamertag"
               value={filterGamertag}
               onChange={(e) => setFilterGamertag(e.target.value)}
               className={softInputNeutral}
               placeholder="Gamertag"
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
             Tipo
             <select
               value={filterEvent}
@@ -609,7 +632,7 @@ export function MinecraftMonitorSection({
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
             Ítem / bloque
             <input
               value={filterItem}
@@ -618,7 +641,7 @@ export function MinecraftMonitorSection({
               placeholder="diamond, tnt, leaves…"
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
             Desde
             <input
               type="datetime-local"
@@ -627,7 +650,7 @@ export function MinecraftMonitorSection({
               className={softInputNeutral}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
             Hasta
             <input
               type="datetime-local"
@@ -640,7 +663,7 @@ export function MinecraftMonitorSection({
 
         <div className="grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_10rem]">
           <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
               Coordenada (centro)
             </p>
             <XyzCoordFields
@@ -655,7 +678,7 @@ export function MinecraftMonitorSection({
               inputClassName={softInputNeutral}
             />
           </div>
-          <label className="flex min-w-0 flex-col gap-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
             Radio (bloques)
             <input
               value={filterRadius}
@@ -666,7 +689,7 @@ export function MinecraftMonitorSection({
             />
           </label>
         </div>
-        <p className="text-[11px] text-zinc-500">
+        <p className="text-sm text-zinc-500">
           Pegá las tres coords en X (`1304, 76, 4848`). El radio acepta{" "}
           <span className="font-mono">100</span> o{" "}
           <span className="font-mono">10.000</span>. Si Y va vacío, se filtra
@@ -683,7 +706,7 @@ export function MinecraftMonitorSection({
         </form>
 
         {message ? (
-          <p className="text-xs text-zinc-600 dark:text-zinc-400">{message}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{message}</p>
         ) : null}
 
         {purge.purging && purge.tick ? (
@@ -701,16 +724,16 @@ export function MinecraftMonitorSection({
             isEmpty={events.length === 0}
             empty="Sin eventos con estos filtros."
             table={
-              <table className="min-w-full text-left text-xs">
-                <thead className="bg-zinc-100/80 text-[10px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-900/60">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-zinc-100/80 text-sm uppercase tracking-wide text-zinc-500 dark:bg-zinc-900/60">
                   <tr>
-                    <th className="px-3 py-2">Hora</th>
-                    <th className="px-3 py-2">Jugador</th>
-                    <th className="px-3 py-2">Acción</th>
-                    <th className="px-3 py-2">Bloque / ítem</th>
-                    <th className="px-3 py-2">Mundo</th>
-                    <th className="px-3 py-2">Coords</th>
-                    <th className="px-3 py-2">Fuego</th>
+                    <th className="px-3.5 py-2.5">Hora</th>
+                    <th className="px-3.5 py-2.5">Jugador</th>
+                    <th className="px-3.5 py-2.5">Acción</th>
+                    <th className="px-3.5 py-2.5">Bloque / ítem</th>
+                    <th className="px-3.5 py-2.5">Mundo</th>
+                    <th className="px-3.5 py-2.5">Coords</th>
+                    <th className="px-3.5 py-2.5">Fuego</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -719,10 +742,10 @@ export function MinecraftMonitorSection({
                       key={e.id}
                       className="border-t border-zinc-200/70 dark:border-zinc-800/70"
                     >
-                      <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-zinc-600 dark:text-zinc-400">
                         {e.timeLabel}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3.5 py-2.5">
                         <Link
                           href={`/dashboard/lista?q=${encodeURIComponent(e.gamertag)}`}
                           className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
@@ -730,19 +753,19 @@ export function MinecraftMonitorSection({
                           {e.gamertag}
                         </Link>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3.5 py-2.5">
                         <MonitorActionLabel event={e} />
                       </td>
-                      <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">
+                      <td className="px-3.5 py-2.5 text-zinc-700 dark:text-zinc-300">
                         <MonitorItemLabel event={e} />
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-zinc-600 dark:text-zinc-400">
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-zinc-600 dark:text-zinc-400">
                         {monitorDimensionLabel(e.dimension)}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
+                      <td className="whitespace-nowrap px-3.5 py-2.5 font-mono">
                         {formatXyz(e.x, e.y, e.z)}
                       </td>
-                      <td className="px-3 py-2 font-mono text-[10px] text-zinc-500">
+                      <td className="px-3.5 py-2.5 font-mono text-zinc-500">
                         <MonitorFireLabel event={e} />
                       </td>
                     </tr>
@@ -754,7 +777,7 @@ export function MinecraftMonitorSection({
               <MobileListItem key={e.id}>
                 <div className="flex items-start justify-between gap-2">
                   <MonitorActionLabel event={e} />
-                  <span className="shrink-0 text-right text-xs text-zinc-600 dark:text-zinc-400">
+                  <span className="shrink-0 text-right text-sm text-zinc-600 dark:text-zinc-400">
                     {e.timeLabel}
                   </span>
                 </div>
@@ -774,7 +797,7 @@ export function MinecraftMonitorSection({
                   {formatXyz(e.x, e.y, e.z)}
                 </p>
                 {e.relatedFireId || e.fireId ? (
-                  <p className="mt-1 font-mono text-xs text-zinc-500">
+                  <p className="mt-1 font-mono text-sm text-zinc-500">
                     Fuego: <MonitorFireLabel event={e} />
                   </p>
                 ) : null}
@@ -785,7 +808,7 @@ export function MinecraftMonitorSection({
 
         {totalPages > 1 ? (
           <nav
-            className="flex flex-wrap items-center justify-center gap-3 text-sm"
+            className="flex flex-wrap items-center justify-center gap-3 text-base"
             aria-label="Paginación del historial"
           >
             <button
@@ -833,10 +856,10 @@ export function MinecraftMonitorSection({
       </div>
 
       <div className={`${softPanel} gap-3`}>
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+        <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
           Bloques excluidos (ruido)
         </h3>
-        <p className="text-xs text-zinc-500">
+        <p className="text-sm text-zinc-500">
           Un id por línea (sin <code>minecraft:</code>). Leaves siguen excluidas
           en place/break; sí se registran si se queman por fuego atribuido.
           Netherrack, nylium y end stone van excluidos de fábrica (editable).
@@ -845,7 +868,7 @@ export function MinecraftMonitorSection({
           value={excludeText}
           onChange={(e) => setExcludeText(e.target.value)}
           rows={10}
-          className={`${softInputNeutral} font-mono text-xs`}
+          className={`${softInputNeutral} font-mono text-sm`}
         />
         <button
           type="button"

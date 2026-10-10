@@ -57,7 +57,7 @@ export function XyzCoordFields({
         <div key={axis} className="flex min-w-0 flex-col gap-1.5">
           <label
             htmlFor={`${idPrefix}-${axis}`}
-            className="text-xs font-medium leading-none text-zinc-700 dark:text-zinc-300"
+            className="text-sm font-medium leading-none text-zinc-700 dark:text-zinc-300"
           >
             {AXIS_LABEL[axis]}
           </label>

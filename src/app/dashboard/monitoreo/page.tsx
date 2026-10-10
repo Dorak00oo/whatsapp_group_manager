@@ -69,10 +69,10 @@ export default async function DashboardMonitoreoPage() {
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
           Monitoreo
         </h2>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-base text-zinc-500">
           Bloques colocados/rotos, fuego, lava, TNT, wither y animales
           domésticos/colección en Overworld, Nether y End. El addon envía
           lotes cada 30 s (o al pedirlos). Historial 6 meses. Alertas 5 días
