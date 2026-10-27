@@ -381,7 +381,7 @@ export function MinecraftParcelSection({
       }
       setMessage(
         parcelForm.enabled
-          ? "Parcela guardada y activa. El addon toma la zona en el próximo sync (~5 min)."
+          ? "Parcela guardada y activa. El addon toma la zona en el próximo sync (~1 min)."
           : "Configuración guardada (monitoreo desactivado).",
       );
     } catch {
