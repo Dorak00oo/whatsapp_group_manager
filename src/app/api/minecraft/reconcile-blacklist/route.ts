@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import {
   blacklistReconcileCandidates,
   buildActiveCompareData,
+  unblacklistReconcileCandidates,
 } from "@/lib/directory-minecraft-compare";
 import {
   buildRosterFromSnapshot,
@@ -37,11 +38,21 @@ export async function POST(request: Request) {
   const userId = await resolveDirectoryUserId(session);
   if (!userId) return unauthorizedMinecraft();
 
-  let body: { gamertags?: unknown };
+  let body: { gamertags?: unknown; action?: unknown };
   try {
-    body = (await request.json()) as { gamertags?: unknown };
+    body = (await request.json()) as { gamertags?: unknown; action?: unknown };
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const action =
+    body.action == null || body.action === "add"
+      ? "add"
+      : body.action === "remove"
+        ? "remove"
+        : null;
+  if (!action) {
+    return NextResponse.json({ error: "action inválida" }, { status: 400 });
   }
 
   if (!Array.isArray(body.gamertags)) {
@@ -98,8 +109,11 @@ export async function POST(request: Request) {
     );
     const compare = buildActiveCompareData(waMembers, displayPlayers);
     const allowed = new Map(
-      blacklistReconcileCandidates(
-        compare.summary.mcActiveNotInWhatsappActive,
+      (action === "remove"
+        ? unblacklistReconcileCandidates(compare.summary.unblacklistCandidates)
+        : blacklistReconcileCandidates(
+            compare.summary.mcActiveNotInWhatsappActive,
+          )
       ).map((row) => [tagKey(row.gamertag), row.gamertag] as const),
     );
 
@@ -110,7 +124,9 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Ningún gamertag marcado es candidato (no está en el directorio o ya salió del grupo).",
+            action === "remove"
+              ? "Ningún gamertag marcado está en blacklist y activo otra vez en el grupo."
+              : "Ningún gamertag marcado es candidato (no está en el directorio o ya salió del grupo).",
           rejected,
         },
         { status: 400 },
@@ -118,6 +134,7 @@ export async function POST(request: Request) {
     }
 
     const blacklisted: string[] = [];
+    const removed: string[] = [];
     const already: string[] = [];
 
     for (const tag of toApply) {
@@ -127,6 +144,24 @@ export async function POST(request: Request) {
           gamertag: { equals: tag, mode: "insensitive" },
         },
       });
+
+      if (action === "remove") {
+        if (!player) continue;
+        if (!player.isBlacklisted) {
+          already.push(player.gamertag);
+          continue;
+        }
+        await prisma.minecraftPlayer.update({
+          where: { id: player.id },
+          data: {
+            isBlacklisted: false,
+            inactivityBlacklistExemptUntilSeen: true,
+          },
+        });
+        await syncDirectoryActiveWithMinecraft(player.gamertag);
+        removed.push(player.gamertag);
+        continue;
+      }
 
       if (!player) {
         const canonical = allowed.get(tagKey(tag)) ?? tag;
@@ -167,7 +202,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
+      action,
       blacklisted,
+      removed,
       already,
       rejected,
       syncRequestedAt: sync.requestedAt,

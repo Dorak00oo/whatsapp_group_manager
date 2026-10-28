@@ -7,7 +7,9 @@ import {
   type ActiveCompareData,
   type ActiveCompareEntry,
 } from "@/lib/directory-minecraft-compare";
-import { softBtnLavender, softBtnPeach, softPanel } from "@/lib/soft-ui";
+import { softBtnLavender, softBtnMint, softBtnPeach, softPanel } from "@/lib/soft-ui";
+
+type ReconcileMode = "add" | "remove";
 
 type Props = {
   data: ActiveCompareData;
@@ -68,12 +70,14 @@ function CompareColumn({
 
 function ReconcileBlacklistDialog({
   open,
+  mode,
   candidates,
   submitting,
   onCancel,
   onConfirm,
 }: {
   open: boolean;
+  mode: ReconcileMode;
   candidates: ActiveCompareEntry[];
   submitting: boolean;
   onCancel: () => void;
@@ -139,12 +143,12 @@ function ReconcileBlacklistDialog({
           id="reconcile-blacklist-title"
           className="text-base font-semibold text-zinc-900 dark:text-zinc-50"
         >
-          Enviar a blacklist
+          {mode === "remove" ? "Quitar de blacklist" : "Enviar a blacklist"}
         </h2>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-          Activos en Minecraft que no están en el directorio o ya salieron del
-          grupo. Marca a quién quieres añadir; los desmarcados no se tocan.
-          Al aceptar se envía la blacklist actualizada al servidor.
+          {mode === "remove"
+            ? "Están en blacklist y volvieron a estar activos en el grupo. Marca a quién quieres sacar; los desmarcados no se tocan. No lo uses si el ban es por otra causa. Al aceptar se envía la lista al servidor."
+            : "Activos en Minecraft que no están en el directorio o ya salieron del grupo. Marca a quién quieres añadir; los desmarcados no se tocan. Al aceptar se envía la blacklist actualizada al servidor."}
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
@@ -215,11 +219,17 @@ function ReconcileBlacklistDialog({
             type="button"
             disabled={submitting || selectedCount === 0}
             onClick={() => onConfirm([...selected])}
-            className="rounded-2xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 dark:bg-red-700 dark:hover:bg-red-600"
+            className={
+              mode === "remove"
+                ? "rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                : "rounded-2xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60 dark:bg-red-700 dark:hover:bg-red-600"
+            }
           >
             {submitting
               ? "Enviando…"
-              : `Añadir a blacklist (${selectedCount})`}
+              : mode === "remove"
+                ? `Quitar de blacklist (${selectedCount})`
+                : `Añadir a blacklist (${selectedCount})`}
           </button>
         </div>
       </div>
@@ -235,9 +245,10 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
     () => blacklistReconcileCandidates(suspects),
     [suspects],
   );
+  const unbanCandidates = summary.unblacklistCandidates ?? [];
 
   const [compared, setCompared] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<ReconcileMode | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -250,33 +261,41 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
     });
   }
 
-  async function confirmBlacklist(gamertags: string[]) {
+  async function confirmReconcile(mode: ReconcileMode, gamertags: string[]) {
     setSubmitting(true);
     setMessage(null);
     try {
       const res = await fetch("/api/minecraft/reconcile-blacklist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gamertags }),
+        body: JSON.stringify({ gamertags, action: mode }),
       });
       const payload = (await res.json()) as {
         ok?: boolean;
         error?: string;
         blacklisted?: string[];
+        removed?: string[];
         already?: string[];
       };
       if (!res.ok || !payload.ok) {
         setMessage(payload.error ?? "No se pudo conciliar la blacklist.");
         return;
       }
-      const n = payload.blacklisted?.length ?? 0;
+      const n =
+        mode === "remove"
+          ? (payload.removed?.length ?? 0)
+          : (payload.blacklisted?.length ?? 0);
       const already = payload.already?.length ?? 0;
-      setDialogOpen(false);
+      setDialogMode(null);
       setMessage(
         n > 0
-          ? `${n} jugador${n === 1 ? "" : "es"} a blacklist. Sincronizar listas enviado; el addon lo aplicará en ~30 s.`
+          ? mode === "remove"
+            ? `${n} jugador${n === 1 ? "" : "es"} fuera de blacklist. Sincronizar listas enviado; el addon lo aplicará en ~30 s.`
+            : `${n} jugador${n === 1 ? "" : "es"} a blacklist. Sincronizar listas enviado; el addon lo aplicará en ~30 s.`
           : already > 0
-            ? "Ya estaban en blacklist. Sincronizar listas enviado al servidor."
+            ? mode === "remove"
+              ? "Ya no estaban en blacklist. Sincronizar listas enviado al servidor."
+              : "Ya estaban en blacklist. Sincronizar listas enviado al servidor."
             : "Nada que actualizar.",
       );
       router.refresh();
@@ -299,9 +318,10 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
           </h3>
           <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
             Lista del grupo de WhatsApp frente a jugadores activos en Minecraft
-            (sin quienes ya están en blacklist). Útil para detectar quién entra
-            al servidor sin estar activo en el grupo. Coincidencia por gamertag
-            (sin distinguir mayúsculas).
+            (sin quienes siguen en blacklist y no volvieron al grupo). Detecta
+            quién entra al servidor sin estar activo en el grupo, y quién ya
+            está activo otra vez para sacarlo de blacklist. Coincidencia por
+            gamertag (sin distinguir mayúsculas).
             {snapshotAt ? (
               <> Datos MC del último reporte: {snapshotAt}.</>
             ) : (
@@ -319,22 +339,40 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
             {isPending ? "Comparando…" : "Comparar activos"}
           </button>
           {compared ? (
-            <button
-              type="button"
-              disabled={candidates.length === 0 || isPending}
-              onClick={() => {
-                setMessage(null);
-                setDialogOpen(true);
-              }}
-              className={softBtnPeach}
-              title={
-                candidates.length === 0
-                  ? "No hay activos en MC fuera del directorio o del grupo"
-                  : undefined
-              }
-            >
-              Actualizar blacklist
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={candidates.length === 0 || isPending}
+                onClick={() => {
+                  setMessage(null);
+                  setDialogMode("add");
+                }}
+                className={softBtnPeach}
+                title={
+                  candidates.length === 0
+                    ? "No hay activos en MC fuera del directorio o del grupo"
+                    : undefined
+                }
+              >
+                Actualizar blacklist
+              </button>
+              <button
+                type="button"
+                disabled={unbanCandidates.length === 0 || isPending}
+                onClick={() => {
+                  setMessage(null);
+                  setDialogMode("remove");
+                }}
+                className={softBtnMint}
+                title={
+                  unbanCandidates.length === 0
+                    ? "Nadie en blacklist volvió a estar activo en el grupo"
+                    : undefined
+                }
+              >
+                Quitar de blacklist
+              </button>
+            </>
           ) : null}
         </div>
       </div>
@@ -374,6 +412,11 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
                 Candidatos a blacklist: {candidates.length}
               </span>
             ) : null}
+            {unbanCandidates.length > 0 ? (
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 font-medium text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100">
+                Volvieron (sacar de blacklist): {unbanCandidates.length}
+              </span>
+            ) : null}
           </div>
 
           {summary.ignoredBlacklistedCount > 0 ? (
@@ -387,7 +430,8 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
               </p>
               <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
                 Siguen contando como activos en el panel de Minecraft, pero no
-                entran en la comparación ni en candidatos a blacklist.
+                están activos en el grupo: se ignoran aquí. Quien volvió al
+                grupo sale aparte, para poder quitarlo de blacklist.
               </p>
               <ul className="mt-2 flex flex-wrap gap-2">
                 {summary.ignoredBlacklisted.map((row) => (
@@ -396,6 +440,31 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
                     className="rounded-lg bg-white/80 px-2 py-1 text-xs text-zinc-800 ring-1 ring-zinc-200/80 dark:bg-zinc-900/80 dark:text-zinc-100 dark:ring-zinc-700/60"
                   >
                     <span className="font-medium">{row.gamertag}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {unbanCandidates.length > 0 ? (
+            <div className="rounded-2xl border border-emerald-200/90 bg-emerald-50/90 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
+              <p className="text-xs font-semibold text-emerald-950 dark:text-emerald-100">
+                En blacklist y otra vez activos en el grupo
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {unbanCandidates.map((row) => (
+                  <li
+                    key={row.id}
+                    className="rounded-lg bg-white/80 px-2 py-1 text-xs text-emerald-950 ring-1 ring-emerald-200/80 dark:bg-zinc-900/80 dark:text-emerald-50 dark:ring-emerald-800/60"
+                    title={row.detail ?? undefined}
+                  >
+                    <span className="font-medium">{row.gamertag}</span>
+                    {row.detail ? (
+                      <span className="text-emerald-800/80 dark:text-emerald-200/80">
+                        {" "}
+                        — {row.detail}
+                      </span>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -436,7 +505,7 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
             />
             <CompareColumn
               title="Minecraft (activos)"
-              subtitle="Activos del último reporte, sin quienes ya están en blacklist"
+              subtitle="Activos del último reporte, sin quienes siguen en blacklist"
               rows={minecraft}
               emptyText="No hay jugadores activos en Minecraft."
             />
@@ -445,13 +514,16 @@ export function DirectoryMinecraftActiveCompare({ data, snapshotAt }: Props) {
       )}
 
       <ReconcileBlacklistDialog
-        open={dialogOpen}
-        candidates={candidates}
+        open={dialogMode != null}
+        mode={dialogMode ?? "add"}
+        candidates={dialogMode === "remove" ? unbanCandidates : candidates}
         submitting={submitting}
         onCancel={() => {
-          if (!submitting) setDialogOpen(false);
+          if (!submitting) setDialogMode(null);
         }}
-        onConfirm={(gamertags) => void confirmBlacklist(gamertags)}
+        onConfirm={(gamertags) => {
+          if (dialogMode) void confirmReconcile(dialogMode, gamertags);
+        }}
       />
     </div>
   );

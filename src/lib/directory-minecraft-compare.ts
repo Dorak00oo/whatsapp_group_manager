@@ -1,6 +1,7 @@
 import { memberMcAccounts } from "@/lib/member-mc-accounts";
 
 export type BlacklistReconcileReason = "not_in_directory" | "left_group";
+export type UnblacklistReconcileReason = "returned_active";
 
 export type ActiveCompareEntry = {
   /** Id de la fila de origen (miembro o jugador); único aunque el gamertag se repita. */
@@ -8,8 +9,8 @@ export type ActiveCompareEntry = {
   gamertag: string;
   label: string;
   detail?: string | null;
-  /** Solo en sospechosos MC: motivo para conciliar a blacklist. */
-  reason?: BlacklistReconcileReason | null;
+  /** Sospechosos MC (añadir) o gente que volvió al grupo (sacar). */
+  reason?: BlacklistReconcileReason | UnblacklistReconcileReason | null;
 };
 
 export function isBlacklistReconcileCandidate(
@@ -24,12 +25,26 @@ export function blacklistReconcileCandidates(
   return entries.filter(isBlacklistReconcileCandidate);
 }
 
+export function isUnblacklistReconcileCandidate(
+  entry: Pick<ActiveCompareEntry, "reason">,
+): boolean {
+  return entry.reason === "returned_active";
+}
+
+export function unblacklistReconcileCandidates(
+  entries: ActiveCompareEntry[],
+): ActiveCompareEntry[] {
+  return entries.filter(isUnblacklistReconcileCandidate);
+}
+
 export type ActiveCompareSummary = {
   whatsappCount: number;
   minecraftCount: number;
   /** Activos en MC (panel) que ya están en blacklist: no entran en la lista comparada. */
   ignoredBlacklistedCount: number;
   ignoredBlacklisted: ActiveCompareEntry[];
+  /** En blacklist y otra vez activos en el grupo: candidatos a sacar. */
+  unblacklistCandidates: ActiveCompareEntry[];
   /** Activos en MC que no están activos en el grupo WA (o no existen / se salieron). */
   mcActiveNotInWhatsappActive: ActiveCompareEntry[];
   /** Activos en WA sin coincidencia activa en MC. */
@@ -107,9 +122,33 @@ export function buildActiveCompareData(
   }
   const waActive = sortByGamertag(waActiveRows);
 
+  const waActiveTags = new Set(waActive.map((r) => tagKey(r.gamertag)));
+
+  const unblacklistCandidates = sortByGamertag(
+    mcPlayers
+      .filter((p) => p.isBlacklisted && waActiveTags.has(tagKey(p.gamertag)))
+      .map((p) => ({
+        id: p.id,
+        gamertag: p.gamertag,
+        label: p.gamertag,
+        detail: p.active
+          ? "En blacklist y otra vez activo en el grupo"
+          : "En blacklist, activo en el grupo (aún no figura activo en MC)",
+        reason: "returned_active" as const,
+      })),
+  );
+  const unblacklistTags = new Set(
+    unblacklistCandidates.map((r) => tagKey(r.gamertag)),
+  );
+
   const ignoredBlacklisted = sortByGamertag(
     mcPlayers
-      .filter((p) => p.active && p.isBlacklisted)
+      .filter(
+        (p) =>
+          p.active &&
+          p.isBlacklisted &&
+          !unblacklistTags.has(tagKey(p.gamertag)),
+      )
       .map((p) => ({
         id: p.id,
         gamertag: p.gamertag,
@@ -132,7 +171,6 @@ export function buildActiveCompareData(
       })),
   );
 
-  const waActiveTags = new Set(waActive.map((r) => tagKey(r.gamertag)));
   const mcActiveTags = new Set(mcActive.map((r) => tagKey(r.gamertag)));
 
   const mcActiveNotInWhatsappActive = sortByGamertag(
@@ -157,7 +195,11 @@ export function buildActiveCompareData(
 
   const waActiveNotInMcActive = sortByGamertag(
     waActive
-      .filter((r) => !mcActiveTags.has(tagKey(r.gamertag)))
+      .filter(
+        (r) =>
+          !mcActiveTags.has(tagKey(r.gamertag)) &&
+          !unblacklistTags.has(tagKey(r.gamertag)),
+      )
       .map((r) => ({
         ...r,
         detail: "Activo en WA, no aparece activo en MC",
@@ -172,6 +214,7 @@ export function buildActiveCompareData(
       minecraftCount: mcActive.length,
       ignoredBlacklistedCount: ignoredBlacklisted.length,
       ignoredBlacklisted,
+      unblacklistCandidates,
       mcActiveNotInWhatsappActive,
       waActiveNotInMcActive,
     },

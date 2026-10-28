@@ -178,3 +178,144 @@ test("alt de un miembro inactivo que sigue en el grupo no es candidato a blackli
   assert.equal(row?.detail, "En directorio pero inactivo en WhatsApp");
   assert.equal(row?.reason, null);
 });
+
+test("quien está en blacklist y volvió a estar activo en WA es candidato a sacarlo", () => {
+  const data = buildActiveCompareData(
+    [
+      {
+        id: "wa-1",
+        gamertag: "Alex",
+        displayName: "Alex",
+        active: true,
+        leftAt: null,
+      },
+    ],
+    [
+      {
+        id: "mc-1",
+        gamertag: "Alex",
+        active: true,
+        isBlacklisted: true,
+        daysInactive: 0,
+      },
+    ],
+  );
+
+  assert.equal(data.summary.unblacklistCandidates.length, 1);
+  assert.equal(data.summary.unblacklistCandidates[0]?.gamertag, "Alex");
+  assert.equal(data.summary.unblacklistCandidates[0]?.reason, "returned_active");
+  assert.equal(data.summary.ignoredBlacklistedCount, 0);
+  assert.equal(data.summary.mcActiveNotInWhatsappActive.length, 0);
+  assert.equal(
+    data.summary.waActiveNotInMcActive.some((r) => r.gamertag === "Alex"),
+    false,
+  );
+});
+
+test("quien está en blacklist y sigue inactivo en WA no se saca", () => {
+  const data = buildActiveCompareData(
+    [
+      {
+        id: "wa-1",
+        gamertag: "Alex",
+        displayName: null,
+        active: false,
+        leftAt: null,
+      },
+    ],
+    [
+      {
+        id: "mc-1",
+        gamertag: "Alex",
+        active: true,
+        isBlacklisted: true,
+        daysInactive: 2,
+      },
+    ],
+  );
+
+  assert.equal(data.summary.unblacklistCandidates.length, 0);
+  assert.equal(data.summary.ignoredBlacklistedCount, 1);
+  assert.equal(data.summary.ignoredBlacklisted[0]?.gamertag, "Alex");
+});
+
+test("alt en blacklist de un miembro otra vez activo es candidato a sacarlo", () => {
+  const data = buildActiveCompareData(
+    [
+      {
+        id: "wa-1",
+        gamertag: "Ana",
+        displayName: "Ana",
+        mcAccount2: "AnaAlt",
+        mcAccount3: null,
+        active: true,
+        leftAt: null,
+      },
+    ],
+    [
+      {
+        id: "mc-1",
+        gamertag: "AnaAlt",
+        active: true,
+        isBlacklisted: true,
+        daysInactive: 0,
+      },
+    ],
+  );
+
+  assert.equal(data.summary.unblacklistCandidates[0]?.gamertag, "AnaAlt");
+  assert.equal(data.summary.ignoredBlacklistedCount, 0);
+});
+
+test("en blacklist, inactivo en MC pero activo en el grupo, sigue siendo candidato a sacarlo", () => {
+  const data = buildActiveCompareData(
+    [
+      {
+        id: "wa-1",
+        gamertag: "Alex",
+        displayName: null,
+        active: true,
+        leftAt: null,
+      },
+    ],
+    [
+      {
+        id: "mc-1",
+        gamertag: "Alex",
+        active: false,
+        isBlacklisted: true,
+        daysInactive: 20,
+      },
+    ],
+  );
+
+  assert.equal(data.summary.unblacklistCandidates.length, 1);
+  assert.equal(data.summary.unblacklistCandidates[0]?.gamertag, "Alex");
+  assert.equal(data.summary.ignoredBlacklistedCount, 0);
+});
+
+test("quien se salió del grupo no es candidato a salir de blacklist", () => {
+  const data = buildActiveCompareData(
+    [
+      {
+        id: "wa-1",
+        gamertag: "Alex",
+        displayName: null,
+        active: false,
+        leftAt: new Date("2026-01-01"),
+      },
+    ],
+    [
+      {
+        id: "mc-1",
+        gamertag: "Alex",
+        active: true,
+        isBlacklisted: true,
+        daysInactive: 0,
+      },
+    ],
+  );
+
+  assert.equal(data.summary.unblacklistCandidates.length, 0);
+  assert.equal(data.summary.ignoredBlacklistedCount, 1);
+});
